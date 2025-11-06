@@ -1,0 +1,4 @@
+apiVersion: v2
+name: auth-setup
+version: 0.1.0
+description: Keycloak + OAuth2 Proxy setup

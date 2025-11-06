@@ -1,0 +1,68 @@
+cluster:
+  name: postgis1
+  image: ghcr.io/cloudnative-pg/postgis:17
+  instances: 1
+  storage:
+    size: 10Gi
+  parameters:
+    log_statement: ddl
+
+roles:
+  - name: datasets_owner
+    password: datasets_owner
+    comment: "User owning the datasets schema"
+
+  - name: datasets_ro
+    password: datasets_ro
+    comment: "Read-only access to datasets"
+
+  - name: meltano
+    password: meltano
+  - name: prefect
+    password: prefect
+  - name: superset
+    password: superset
+  - name: keycloak
+    password: keycloak
+  - name: marquez
+    password: marquez
+
+databases:
+  - name: datasets
+    owner: datasets_owner
+    extensions:
+      - postgis
+      - postgis_topology
+      - fuzzystrmatch
+      - postgis_tiger_geocoder
+
+  - name: keycloak
+    owner: keycloak
+
+  - name: superset
+    owner: superset
+
+  - name: meltano
+    owner: meltano
+
+  - name: prefect
+    owner: prefect
+
+  - name: marquez
+    owner: marquez
+
+connection_strings:
+  - database: datasets
+    user: datasets_owner
+
+  - database: prefect
+    dialect: postgresql+asyncpg
+
+  - database: meltano
+
+grants:
+  enabled: true
+  job:
+    image: ghcr.io/cloudnative-pg/postgis:17
+    superuserSecret: datasets-owner-db-secret
+    superuserKey: password

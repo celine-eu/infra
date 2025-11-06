@@ -1,0 +1,50 @@
+# Oauth client configuration specifics
+config:
+  existingSecret: oauth2-proxy-secret
+  existingConfig: oauth2-proxy-config
+
+initContainers:
+  waitForRedis:
+    enabled: false
+
+# Configure the session storage type, between cookie and redis
+sessionStorage:
+  # Can be one of the supported session storage cookie|redis
+  type: redis
+  redis:
+    # existingSecret: ""
+    # passwordKey: "redis-password"
+    clientType: "standalone"
+    standalone:
+      # URL of redis standalone server for redis session storage (e.g. `redis://HOST[:PORT]`). Automatically generated if not set
+      connectionUrl: "redis://redis:6379"
+
+extraEnv:
+  - name: OAUTH2_PROXY_LOG_LEVEL
+    value: debug
+
+ingress:
+  enabled: true
+  className: nginx
+  path: /
+  pathType: ImplementationSpecific
+  hosts:
+    - sso.{{ .Environment.Values.domain }}
+  # Extra paths to prepend to every host configuration. This is useful when working with annotation based services.
+  # Warning! The configuration is dependant on your current k8s API version capabilities (networking.k8s.io/v1)
+  # extraPaths:
+  # - path: /*
+  #   pathType: ImplementationSpecific
+  #   backend:
+  #     service:
+  #       name: ssl-redirect
+  #       port:
+  #         name: use-annotation
+  labels: {}
+  # annotations:
+  #   kubernetes.io/ingress.class: nginx
+  #   kubernetes.io/tls-acme: "true"
+  tls:
+    - secretName: oauth2-proxy-tls
+      hosts:
+        - "sso.{{ .Environment.Values.domain }}"

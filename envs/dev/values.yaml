@@ -1,0 +1,5 @@
+domain: celine.local
+
+skipInstallation:
+  seaweedfs: false
+  mqtt_ingestor: false

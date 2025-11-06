@@ -1,0 +1,18 @@
+{{- range .Values.databases }}
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: {{ printf "%s-db" .name | replace "_" "-"  }}
+spec:
+  name: {{ .name }}
+  owner: {{ .owner }}
+  cluster:
+    name: {{ $.Values.cluster.name }}
+  {{- if .extensions }}
+  extensions:
+    {{- range .extensions }}
+    - name: {{ . }}
+    {{- end }}
+  {{- end }}
+---
+{{- end }}

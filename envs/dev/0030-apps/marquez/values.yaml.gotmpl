@@ -1,0 +1,44 @@
+image:
+  api: "ilum/marquez:0.53.0"
+  web: "ilum/marquez-web:0.53.0"
+  opensearch: "opensearchproject/opensearch:2.5.0"
+
+replicaCount: 1
+
+postgres:
+  host: postgis1-rw
+  port: 5432
+  database: marquez
+  user: marquez
+  existingSecret: marquez-db-secret
+  existingSecretKey: password
+
+search:
+  enabled: false
+  host: opensearch
+  port: 9200
+
+service:
+  api:
+    port: 5000
+  web:
+    port: 5002
+
+ingress:
+  enabled: true
+  className: nginx
+  host: "marquez.{{ .Environment.Values.domain }}"
+  tlsEnabled: true
+  tlsSecret: celine-tls
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/auth-url: "https://sso.{{ .Environment.Values.domain }}/oauth2/auth"
+    nginx.ingress.kubernetes.io/auth-signin: "https://sso.{{ .Environment.Values.domain }}/oauth2/start?rd=$scheme://$host$request_uri"
+    nginx.ingress.kubernetes.io/auth-response-headers: "Authorization, X-Auth-Request-Email, X-Auth-Request-User"
+
+persistence:
+  enabled: true
+  size: 5Gi
+  storageClass: standard
+
+resources: {}

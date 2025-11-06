@@ -1,0 +1,6 @@
+apiVersion: v2
+name: prefect-pipelines
+description: Deploy multiple Prefect flows with individual images and secrets
+type: application
+version: 0.2.0
+appVersion: "3.x"

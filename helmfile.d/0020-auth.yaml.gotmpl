@@ -1,0 +1,55 @@
+environments:
+  dev:
+    values:
+      - ../envs/dev/values.yaml
+  staging:
+    values:
+      - ../envs/staging/values.yaml
+  prod:
+    values:
+      - ../envs/prod/values.yaml
+---
+repositories:
+  # - name: codecentric
+  #   url: https://codecentric.github.io/helm-charts
+
+  - name: oauth2-proxy
+    url: https://oauth2-proxy.github.io/manifests
+
+releases:
+  - name: auth-setup
+    namespace: celine-{{ .Environment.Name }}
+    createNamespace: true
+    missingFileHandler: Warn
+    chart: ../charts/auth-setup
+    values:
+      - ../defaults/0020-auth/auth-setup/values.yaml
+      - ../envs/{{ .Environment.Name }}/0020-auth/auth-setup/values.yaml.gotmpl
+    labels:
+      group: auth
+
+  - name: keycloak
+    namespace: celine-{{ .Environment.Name }}
+    chart: oci://ghcr.io/codecentric/helm-charts/keycloakx
+    version: 7.1.4
+    createNamespace: true
+    missingFileHandler: Warn
+    values:
+      - ../defaults/0020-auth/keycloak/values.yaml
+      - ../envs/{{ .Environment.Name }}/0020-auth/keycloak/values.yaml.gotmpl
+    needs:
+      - celine-{{ .Environment.Name }}/auth-setup
+    labels:
+      group: auth
+
+  - name: oauth2-proxy
+    namespace: celine-{{ .Environment.Name }}
+    chart: oauth2-proxy/oauth2-proxy
+    version: 8.3.1
+    createNamespace: true
+    missingFileHandler: Warn
+    values:
+      - ../defaults/0020-auth/oauth2-proxy/values.yaml
+      - ../envs/{{ .Environment.Name }}/0020-auth/oauth2-proxy/values.yaml.gotmpl
+    labels:
+      group: auth

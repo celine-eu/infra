@@ -1,0 +1,23 @@
+endpoint: http://seaweedfs-s3:8333
+
+users: []
+  # Example
+  # - name: admin
+  #   accessKey: admin-access-key
+  #   secretKey: admin-secret-key
+  #   actions: ["Admin", "Read", "Write"]
+
+  # - name: etl-user
+  #   accessKey: etl-access-key
+  #   secretKey: etl-secret-key
+  #   actions: ["Read", "Write"]
+
+  # - name: readonly
+  #   accessKey: readonly-access-key
+  #   secretKey: readonly-secret-key
+  #   actions: ["Read"]
+
+seaweed:
+  enabled: false
+  secret:
+    name: seaweedfs-s3-config

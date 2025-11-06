@@ -1,0 +1,6 @@
+apiVersion: v2
+name: mqtt-ingestor
+description: MQTT message ingestor for storing data to Postgres or SQLAlchemy
+type: application
+version: 0.1.0
+appVersion: "latest"

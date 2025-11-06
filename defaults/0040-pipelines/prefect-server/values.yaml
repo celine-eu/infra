@@ -1,0 +1,102 @@
+server:
+  uiConfig:
+    prefectUiApiUrl: "https://prefect.celine.local/api"
+
+## Database Migration Configuration
+migrations:
+  # -- enable automatic database migrations during chart upgrades
+  enabled: true
+  # -- commands to run for database migrations (default: prefect server database upgrade -y)
+  command: |
+    prefect server database upgrade -y
+  # -- custom container entrypoint for the migration job
+  entrypoint: ["/bin/sh", "-c"]
+  # -- job resources configuration
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  # -- job security context configuration
+  securityContext:
+    runAsUser: 1001
+    runAsNonRoot: true
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    capabilities: {}
+  # -- job timeout in seconds (default: 300 seconds / 5 minutes)
+  timeoutSeconds: 300
+  # -- job backoff limit (number of retries)
+  backoffLimit: 5
+  # -- job restart policy
+  restartPolicy: Never
+  # -- additional environment variables for the migration job
+  env: []
+  # -- additional volume mounts for the migration job
+  extraVolumeMounts: []
+  # -- additional volumes for the migration job
+  extraVolumes: []
+
+  # ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
+  # -- affinity for migration job pods assignment
+  affinity: {}
+
+  # ref: https://kubernetes.io/docs/user-guide/node-selection/
+  # -- node labels for migration job pods assignment
+  nodeSelector: {}
+
+  # ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+  # -- tolerations for migration job pods assignment
+  tolerations: []
+
+## Background Services Deployment Configuration
+backgroundServices:
+  messaging:
+    broker: prefect_redis.messaging
+    cache: prefect_redis.messaging
+    redis:
+      host: "redis"
+      port: 6379
+      db: 0
+      username: ""
+      password: ""
+      ssl: false
+
+# Ingress configuration
+ingress:
+  enabled: true
+  servicePort: server-svc-port
+  className: "nginx"
+  host:
+    hostname: prefect.celine.local
+    path: /
+    pathType: ImplementationSpecific
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/auth-url: "https://sso.celine.local/oauth2/auth"
+    nginx.ingress.kubernetes.io/auth-signin: "https://sso.celine.local/oauth2/start?rd=$scheme://$host$request_uri"
+    nginx.ingress.kubernetes.io/auth-response-headers: "Authorization, X-Auth-Request-Email, X-Auth-Request-User"
+  tls: true
+  selfSigned: false
+
+secret:
+  # # TODO set secret name if created outside. Example
+  # # data:
+  # #   connection-string: {{ include "server.postgres-connstr" . | b64enc | quote  }}
+  # #   connection-string: 'postgresql+asyncpg://prefect:prefect@postgis1-rw:5432/prefect'
+  # # https://github.com/PrefectHQ/prefect-helm/blob/main/charts/prefect-server/templates/secret.yaml
+  # create: false
+  # name: ""
+  create: true
+  username: prefect
+  password: prefect
+  host: postgis1-rw
+  port: 5432
+  database: prefect
+
+postgresql:
+  enabled: false
+redis:
+  enabled: false

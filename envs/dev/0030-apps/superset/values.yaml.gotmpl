@@ -1,0 +1,89 @@
+configMountPath: "/foobar"
+
+image:
+  repository: ghcr.io/celine-eu/superset
+  tag: latest
+  pullPolicy: Always
+
+initImage:
+  repository: ghcr.io/celine-eu/superset
+  tag: latest
+  pullPolicy: Always
+
+extraSecretEnv:
+  SUPERSET_SECRET_KEY: 25+3w9S0ue87veee4/4oE0PHC1zLqA4Ifoa+tm1FyGHSgy8P2IeQ2aH
+
+secretEnv:
+  create: true
+
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/auth-url: "https://sso.{{ .Environment.Values.domain }}/oauth2/auth"
+    nginx.ingress.kubernetes.io/auth-signin: "https://sso.{{ .Environment.Values.domain }}/oauth2/start?rd=$scheme://$host$request_uri"
+    nginx.ingress.kubernetes.io/auth-response-headers: "Authorization, X-Auth-Request-Email, X-Auth-Request-User"
+
+    ## Extend timeout to allow long running queries.
+    # nginx.ingress.kubernetes.io/proxy-connect-timeout: "300"
+    # nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    # nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+  path: /
+  pathType: ImplementationSpecific
+  hosts:
+    - superset.{{ .Environment.Values.domain }}
+  tls:
+    - secretName: superset-tls
+      hosts:
+        - superset.{{ .Environment.Values.domain }}
+  extraHostsRaw: []
+
+init:
+  enabled: false
+  createAdmin: false
+
+postgresql:
+  enabled: false
+redis:
+  enabled: false
+
+supersetNode:
+  forceReload: true
+  connections:
+    db_type: "postgresql"
+    db_host: "postgis1-rw"
+    db_port: "5432"
+    db_user: "superset"
+    db_pass: "superset"
+    db_name: "superset"
+
+    redis_host: "redis"
+    redis_port: "6379"
+    redis_cache_db: "1"
+    redis_celery_db: "0"
+    redis_ssl:
+      enabled: false
+
+  command: ["/app/docker/superset-bootstrap.sh", "app-gunicorn"]
+
+  initContainers:
+    - name: run-setup
+      # note: avoid double rendering of helmfile + helm
+      image: "{{`{{ .Values.initImage.repository }}:{{ .Values.initImage.tag }}`}}"
+      imagePullPolicy: "{{`{{ .Values.initImage.pullPolicy }}`}}"
+      envFrom:
+        - secretRef:
+            name: superset-env
+      command: [/app/docker/superset-setup.sh]
+
+supersetWorker:
+  forceReload: true
+  command: ["/app/docker/superset-bootstrap.sh", "worker"]
+  initContainers: []
+
+supersetCeleryBeat:
+  enabled: true
+  forceReload: true
+  command: ["/app/docker/superset-bootstrap.sh", "beat"]
+  initContainers: []

@@ -1,0 +1,8 @@
+worker:
+  apiConfig: selfHostedServer
+  replicaCount: 2
+  config:
+    workPool: celine
+    jobNamespace: celine
+  selfHostedServerApiConfig:
+    apiUrl: http://prefect-server:4200/api

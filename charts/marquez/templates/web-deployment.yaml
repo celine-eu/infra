@@ -1,0 +1,30 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "marquez.fullname" . }}-web
+  labels:
+    app.kubernetes.io/name: marquez-web
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: marquez-web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: marquez-web
+    spec:
+      containers:
+        - name: marquez-web
+          image: {{ .Values.image.web }}
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: MARQUEZ_HOST
+              value: {{ include "marquez.fullname" . }}-api
+            - name: MARQUEZ_PORT
+              value: "5000"
+            - name: WEB_PORT
+              value: "5002"
+          ports:
+            - containerPort: 5002

@@ -1,0 +1,113 @@
+environments:
+  dev:
+    values:
+      - ../envs/dev/values.yaml
+  staging:
+    values:
+      - ../envs/staging/values.yaml
+  prod:
+    values:
+      - ../envs/prod/values.yaml
+---
+repositories:
+  - name: cnpg
+    url: https://cloudnative-pg.github.io/charts
+  - name: prometheus-community
+    url: https://prometheus-community.github.io/helm-charts
+  - name: seaweedfs
+    url: https://seaweedfs.github.io/seaweedfs/helm
+
+releases:
+  - name: cnpg
+    namespace: cnpg
+    chart: cnpg/cloudnative-pg
+    version: 0.26.0
+    createNamespace: true
+    missingFileHandler: Warn
+    hooks:
+      - events: [postsync]
+        showlogs: true
+        command: bash
+        args:
+          - -c
+          - |
+            echo "⏳ Waiting for CNPG operator webhook service to become ready..."
+            # Wait for deployment rollout
+            kubectl rollout status deployment \
+              -n cnpg \
+              -l app.kubernetes.io/name=cloudnative-pg \
+              --timeout=120s || exit 1
+
+            # Wait for the webhook service endpoint to respond
+            echo "🔍 Checking CNPG webhook availability..."
+            for i in {1..30}; do
+              if kubectl run --rm -i --quiet=true -n cnpg test-conn-$i \
+                --image=curlimages/curl:8.7.1 \
+                --restart=Never \
+                -- curl -sk https://cnpg-webhook-service.cnpg.svc:443/healthz >/dev/null 2>&1; then
+                echo "✅ CNPG webhook service is reachable."
+                exit 0
+              fi
+              echo "Still waiting for CNPG webhook... ($i/30)"
+              sleep 5
+            done
+            echo "❌ CNPG webhook not ready in time"
+            exit 1
+    values:
+      - ../defaults/0010-core/cnpg/values.yaml
+      - ../envs/{{ .Environment.Name }}/0010-core/cnpg/values.yaml
+
+    labels:
+      group: core
+
+  - name: postgres-db
+    namespace: celine-{{ .Environment.Name }}
+    chart: ../charts/postgres-db
+    version: 0.1.0
+    createNamespace: true
+    missingFileHandler: Warn
+    values:
+      - ../defaults/0010-core/postgres-db/values.yaml
+      - ../envs/{{ .Environment.Name }}/0010-core/postgres-db/values.yaml
+    needs:
+      - cnpg/cnpg
+    labels:
+      group: core
+
+  - name: redis
+    namespace: celine-{{ .Environment.Name }}
+    chart: oci://ghcr.io/cloudpirates-io/helm-charts/redis
+    version: 0.6.3
+    createNamespace: true
+    missingFileHandler: Warn
+    values:
+      - ../defaults/0010-core/redis/values.yaml
+      - ../envs/{{ .Environment.Name }}/0010-core/redis/values.yaml
+    labels:
+      group: core
+
+  ## S3 storage setup
+  - name: s3-accounts
+    namespace: celine-{{ .Environment.Name }}
+    chart: ../charts/s3-accounts
+    version: 0.1.0
+    createNamespace: true
+    missingFileHandler: Warn
+    values:
+      - ../defaults/0010-core/s3-accounts/values.yaml
+      - ../envs/{{ .Environment.Name }}/0010-core/s3-accounts/values.yaml
+    labels:
+      group: core
+
+  - name: seaweedfs
+    installed: {{ .Values.skipInstallation.seaweedfs | default false }}
+    namespace: celine-{{ .Environment.Name }}
+    chart: seaweedfs/seaweedfs
+    version: 4.0.398
+    createNamespace: true
+    missingFileHandler: Warn
+    values:
+      - ../defaults/0010-core/seaweedfs/values.yaml
+      - ../envs/{{ .Environment.Name }}/0010-core/seaweedfs/values.yaml.gotmpl
+    labels:
+      group: core

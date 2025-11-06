@@ -1,0 +1,103 @@
+{
+  "id": "0c1045cc-7e38-4235-8a5b-502a2c4ae1ac",
+  "realm": "{{ .Values.realm }}",
+  "enabled": true,
+  "displayName": "{{ upper .Values.realm }}",
+  "roles": {
+    "realm": [
+      { "name": "admin", "containerId": "0c1045cc-7e38-4235-8a5b-502a2c4ae1ac" },
+      { "name": "manager", "containerId": "0c1045cc-7e38-4235-8a5b-502a2c4ae1ac" },
+      { "name": "editor", "containerId": "0c1045cc-7e38-4235-8a5b-502a2c4ae1ac" },
+      { "name": "viewer", "containerId": "0c1045cc-7e38-4235-8a5b-502a2c4ae1ac" }
+    ]
+  },
+  "groups": [
+    { "name": "admins", "path": "/admins", "realmRoles": ["admin"] },
+    { "name": "managers", "path": "/managers", "realmRoles": ["manager"] },
+    { "name": "editors", "path": "/editors", "realmRoles": ["editor"] },
+    { "name": "viewers", "path": "/viewers", "realmRoles": ["viewer"] }
+  ],
+  "clients": [
+    {
+      "clientId": "oauth2_proxy",
+      "name": "oauth2_proxy",
+      "description": "OIDC client for oauth2-proxy",
+      "rootUrl": "",
+      "adminUrl": "",
+      "baseUrl": "",
+      "enabled": true,
+      "alwaysDisplayInConsole": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "{{ .Values.oauth2Proxy.clientSecret }}",
+      "redirectUris": [
+        "https://sso.{{ .Values.domain }}/oauth2/callback",
+        "https://superset.{{ .Values.domain }}/*/"
+      ],
+      "webOrigins": [
+        "https://*.{{ .Values.domain }}"
+      ],
+      "notBefore": 0,
+      "bearerOnly": false,
+      "consentRequired": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "publicClient": false,
+      "frontchannelLogout": false,
+      "protocol": "openid-connect",
+      "attributes": {
+        "realm_client": "false",
+        "oidc.ciba.grant.enabled": "false",
+        "backchannel.logout.session.required": "true",
+        "standard.token.exchange.enabled": "false",
+        "oauth2.device.authorization.grant.enabled": "false",
+        "display.on.consent.screen": "false",
+        "backchannel.logout.revoke.offline.tokens": "false",
+        "access.token.lifespan": "1800",
+        "client.session.idle.timeout": "1800",
+        "client.session.max.lifespan": "1800",
+        "refresh.token.max.reuse": "0",
+        "use.refresh.tokens": "true"
+      },
+      "authenticationFlowBindingOverrides": {},
+      "fullScopeAllowed": true,
+      "nodeReRegistrationTimeout": -1,
+      "protocolMappers": [
+        {
+          "name": "aud-mapper-oauth2_proxy",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "oauth2_proxy",
+            "id.token.claim": "true",
+            "lightweight.claim": "false",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ],
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "profile",
+        "roles",
+        "basic",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access",
+        "organization",
+        "microprofile-jwt"
+      ],
+      "access": {
+        "view": true,
+        "configure": true,
+        "manage": true
+      }
+    }
+  ]
+}

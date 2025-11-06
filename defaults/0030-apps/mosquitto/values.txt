@@ -1,0 +1,1 @@
+https://github.com/vicsufer/charts/blob/main/charts/mosquitto/values.yaml

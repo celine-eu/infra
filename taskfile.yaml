@@ -1,0 +1,88 @@
+version: "3"
+
+vars:
+  K8S_VERSION: v1.33.0
+
+tasks:
+  dev:start:
+    cmds:
+      - minikube start --kubernetes-version={{.K8S_VERSION}}
+      - minikube addons enable ingress
+      - minikube addons enable ingress-dns
+      - task: dev:set-context
+
+  dev:stop:
+    cmds:
+      - minikube stop
+
+  dev:reset:
+    cmds:
+      - minikube delete
+      - task: dev:reset:pipelines
+
+  dev:build:pipelines:
+    cmds:
+      - |
+        eval $(minikube -p minikube docker-env)
+        cd ../services/pipelines && skaffold build
+
+  dev:reset:pipelines:
+    cmds:
+      - |
+        eval $(minikube -p minikube docker-env)
+        cd ../services/pipelines && skaffold delete
+
+  dev:set-context:
+    desc: Set kubectl default namespace to celine
+    cmds:
+      - kubectl config use-context minikube
+      - kubectl config set-context --current --namespace=celine-dev
+
+  dev:helm:destroy:
+    vars:
+      APP_NAME: "{{.CLI_ARGS}}"
+    cmds:
+      - helmfile -e dev -l name={{.APP_NAME}} destroy
+
+  dev:helm:apply:
+    vars:
+      APP_NAME: "{{.CLI_ARGS}}"
+    cmds:
+      - helmfile -e dev -l name={{.APP_NAME}} apply
+
+  dev:helm:apply-by:
+    vars:
+      APP_NAME: "{{.CLI_ARGS}}"
+    cmds:
+      - helmfile -e dev -l {{.APP_NAME}} apply
+
+  dev:helm:reinstall:
+    deps: [dev:set-context]
+    vars:
+      APP_NAME: "{{.CLI_ARGS}}"
+    cmds:
+      - task dev:helm:destroy -- {{.APP_NAME}}
+      - task dev:helm:apply -- {{.APP_NAME}}
+
+  dev:setup:
+    deps:
+      - dev:set-context
+      - dev:build:pipelines
+    cmds:
+      - helmfile -e dev -l name=cnpg apply
+      - helmfile -e dev -l group=core apply
+      - helmfile -e dev -l group=auth apply
+      - helmfile -e dev -l group=apps apply
+      - helmfile -e dev -l group=pipelines apply
+
+  dev:mqtt:passwd:
+    cmds:
+      - |
+        FILE=$(mktemp)
+        mosquitto_passwd -H sha512-pbkdf2 -c $FILE USERNAME
+        cut -d ":" -f 2 $FILE
+        rm $FILE
+
+  dev:postgres:forward:
+    cmds:
+      - kubectl port-forward svc/postgis1-rw 5432:5432

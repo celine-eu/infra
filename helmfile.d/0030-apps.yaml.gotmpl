@@ -1,0 +1,81 @@
+environments:
+  dev:
+    values:
+      - ../envs/dev/values.yaml
+  staging:
+    values:
+      - ../envs/staging/values.yaml
+  prod:
+    values:
+      - ../envs/prod/values.yaml
+---
+repositories:
+  - name: superset
+    url: https://apache.github.io/superset
+  - name: vicsufer
+    url: https://charts.vicsufer.dev/
+
+# hooks:
+#   - events: ["prepare"]
+#     command: "./scripts/generate-configs.sh"
+#     args: ["apps", "{{ .Environment.Name }}"]
+
+releases:
+  - name: superset
+    namespace: celine-{{ .Environment.Name }}
+    chart: superset/superset
+    version: 0.15.0
+    createNamespace: true
+    missingFileHandler: Warn
+    values:
+      - ../defaults/0030-apps/superset/values.yaml
+      - ../envs/{{ .Environment.Name }}/0030-apps/superset/values.yaml.gotmpl
+    labels:
+      group: apps
+
+  - name: marquez
+    namespace: celine-{{ .Environment.Name }}
+    chart: ../charts/marquez
+    createNamespace: true
+    missingFileHandler: Warn
+    values:
+      - ../defaults/0030-apps/marquez/values.yaml
+      - ../envs/{{ .Environment.Name }}/0030-apps/marquez/values.yaml.gotmpl
+    labels:
+      group: apps
+
+  - name: mqtt
+    namespace: celine-{{ .Environment.Name }}
+    chart: vicsufer/mosquitto
+    createNamespace: true
+    missingFileHandler: Warn
+    values:
+      - ../defaults/0030-apps/mosquitto/values.yaml
+      - ../envs/{{ .Environment.Name }}/0030-apps/mosquitto/values.yaml.gotmpl
+    labels:
+      group: apps
+
+  - name: mqtt-setup
+    namespace: celine-{{ .Environment.Name }}
+    chart: ../charts/mqtt-setup
+    createNamespace: true
+    missingFileHandler: Warn
+    values:
+      - ../defaults/0030-apps/mqtt-setup/values.yaml
+      - ../envs/{{ .Environment.Name }}/0030-apps/mqtt-setup/values.yaml.gotmpl
+    labels:
+      group: apps
+
+  - name: mqtt-ingestor
+    namespace: celine-{{ .Environment.Name }}
+    chart: ../charts/mqtt-ingestor
+    installed: {{ .Values.skipInstallation.mqtt_ingestor | default true }}
+    createNamespace: true
+    missingFileHandler: Warn
+    needs:
+      - celine-{{ .Environment.Name }}/mqtt-setup
+    values:
+      - ../defaults/0030-apps/mqtt-ingestor/values.yaml
+      - ../envs/{{ .Environment.Name }}/0030-apps/mqtt-ingestor/values.yaml.gotmpl
+    labels:
+      group: apps

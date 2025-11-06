@@ -1,0 +1,85 @@
+{{- range .Values.flows }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: prefect-deploy-{{ .name }}
+  namespace: {{ $.Values.global.namespace }}
+spec:
+  ttlSecondsAfterFinished: 30
+  template:
+    spec:
+      restartPolicy: Never
+      serviceAccountName: prefect-worker
+      containers:
+        - name: prefect-deploy-{{ .name }}
+          image: {{ .image }}
+          imagePullPolicy: IfNotPresent
+          env:
+            # Render all global envs
+            {{- range $.Values.global.env }}
+            {{- if .value }}
+            - name: {{ .name }}
+              value: "{{ .value }}"
+            {{- else if .secret }}
+            - name: {{ .name }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .secret }}
+                  key: {{ default .name .key }}
+            {{- end }}
+            {{- end }}
+
+            # Render all flow-level envs
+            {{- range .env }}
+            {{- if .value }}
+            - name: {{ .name }}
+              value: "{{ .value }}"
+            {{- else if .secret }}
+            - name: {{ .name }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .secret }}
+                  key: {{ default .name .key }}
+            {{- end }}
+            {{- end }}
+
+          command:
+            - "bash"
+            - "-c"
+            - |
+              set -eux
+              echo "Building prefect.yaml for {{ .name }}"
+              mkdir -p /config
+
+              cat > /config/prefect.yaml <<EOF
+              name: {{ .name }}-deployment
+              deployments:
+                - name: {{ .name }}-flow
+                  description: "{{ .name }} Prefect deployment"
+                  entrypoint: "{{ .path }}:{{ .callback }}"
+                  work_pool:
+                    name: {{ $.Values.global.work_pool }}
+                    schedule:
+              {{ toYaml .schedule | indent 10 }}
+                    job_variables:
+                      image: {{ .image }}
+                      namespace: {{ $.Values.global.namespace }}
+                      env:
+              {{- range (concat $.Values.global.env .env) }}
+              {{- if .value }}
+                        {{ .name }}: "{{ .value }}"
+              {{- else }}
+                        {{ .name }}: "$${{ .name }}"
+              {{- end }}
+              {{- end }}
+              EOF
+
+              echo "Generated /config/prefect.yaml:"
+              cat /config/prefect.yaml
+
+              echo "Registering Prefect deployment for {{ .name }}"
+              prefect deploy --prefect-file /config/prefect.yaml
+              echo ""
+              cat /config/prefect.yaml
+---
+{{- end }}

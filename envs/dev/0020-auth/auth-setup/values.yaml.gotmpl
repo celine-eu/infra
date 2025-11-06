@@ -1,0 +1,22 @@
+secure: false
+
+realm: celine
+domain: "{{ .Environment.Values.domain }}"
+
+oauth2Proxy:
+  clientID: oauth2_proxy
+  # openssl rand -hex 16
+  clientSecret: 88a52beb361e342e19c0fe82cbda7acb
+  cookieSecret: 411e509ecac4adca7be836fd8d337310
+
+dashboard_items:
+  - name: Dashboards (Superset)
+    host: superset
+  - name: Data Lineage (Marquez)
+    host: marquez
+  - name: Security (Keycloak)
+    host: keycloak
+  - name: Data Pipelines (Prefect)
+    host: prefect
+  # - name: Monitoring (Prometheus)
+  #   host: prometheus

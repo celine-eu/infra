@@ -1,0 +1,13 @@
+{{- $endpoint := .Values.endpoint }}
+{{- range $index, $user := .Values.users }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: s3-account-{{ $user.name  | replace "_" "-" }}
+type: Opaque
+stringData:
+  S3_ACCESS_KEY_ID: "{{ $user.accessKey }}"
+  S3_SECRET_ACCESS_KEY: "{{ $user.secretKey }}"
+  S3_ENDPOINT_URL: "{{ $endpoint }}"
+{{- end }}
