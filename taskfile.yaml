@@ -1,5 +1,8 @@
 version: "3"
 
+env:
+  SOPS_AGE_KEY_FILE: "{{.PWD}}/.sops/dev/key.txt"
+
 vars:
   K8S_VERSION: v1.33.0
 

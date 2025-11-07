@@ -1,4 +1,4 @@
 host: {{ .Environment.Values.mqtt_setup.host | default "mqtt-mosquitto" }}
 
-users: |
+users:
 {{ toYaml .Environment.Values.mqtt_setup.users | indent 2 }}

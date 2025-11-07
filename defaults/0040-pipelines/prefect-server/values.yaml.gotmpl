@@ -74,7 +74,7 @@ ingress:
     path: /
     pathType: ImplementationSpecific
   annotations:
-    cert-manager.io/issuer: {{ .Environment.Values.tls.issuer | default "celine-tls" }}
+    cert-manager.io/issuer: {{ .Environment.Values.tls_setup.issuer | default "celine-tls" }}
     nginx.ingress.kubernetes.io/rewrite-target: /
     nginx.ingress.kubernetes.io/auth-url: "https://sso.{{ .Environment.Values.domain }}/oauth2/auth"
     nginx.ingress.kubernetes.io/auth-signin: "https://sso.{{ .Environment.Values.domain }}/oauth2/start?rd=$scheme://$host$request_uri"

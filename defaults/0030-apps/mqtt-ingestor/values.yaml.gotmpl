@@ -5,7 +5,7 @@ image:
   tag: latest
   pullPolicy: IfNotPresent
 
-env: |
+env:
 {{ toYaml .Environment.Values.mqtt_ingestor.env | indent 2 }}
 
 db:

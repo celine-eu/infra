@@ -39,7 +39,7 @@ ingress:
     ## Resolve HTTP 502 error using ingress-nginx:
     ## See https://www.ibm.com/support/pages/502-error-ingress-keycloak-response
     nginx.ingress.kubernetes.io/proxy-buffer-size: 128k
-    cert-manager.io/issuer: {{ .Environment.Values.tls.issuer | default "celine-tls" }}
+    cert-manager.io/issuer: {{ .Environment.Values.tls_setup.issuer | default "celine-tls" }}
 
   # Additional Ingress labels
   labels: {}

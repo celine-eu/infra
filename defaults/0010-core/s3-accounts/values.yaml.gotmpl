@@ -1,6 +1,6 @@
 endpoint: {{ .Environment.Values.s3_accounts.endpoint | quote }}
 
-users: |
+users: 
 {{ toYaml .Environment.Values.s3_accounts.users | indent 2 }}
 
 seaweed:

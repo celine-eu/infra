@@ -2,14 +2,14 @@
 
 auth:
   enabled: true
-  users: |
+  users:
 {{ toYaml .Environment.Values.mosquitto.users | indent 4 }}
 
 ingress:
   enabled: true
   className: "nginx"
   annotations:
-    cert-manager.io/issuer: {{ .Environment.Values.tls.issuer | default "celine-tls" }}
+    cert-manager.io/issuer: {{ .Environment.Values.tls_setup.issuer | default "celine-tls" }}
     # kubernetes.io/ingress.class: nginx
     # kubernetes.io/tls-acme: "true"
   hosts:

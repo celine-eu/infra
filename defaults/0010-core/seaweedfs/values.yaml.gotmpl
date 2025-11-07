@@ -50,7 +50,7 @@ s3:
     className: nginx
     host: s3.{{ .Environment.Values.domain }}
     annotations:
-      cert-manager.io/issuer: {{ .Environment.Values.tls.issuer | default "celine-tls" }}
+      cert-manager.io/issuer: {{ .Environment.Values.tls_setup.issuer | default "celine-tls" }}
     tls:
       - hosts:
           - s3.{{ .Environment.Values.domain }}
