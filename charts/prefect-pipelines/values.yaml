@@ -1,0 +1,67 @@
+# Global shared configuration
+global:
+  image: prefecthq/prefect:3-latest
+  namespace: celine
+  work_pool: celine
+  env:
+    - name: PREFECT_MODE
+      value: prod
+    - name: PREFECT_API_URL
+      value: "http://prefect-server:4200/api"
+
+    - name: POSTGRES_HOST
+      secret: postgis1-datasets-connection-string
+      key: host
+    - name: POSTGRES_PORT
+      value: "5432"
+    - name: POSTGRES_USER
+      secret: postgis1-datasets-connection-string
+      key: username
+    - name: POSTGRES_PASSWORD
+      secret: postgis1-datasets-connection-string
+      key: password
+    - name: POSTGRES_DB
+      secret: postgis1-datasets-connection-string
+      key: dbname
+
+    - name: MELTANO_DATABASE_URI
+      secret: postgis1-meltano-connection-string
+      key: connection-string
+
+    - name: OPENLINEAGE_URL
+      value: http://marquez-marquez-api:5000
+
+    - name: TARGET_POSTGRES_DEFAULT_TARGET_SCHEMA
+      value: raw
+
+# Individual flows
+flows:
+  - name: copernicus
+    path: /pipelines/apps/copernicus/flows/pipeline.py
+    callback: copernicus_flow
+    image: ghcr.io/celine-eu/pipeline-copernicus:latest
+    schedule:
+      cron: "0 0,6,12,18 * * *"
+    env:
+      - name: CDSAPI_KEY
+        value: "TODO"
+      - name: ADSAPI_KEY
+        value: "TODO"
+
+  - name: osm
+    path: /pipelines/apps/osm/flows/pipeline.py
+    callback: osm_flow
+    image: ghcr.io/celine-eu/pipeline-osm:latest
+    schedule:
+      cron: "0 0,6,12,18 * * *"
+    env: []
+
+  - name: owm
+    path: /pipelines/apps/owm/flows/pipeline.py
+    callback: openweathermap_flow
+    image: ghcr.io/celine-eu/pipeline-owm:latest
+    schedule:
+      cron: "2 * * * *"
+    env:
+      - name: TAP_OPENWEATHERMAP_API_KEY
+        value: "TODO"

@@ -1,0 +1,10 @@
+{
+    "python.languageServer": "Pylance",
+    "python.analysis.extraPaths": [
+        "services/pipelines/apps"
+    ],
+    "files.associations": {
+        "**/*.gotmpl": "helm",
+        "**/helmfile.d/*.yaml": "helm",
+    }
+}

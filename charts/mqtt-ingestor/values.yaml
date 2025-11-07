@@ -1,0 +1,40 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/celine-eu/mqtt-ingestor
+  tag: latest
+  pullPolicy: IfNotPresent
+
+env:
+  LOG_LEVEL: INFO
+  MQTT_PORT: 1883
+  MQTT_TLS: 0
+  MQTT_TRANSPORT: tcp
+  MQTT_TOPICS: "#"
+  STORAGE_BACKEND: postgres
+  POSTGRES_TABLE: mqtt_messages
+
+db:
+  # Name of an existing Secret containing the DSN
+  create: false
+  existingSecret: "postgis1-datasets-connection-string"
+  key: connection-string
+
+  # Or let Helm create one by providing value here
+  # create: true
+  # name: mqtt-ingestor-dsn
+  # key: POSTGRES_DSN
+  # value: postgresql://postgres:postgres@postgres:5432/mqtt
+
+mqtt:
+  create: false
+  existingSecret: "mqtt-account-readonly"
+  # Optional: let Helm create it
+  # create: true
+  # name: mqtt-account-readonly
+  # data:
+  #   MQTT_BROKER: mqtt
+  #   MQTT_USER: mqtt_user
+  #   MQTT_PASS: secretpass
+
+resources: {}

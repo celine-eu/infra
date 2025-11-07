@@ -1,0 +1,68 @@
+master:
+  replicas: 1
+  persistence:
+    enabled: true
+    size: 5Gi
+    storageClass: standard
+
+volume:
+  replicas: 1
+  persistence:
+    enabled: true
+    size: 100Gi
+    storageClass: standard
+  env:
+    WEED_VOLUME_PREALLOCATE: "true"
+
+filer:
+  replicas: 1
+  persistence:
+    enabled: true
+    size: 5Gi
+    storageClass: standard
+  env:
+    WEED_LEVELDB2_ENABLED: "true"
+    WEED_LEVELDB2_DIR: "/data"
+
+s3:
+  enabled: true
+  replicas: 1
+
+  extraVolumeMounts: |
+    - name: s3-config
+      mountPath: /etc/seaweedfs/config
+      readOnly: true
+  extraVolumes: |
+    - name: s3-config
+      secret:
+        secretName: seaweedfs-s3-config
+
+  env:
+    WEED_S3_CONFIG_DIR: "/etc/seaweedfs/config"
+    WEED_S3_ALLOWED_ORIGINS: "*"
+
+  service:
+    type: ClusterIP
+    port: 8333
+
+  ingress:
+    enabled: true
+    className: nginx
+    host: s3.{{ .Environment.Values.domain }}
+    annotations:
+      cert-manager.io/issuer: {{ .Environment.Values.tls.issuer | default "celine-tls" }}
+    tls:
+      - hosts:
+          - s3.{{ .Environment.Values.domain }}
+        secretName: s3-tls-cert
+
+topology:
+  dataCenter: dc1
+  rack: rack1
+
+metrics:
+  prometheus:
+    enabled: false
+
+logging:
+  level: info

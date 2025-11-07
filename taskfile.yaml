@@ -1,0 +1,177 @@
+version: "3"
+
+vars:
+  K8S_VERSION: v1.33.0
+
+tasks:
+  start:
+    cmds:
+      - minikube start --kubernetes-version={{.K8S_VERSION}}
+      - minikube addons enable ingress
+      - minikube addons enable ingress-dns
+      - task: set-context
+
+  stop:
+    cmds:
+      - minikube stop
+
+  reset:
+    cmds:
+      - minikube delete
+      - task: reset:pipelines
+
+  build:pipelines:
+    cmds:
+      - |
+        eval $(minikube -p minikube docker-env)
+        cd ../processing/services/pipelines && skaffold build || true
+
+  reset:pipelines:
+    cmds:
+      - |
+        eval $(minikube -p minikube docker-env)
+        cd ../services/pipelines && skaffold delete
+
+  set-context:
+    desc: Set kubectl default namespace to celine
+    cmds:
+      - kubectl config use-context minikube
+      - kubectl config set-context --current --namespace=celine-dev
+
+  helm:destroy:
+    vars:
+      APP_NAME: "{{.CLI_ARGS}}"
+    cmds:
+      - helmfile -e dev -l name={{.APP_NAME}} destroy
+
+  helm:apply:
+    vars:
+      APP_NAME: "{{.CLI_ARGS}}"
+    cmds:
+      - helmfile -e dev -l name={{.APP_NAME}} apply
+
+  helm:apply-by:
+    vars:
+      APP_NAME: "{{.CLI_ARGS}}"
+    cmds:
+      - helmfile -e dev -l {{.APP_NAME}} apply
+
+  helm:reinstall:
+    deps: [set-context]
+    vars:
+      APP_NAME: "{{.CLI_ARGS}}"
+    cmds:
+      - task helm:destroy -- {{.APP_NAME}}
+      - task helm:apply -- {{.APP_NAME}}
+
+  setup:apply:
+    cmds:
+      - helmfile -e dev -l name=cnpg apply
+      - helmfile -e dev -l group=core apply
+      - helmfile -e dev -l group=auth apply
+      - helmfile -e dev -l group=apps apply
+      - helmfile -e dev -l group=pipelines apply
+
+  setup:
+    deps:
+      - sops:copy-dev-keys
+      - set-context
+      - build:pipelines
+    cmds:
+      - task: setup:apply
+
+  mqtt:passwd:
+    cmds:
+      - |
+        FILE=$(mktemp)
+        mosquitto_passwd -H sha512-pbkdf2 -c $FILE USERNAME
+        cut -d ":" -f 2 $FILE
+        rm $FILE
+
+  postgres:forward:
+    cmds:
+      - kubectl port-forward svc/postgis1-rw 5432:5432
+  sops:encrypt:
+    desc: Encrypt secrets.yaml -> secrets.sops.yaml (per-env key)
+    cmds:
+      - |
+        set -e
+        for f in envs/*/secrets.yaml; do
+          env=$(basename "$(dirname "$f")")
+          key=".sops/$env/key.txt"
+          out="${f%.yaml}.sops.yaml"
+
+          if [ ! -f "$key" ]; then
+            echo "Missing key for $env ($key)"
+            exit 1
+          fi
+
+          echo "Encrypting $f → $out"
+          SOPS_AGE_KEY_FILE="$key" sops --encrypt "$f" > "$out"
+        done
+
+  sops:decrypt:
+    desc: Decrypt secrets.sops.yaml -> secrets.yaml (per-env key)
+    cmds:
+      - |
+        set -e
+        for f in envs/*/secrets.sops.yaml; do
+          env=$(basename "$(dirname "$f")")
+          key=".sops/$env/key.txt"
+          out="${f%.sops.yaml}.yaml"
+
+          if [ ! -f "$key" ]; then
+            echo "Missing key for $env ($key)"
+            exit 1
+          fi
+
+          echo "Decrypting $f → $out"
+          SOPS_AGE_KEY_FILE="$key" sops --decrypt "$f" > "$out"
+        done
+
+  sops:create-env:
+    desc: Create a new environment and AGE key (adds to .sops.yaml)
+    cmds:
+      - |
+        set -e
+        ENV={{.CLI_ARGS}}
+        test -n "$ENV" || { echo "Usage: task sops:create-env <env>"; exit 1; }
+
+        keydir=".sops/$ENV"
+        keyfile="$keydir/key.txt"
+
+        if [ -d "$keydir" ]; then
+          echo "Environment '$ENV' already exists."
+          exit 1
+        fi
+
+        mkdir -p "$keydir"
+        age-keygen -o "$keyfile" > /dev/null
+
+        # create stub folder
+        mkdir -p "./envs/$ENV"
+        SEC=./envs/$ENV/secrets.yaml
+        if [ ! -f $SEC ]; then
+          echo "---" > $SEC
+          echo "Created stub secret $SEC"
+        fi
+        VAL=./envs/$ENV/values.yaml
+        if [ ! -f $VAL ]; then
+          cp ./envs/dev/values.yaml $VAL
+          echo "Created stub file $VAL"
+        fi
+
+        pubkey=$(grep "public key" "$keyfile" | awk '{print $4}')
+        echo "Public key for $ENV: $pubkey"
+
+        touch .sops.yaml
+        if ! grep -q "path_regex: envs/$ENV/secrets\\.ya" .sops.yaml 2>/dev/null; then
+          printf "  - path_regex: envs/%s/secrets\\.ya?ml\$\n    age: %s\n" "$ENV" "$pubkey" >> .sops.yaml
+        fi
+
+        echo "Added creation rule for $ENV in .sops.yaml"
+
+  sops:copy-dev-keys:
+    desc: Copy dev sops keys
+    cmds:
+      - cp .sops/dev/key.txt.example .sops/dev/key.txt

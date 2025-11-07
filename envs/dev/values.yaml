@@ -1,0 +1,90 @@
+domain: celine.local
+
+seaweedfs:
+  enabled: false
+
+tls_setup:
+  enabled: false
+  issuer: celine-tls
+  email: issuer@celine.local
+
+mqtt_ingestor:
+  enabled: false
+  secret: "mqtt-account-readonly"
+  env:
+    LOG_LEVEL: INFO
+    MQTT_PORT: 1883
+    MQTT_TLS: 0
+    MQTT_TRANSPORT: tcp
+    MQTT_TOPICS: "#"
+    STORAGE_BACKEND: postgres
+    POSTGRES_TABLE: mqtt_messages
+
+postgres_db:
+  datasets_owner: datasets_owner
+  datasets_ro: datasets_ro
+  meltano: meltano
+  prefect: prefect
+  superset: superset
+  keycloak: keycloak
+  marquez: marquez
+
+s3_accounts:
+  endpoint: http://seaweedfs:8333
+  users:
+    - name: admin
+      accessKey: admin-access-key
+      secretKey: admin-secret-key
+      actions: ["Admin", "Read", "Write"]
+
+    - name: user_rw
+      accessKey: user
+      secretKey: user
+      actions: ["Read", "Write"]
+
+    # Example (optional)
+    - name: user_ro
+      accessKey: user
+      secretKey: user
+      actions: ["Read"]
+
+auth_setup:
+  clientID: oauth2_proxy
+  clientSecret: oauth2_proxy
+  cookieSecret: s3cret
+
+keycloak:
+  username: admin
+  password: admin
+
+# NOTE: mqtt_setup and mosquitto users should be aligned.
+mqtt_setup:
+  host: mqtt-mosquitto
+  users:
+    - username: admin
+      password: admin
+    - username: readonly
+      password: readonly
+
+mosquitto:
+  users:
+    - username: admin
+      # "admin" password in sha512-pbkdf2 format, generated with mosquitto_passwd
+      password: $7$101$T1RBXD5MGIImHq8g$hSCHVAyZtAif0qN9Fhuam9mVCd0xLomREHIwzdreGjjADCQewz9VpfhK6AumcZyVFHFpHd2EhZdqU+Lq7393Xw==
+      acl:
+        - topic: "#"
+          access: readwrite
+    - username: readonly
+      # "readonly"
+      password: $7$101$7BjHYB04irOjQSjW$4Wqgc1ZjUb14suJril94g8S5PzgoAXwSWRrI81etv4XHHryqzljiWFt59MFpCKnYRCaLzYulS80Tj0imGkA3cQ==
+      acl:
+        - topic: "#"
+          access: read
+
+superset:
+  secretKey: 2tm1FyGHSgy8P2IeQ2aH5+3w9S0ue87v43lmjrtl4oE0PHC1zLqA4Ifoa
+
+pipelines:
+  CDSAPI_KEY: todo
+  ADSAPI_KEY: todo
+  OWM_APIKEY: todo

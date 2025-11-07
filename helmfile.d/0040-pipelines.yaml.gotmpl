@@ -1,0 +1,61 @@
+environments:
+  dev:
+    values:
+      - ../envs/dev/values.yaml
+    secrets:
+      - ../envs/dev/secrets.yaml
+  staging:
+    values:
+      - ../envs/staging/values.yaml
+    secrets:
+      - ../envs/staging/secrets.yaml
+  prod:
+    values:
+      - ../envs/prod/values.yaml
+    secrets:
+      - ../envs/prod/secrets.yaml
+---
+repositories:
+  - name: prefect
+    url: https://prefecthq.github.io/prefect-helm
+
+releases:
+  - name: prefect-server
+    namespace: celine-{{ .Environment.Name }}
+    chart: prefect/prefect-server
+    version: 2025.10.23195705
+    createNamespace: true
+    missingFileHandler: Warn
+    values:
+      - ../defaults/0040-pipelines/prefect-server/values.yaml.gotmpl
+      - ../envs/{{ .Environment.Name }}/0040-pipelines/prefect-server/values.yaml.gotmpl
+    labels:
+      group: pipelines
+
+  - name: prefect-worker
+    namespace: celine-{{ .Environment.Name }}
+    chart: prefect/prefect-worker
+    version: 2025.10.23195705
+    createNamespace: true
+    missingFileHandler: Warn
+    needs:
+      - celine-{{ .Environment.Name }}/prefect-server
+    values:
+      - ../defaults/0040-pipelines/prefect-worker/values.yaml.gotmpl
+      - ../envs/{{ .Environment.Name }}/0040-pipelines/prefect-worker/values.yaml.gotmpl
+    labels:
+      group: pipelines
+
+  - name: prefect-pipelines
+    namespace: celine-{{ .Environment.Name }}
+    chart: ../charts/prefect-pipelines
+    version: 0.1.0
+    createNamespace: true
+    missingFileHandler: Warn
+    needs:
+      - celine-{{ .Environment.Name }}/prefect-worker
+    values:
+      - ../defaults/0040-pipelines/prefect-pipelines/values.yaml.gotmpl
+      - ../envs/{{ .Environment.Name }}/0040-pipelines/prefect-pipelines/values.yaml.gotmpl
+    labels:
+      group: pipelines

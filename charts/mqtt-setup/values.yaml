@@ -1,0 +1,5 @@
+host: mqtt-mosquitto
+
+users:
+  - username: admin
+    password: admin

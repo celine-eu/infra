@@ -1,0 +1,9 @@
+endpoint: {{ .Environment.Values.s3_accounts.endpoint | quote }}
+
+users: |
+{{ toYaml .Environment.Values.s3_accounts.users | indent 2 }}
+
+seaweed:
+  enabled: {{ .Environment.Values.seaweedfs.enabled }}
+  secret:
+    name: seaweedfs-s3-config

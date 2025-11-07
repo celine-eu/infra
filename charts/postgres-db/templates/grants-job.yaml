@@ -1,0 +1,41 @@
+{{- if .Values.grants.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Values.cluster.name }}-grants
+spec:
+  ttlSecondsAfterFinished: 30
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: grant-datasets-ro
+          image: {{ .Values.grants.job.image }}
+          command:
+            - bash
+            - -c
+            - |
+              set -e
+              echo "Applying read-only grants..."
+              PGPASSWORD=$(cat /tmp/password)
+              {{- range .Values.databases }}
+              {{- if and .grants (hasKey .grants "readonly") }}
+              {{- if .grants.readonly }}
+              echo " - {{ .name }}"
+              psql "postgresql://app:${PGPASSWORD}@{{ $.Values.cluster.name }}-rw:5432/{{ .name }}" -v ON_ERROR_STOP=1 -c "
+                GRANT USAGE ON SCHEMA public TO {{ .username }};
+                GRANT SELECT ON ALL TABLES IN SCHEMA public TO {{ .username }};
+                ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO {{ .username }};
+              "
+              {{- end }}
+              {{- end }}
+              {{- end }}
+          volumeMounts:
+            - name: super-pass
+              mountPath: /tmp/password
+              subPath: {{ .Values.grants.job.superuserKey }}
+      volumes:
+        - name: super-pass
+          secret:
+            secretName: {{ .Values.grants.job.superuserSecret }}
+{{- end }}

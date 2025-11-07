@@ -1,0 +1,1 @@
+https://github.com/cloudnative-pg/charts/blob/main/charts/cloudnative-pg/values.yaml

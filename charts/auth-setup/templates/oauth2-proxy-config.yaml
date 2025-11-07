@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: oauth2-proxy-config
+  labels:
+    app: oauth2-proxy
+data:
+  oauth2_proxy.cfg: |
+    provider = "keycloak-oidc"
+    upstreams = [ "file:///dev/null" ]
+    oidc_issuer_url = "https://keycloak.{{ .Values.domain }}/auth/realms/{{ .Values.realm | default "celine" }}"
+    redirect_url = "https://sso.{{ .Values.domain }}/oauth2/callback"
+    email_domains = [ "*" ]
+    cookie_domains = [ ".{{ .Values.domain }}" ]
+    whitelist_domains = [ "*.{{ .Values.domain }}" ]
+    skip_provider_button = true
+    pass_authorization_header = true
+    set_xauthrequest = true
+    set_authorization_header = true
+    pass_access_token = true
+    pass_user_headers = true
+    reverse_proxy = true
+    {{ if .Values.secure -}}
+    cookie_secure = true
+    ssl_insecure_skip_verify = false
+    cookie_httponly = false
+    {{ else }}
+    cookie_secure = false
+    ssl_insecure_skip_verify = true
+    cookie_httponly = true
+    {{ end -}}
+    cookie_samesite = "lax"
+    session_store_type = "redis"
+    redis_connection_url = "redis://redis:6379"
+

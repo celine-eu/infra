@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>CELINE Admin Dashboard</title>
+    <style>
+        html {
+            height: 100%;
+            font-family: Arial, sans-serif;
+            background: #121212;
+            color: #e0e0e0;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            color: #ffffff;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        a {
+            display: block;
+            text-decoration: none;
+            color: #e0e0e0;
+            background: #1e1e1e;
+            margin: 10px 0;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(255, 255, 255, 0.05);
+            font-size: 18px;
+            transition: background 0.3s, color 0.3s, box-shadow 0.3s;
+        }
+
+        a:hover {
+            background: #333;
+            color: #90caf9;
+            box-shadow: 0 4px 10px rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>CELINE Services Dashboard</h1>
+
+    <ul>
+        {{- range .Values.dashboard_items }}
+        <li>
+            <a href="//{{ .host }}.{{ $.Values.domain }}">{{ .name }}</a>
+        </li>
+        {{- end }}
+    </ul>
+
+</body>
+
+</html>

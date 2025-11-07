@@ -1,0 +1,3 @@
+creation_rules:
+  - path_regex: envs/dev/secrets\.ya?ml$
+    age: age1revc49du0w4eep6pdj2sfusjkp50auljayqlgagnexfd6ssndghsdx3pj5

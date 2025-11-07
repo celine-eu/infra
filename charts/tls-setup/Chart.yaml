@@ -1,0 +1,4 @@
+apiVersion: v2
+name: tls-setup
+version: 0.1.0
+description: Configure TLS issuer

@@ -1,0 +1,1 @@
+https://github.com/codecentric/helm-charts/blob/master/charts/keycloakx/values.yaml

@@ -1,0 +1,17 @@
+{{- if .Values.enabled -}}
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ .Values.issuer_name }}
+spec:
+  acme:
+    email: {{ .Values.email }}
+    preferredChain: ""
+    privateKeySecretRef:
+      name: {{ .Values.issuer_name }}
+    server: https://acme-v02.api.letsencrypt.org/directory
+    solvers:
+      - http01:
+          ingress:
+            class: nginx
+{{- end -}}

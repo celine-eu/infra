@@ -1,0 +1,12 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "marquez.fullname" . }}-api
+spec:
+  selector:
+    app.kubernetes.io/name: marquez-api
+  ports:
+    - name: http
+      port: {{ .Values.service.api.port }}
+      targetPort: 5000

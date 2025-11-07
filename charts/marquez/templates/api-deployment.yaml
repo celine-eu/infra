@@ -1,0 +1,67 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "marquez.fullname" . }}-api
+  labels:
+    app.kubernetes.io/name: marquez-api
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: marquez-api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: marquez-api
+    spec:
+      containers:
+        - name: marquez-api
+          image: {{ .Values.image.api }}
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: MARQUEZ_PORT
+              value: "5000"
+            - name: MARQUEZ_ADMIN_PORT
+              value: "5001"
+            - name: MARQUEZ_CONFIG
+              value: /usr/src/app/marquez.yaml
+            - name: POSTGRES_HOST
+              value: {{ .Values.postgres.host | quote }}
+            - name: POSTGRES_PORT
+              value: {{ .Values.postgres.port | quote }}
+            - name: POSTGRES_DB
+              value: {{ .Values.postgres.database | quote }}
+            - name: POSTGRES_USER
+              value: {{ .Values.postgres.user | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgres.existingSecret }}
+                  key: {{ .Values.postgres.existingSecretKey }}
+            - name: SEARCH_ENABLED
+              value: {{ ternary "true" "false" .Values.search.enabled | quote }}
+            - name: SEARCH_HOST
+              value: {{ .Values.search.host | quote }}
+            - name: SEARCH_PORT
+              value: {{ .Values.search.port | quote }}
+          ports:
+            - containerPort: 5000
+            - containerPort: 5001
+          volumeMounts:
+            - name: marquez-data
+              mountPath: /opt/marquez
+            - name: marquez-config
+              mountPath: /usr/src/app/marquez.yaml
+              subPath: marquez.yaml
+      volumes:
+        - name: marquez-data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "marquez.fullname" . }}-data
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        - name: marquez-config
+          configMap:
+            name: {{ include "marquez.fullname" . }}-config

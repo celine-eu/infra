@@ -1,0 +1,2 @@
+.sops/*/key.txt
+envs/*/secrets.yaml
