@@ -48,6 +48,7 @@ This will update `.sops.yaml` and add the AGE keys to `.sops/[env]/key.txt`. Bac
 
 ### Encryption and decryption
 
-Use `task sops:encrypt` and `task sops:decrypt` to swap contents in `.envs/*/secrets.yaml`
+- `task sops:encrypt` to encrypt `.envs/*/secrets.yaml` to `.envs/*/secrets.sops.yaml` 
+- `task sops:decrypt` to decrypt `.envs/*/secrets.sops.yaml` to `.envs/*/secrets.yaml`
 
-**IMPORTANT** Run `task sops:encrypt` before committing if secret is decrypted.
+**Note** Do not version `secrets.yaml` files to avoid credential leaking

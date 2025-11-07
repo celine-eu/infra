@@ -29,11 +29,23 @@ tasks:
         eval $(minikube -p minikube docker-env)
         cd ../processing/services/pipelines && skaffold build || true
 
+  build:superset:
+    cmds:
+      - |
+        eval $(minikube -p minikube docker-env)
+        cd ../processing/services/superset && skaffold build || true
+
   reset:pipelines:
     cmds:
       - |
         eval $(minikube -p minikube docker-env)
-        cd ../services/pipelines && skaffold delete
+        cd ../processing/services/pipelines && skaffold delete
+
+  reset:superset:
+    cmds:
+      - |
+        eval $(minikube -p minikube docker-env)
+        cd ../processing/services/superset && skaffold delete
 
   set-context:
     desc: Set kubectl default namespace to celine

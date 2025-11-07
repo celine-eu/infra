@@ -14,9 +14,9 @@ data:
     cookie_domains = [ ".{{ .Values.domain }}" ]
     whitelist_domains = [ "*.{{ .Values.domain }}" ]
     skip_provider_button = true
-    pass_authorization_header = true
     set_xauthrequest = true
     set_authorization_header = true
+    pass_authorization_header = true
     pass_access_token = true
     pass_user_headers = true
     reverse_proxy = true

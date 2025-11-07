@@ -5,17 +5,53 @@
   "displayName": "{{ upper .Values.realm }}",
   "roles": {
     "realm": [
-      { "name": "admin", "containerId": "0c1045cc-7e38-4235-8a5b-502a2c4ae1ac" },
-      { "name": "manager", "containerId": "0c1045cc-7e38-4235-8a5b-502a2c4ae1ac" },
-      { "name": "editor", "containerId": "0c1045cc-7e38-4235-8a5b-502a2c4ae1ac" },
-      { "name": "viewer", "containerId": "0c1045cc-7e38-4235-8a5b-502a2c4ae1ac" }
+      {
+        "name": "admin",
+        "containerId": "0c1045cc-7e38-4235-8a5b-502a2c4ae1ac"
+      },
+      {
+        "name": "manager",
+        "containerId": "0c1045cc-7e38-4235-8a5b-502a2c4ae1ac"
+      },
+      {
+        "name": "editor",
+        "containerId": "0c1045cc-7e38-4235-8a5b-502a2c4ae1ac"
+      },
+      {
+        "name": "viewer",
+        "containerId": "0c1045cc-7e38-4235-8a5b-502a2c4ae1ac"
+      }
     ]
   },
   "groups": [
-    { "name": "admins", "path": "/admins", "realmRoles": ["admin"] },
-    { "name": "managers", "path": "/managers", "realmRoles": ["manager"] },
-    { "name": "editors", "path": "/editors", "realmRoles": ["editor"] },
-    { "name": "viewers", "path": "/viewers", "realmRoles": ["viewer"] }
+    {
+      "name": "admins",
+      "path": "/admins",
+      "realmRoles": [
+        "admin"
+      ]
+    },
+    {
+      "name": "managers",
+      "path": "/managers",
+      "realmRoles": [
+        "manager"
+      ]
+    },
+    {
+      "name": "editors",
+      "path": "/editors",
+      "realmRoles": [
+        "editor"
+      ]
+    },
+    {
+      "name": "viewers",
+      "path": "/viewers",
+      "realmRoles": [
+        "viewer"
+      ]
+    }
   ],
   "clients": [
     {
@@ -64,6 +100,21 @@
       "fullScopeAllowed": true,
       "nodeReRegistrationTimeout": -1,
       "protocolMappers": [
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "full.path": "true",
+            "introspection.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "id.token.claim": "true",
+            "lightweight.claim": "false",
+            "access.token.claim": "true",
+            "claim.name": "groups"
+          }
+        },
         {
           "name": "aud-mapper-oauth2_proxy",
           "protocol": "openid-connect",

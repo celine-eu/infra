@@ -3,15 +3,18 @@ configMountPath: "/foobar"
 image:
   repository: ghcr.io/celine-eu/superset
   tag: latest
-  pullPolicy: Always
+  pullPolicy: IfNotPresent
 
 initImage:
   repository: ghcr.io/celine-eu/superset
   tag: latest
-  pullPolicy: Always
+  pullPolicy: IfNotPresent
 
 extraSecretEnv:
   SUPERSET_SECRET_KEY: {{ .Environment.Values.superset.secretKey }}
+  CUSTOM_SECURITY_MANAGER_SSO_BASE_URL: https://sso.{{ .Environment.Values.domain }}
+  CUSTOM_SECURITY_MANAGER_SKIP_SSL_VERIFY: {{ .Environment.Values.superset.acceptSelfSignedCerts }}
+  SUPERSET_LOG_LEVEL: DEBUG
 
 secretEnv:
   create: true
@@ -24,14 +27,16 @@ ingress:
     nginx.ingress.kubernetes.io/rewrite-target: /
     nginx.ingress.kubernetes.io/auth-url: "https://sso.{{ .Environment.Values.domain }}/oauth2/auth"
     nginx.ingress.kubernetes.io/auth-signin: "https://sso.{{ .Environment.Values.domain }}/oauth2/start?rd=$scheme://$host$request_uri"
-    nginx.ingress.kubernetes.io/auth-response-headers: "Authorization, X-Auth-Request-Email, X-Auth-Request-User"
+    nginx.ingress.kubernetes.io/auth-response-headers: "Authorization, X-Auth-Request-Email, X-Auth-Request-User, X-Auth-Request-Access-Token"
+    nginx.ingress.kubernetes.io/auth-response-header-access-control-allow-origin: "*"
+    nginx.ingress.kubernetes.io/x-forwarded-proto: "https"
 
     ## Extend timeout to allow long running queries.
     # nginx.ingress.kubernetes.io/proxy-connect-timeout: "300"
     # nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
     # nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
   path: /
-  pathType: ImplementationSpecific
+  pathType: Prefix
   hosts:
     - superset.{{ .Environment.Values.domain }}
   tls:

@@ -82,6 +82,7 @@ mosquitto:
           access: read
 
 superset:
+  acceptSelfSignedCerts: true
   secretKey: 2tm1FyGHSgy8P2IeQ2aH5+3w9S0ue87v43lmjrtl4oE0PHC1zLqA4Ifoa
 
 pipelines:
