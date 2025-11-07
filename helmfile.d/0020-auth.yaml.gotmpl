@@ -3,17 +3,17 @@ environments:
     values:
       - ../envs/dev/values.yaml
     secrets:
-      - ../envs/dev/secrets.yaml
+      - ../envs/dev/secrets.sops.yaml
   staging:
     values:
       - ../envs/staging/values.yaml
     secrets:
-      - ../envs/staging/secrets.yaml
+      - ../envs/staging/secrets.sops.yaml
   prod:
     values:
       - ../envs/prod/values.yaml
     secrets:
-      - ../envs/prod/secrets.yaml
+      - ../envs/prod/secrets.sops.yaml
 ---
 repositories:
   # - name: codecentric
