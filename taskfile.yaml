@@ -50,31 +50,23 @@ tasks:
       - kubectl config use-context minikube
       - kubectl config set-context --current --namespace=celine-dev
 
-  helm:destroy:
+  helm:apply:*:
     vars:
-      APP_NAME: "{{.CLI_ARGS}}"
+      DEPLOYMENT_ENV: "{{index .MATCH 0}}"
+      ARGS: "{{.CLI_ARGS}}"
+    env:
+      SOPS_AGE_KEY_FILE: "{{.PWD}}/.sops/{{.DEPLOYMENT_ENV}}/key.txt"
     cmds:
-      - helmfile -e dev -l name={{.APP_NAME}} destroy
+      - helmfile -e {{.DEPLOYMENT_ENV}} apply {{.ARGS}}
 
-  helm:apply:
+  helm:destroy:*:
     vars:
+      DEPLOYMENT_ENV: "{{index .MATCH 0}}"
       APP_NAME: "{{.CLI_ARGS}}"
+    env:
+      SOPS_AGE_KEY_FILE: "{{.PWD}}/.sops/{{.DEPLOYMENT_ENV}}/key.txt"
     cmds:
-      - helmfile -e dev -l name={{.APP_NAME}} apply
-
-  helm:apply-by:
-    vars:
-      APP_NAME: "{{.CLI_ARGS}}"
-    cmds:
-      - helmfile -e dev -l {{.APP_NAME}} apply
-
-  helm:reinstall:
-    deps: [set-context]
-    vars:
-      APP_NAME: "{{.CLI_ARGS}}"
-    cmds:
-      - task helm:destroy -- {{.APP_NAME}}
-      - task helm:apply -- {{.APP_NAME}}
+      - helmfile -e {{.DEPLOYMENT_ENV}} destroy {{.ARGS}}
 
   apply:
     env:
