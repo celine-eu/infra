@@ -25,11 +25,11 @@ Add to `/etc/hosts`
 
 Start local environment (minikube with docker driver)
 
-`task dev:start`
+`task start`
 
 Setup infrastructure
 
-`task dev:setup`
+`task apply:dev`
 
 ## Deployment flow
 
