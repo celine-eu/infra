@@ -111,19 +111,21 @@ tasks:
     cmds:
       - |
         set -e
+        shopt -s nullglob
         for f in envs/*/secrets.yaml; do
           env=$(basename "$(dirname "$f")")
           key=".sops/$env/key.txt"
           out="${f%.yaml}.sops.yaml"
 
           if [ ! -f "$key" ]; then
-            echo "Missing key for $env ($key)"
-            exit 1
+            echo "Missing key for $env ($key), skipping"
+            continue
           fi
 
           echo "Encrypting $f → $out"
           SOPS_AGE_KEY_FILE="$key" sops --encrypt "$f" > "$out"
         done
+        shopt -u nullglob
 
   sops:decrypt:
     desc: Decrypt secrets.sops.yaml -> secrets.yaml (per-env key)
@@ -136,8 +138,8 @@ tasks:
           out="${f%.sops.yaml}.yaml"
 
           if [ ! -f "$key" ]; then
-            echo "Missing key for $env ($key)"
-            exit 1
+            echo "Missing key for $env ($key), skipping"
+            continue
           fi
 
           echo "Decrypting $f → $out"
