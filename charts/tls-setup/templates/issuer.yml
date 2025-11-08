@@ -2,13 +2,13 @@
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
-  name: {{ .Values.issuer_name }}
+  name: {{ .Values.issuer }}
 spec:
   acme:
     email: {{ .Values.email }}
     preferredChain: ""
     privateKeySecretRef:
-      name: {{ .Values.issuer_name }}
+      name: {{ .Values.issuer }}
     server: https://acme-v02.api.letsencrypt.org/directory
     solvers:
       - http01:

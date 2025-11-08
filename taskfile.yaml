@@ -1,8 +1,5 @@
 version: "3"
 
-env:
-  SOPS_AGE_KEY_FILE: "{{.PWD}}/.sops/dev/key.txt"
-
 vars:
   K8S_VERSION: v1.33.0
 
@@ -79,21 +76,28 @@ tasks:
       - task helm:destroy -- {{.APP_NAME}}
       - task helm:apply -- {{.APP_NAME}}
 
-  setup:apply:
+  apply:
+    env:
+      SOPS_AGE_KEY_FILE: "{{.PWD}}/.sops/{{.CLI_ARGS}}/key.txt"
     cmds:
-      - helmfile -e dev -l name=cnpg apply
-      - helmfile -e dev -l group=core apply
-      - helmfile -e dev -l group=auth apply
-      - helmfile -e dev -l group=apps apply
-      - helmfile -e dev -l group=pipelines apply
+      - |
+        if [ ! -d "./envs/{{.CLI_ARGS}}" ]; then \
+          echo "Environment ./envs/{{.CLI_ARGS}} not found"
+          exit 1
+        fi
+      - helmfile -e {{.CLI_ARGS}} -l name=cnpg apply
+      - helmfile -e {{.CLI_ARGS}} -l group=core apply
+      - helmfile -e {{.CLI_ARGS}} -l group=auth apply
+      - helmfile -e {{.CLI_ARGS}} -l group=apps apply
+      - helmfile -e {{.CLI_ARGS}} -l group=pipelines apply
 
-  setup:
+  apply:dev:
     deps:
       - sops:copy-dev-keys
       - set-context
       - build:pipelines
     cmds:
-      - task: setup:apply
+      - task apply -- dev
 
   mqtt:passwd:
     cmds:
@@ -192,3 +196,7 @@ tasks:
     desc: Copy dev sops keys
     cmds:
       - cp .sops/dev/key.txt.example .sops/dev/key.txt
+      - |
+        if [ ! -f .sops.yaml ]; then 
+          cp .sops.example.yaml .sops.yaml
+        fi
