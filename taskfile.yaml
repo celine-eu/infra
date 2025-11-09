@@ -4,18 +4,18 @@ vars:
   K8S_VERSION: v1.33.0
 
 tasks:
-  start:
+  dev:start:
     cmds:
       - minikube start --kubernetes-version={{.K8S_VERSION}}
       - minikube addons enable ingress
       - minikube addons enable ingress-dns
       - task: set-context
 
-  stop:
+  dev:stop:
     cmds:
       - minikube stop
 
-  reset:
+  dev:reset:
     cmds:
       - minikube delete
       - task: reset:pipelines
@@ -49,24 +49,33 @@ tasks:
     cmds:
       - kubectl config use-context minikube
       - kubectl config set-context --current --namespace=celine-dev
-
   helm:apply:*:
     vars:
-      DEPLOYMENT_ENV: "{{index .MATCH 0}}"
-      ARGS: "{{.CLI_ARGS}}"
+      DEPLOYMENT_ENV: "{{ index .MATCH 0 }}"
+      ARGS: "{{ .CLI_ARGS }}"
     env:
-      SOPS_AGE_KEY_FILE: "{{.PWD}}/.sops/{{.DEPLOYMENT_ENV}}/key.txt"
+      SOPS_AGE_KEY_FILE: "{{ .PWD }}/.sops/{{ .DEPLOYMENT_ENV }}/key.txt"
     cmds:
-      - helmfile -e {{.DEPLOYMENT_ENV}} apply {{.ARGS}}
+      - |
+        if [ -z "{{ .ARGS }}" ]; then
+          echo "Error: missing filter argument (e.g. name=chart1)"
+          exit 1
+        fi
+        helmfile -e {{ .DEPLOYMENT_ENV }} -l {{ .ARGS }} apply
 
   helm:destroy:*:
     vars:
-      DEPLOYMENT_ENV: "{{index .MATCH 0}}"
-      APP_NAME: "{{.CLI_ARGS}}"
+      DEPLOYMENT_ENV: "{{ index .MATCH 0 }}"
+      ARGS: "{{ .CLI_ARGS }}"
     env:
-      SOPS_AGE_KEY_FILE: "{{.PWD}}/.sops/{{.DEPLOYMENT_ENV}}/key.txt"
+      SOPS_AGE_KEY_FILE: "{{ .PWD }}/.sops/{{ .DEPLOYMENT_ENV }}/key.txt"
     cmds:
-      - helmfile -e {{.DEPLOYMENT_ENV}} destroy {{.ARGS}}
+      - |
+        if [ -z "{{ .ARGS }}" ]; then
+          echo "Error: missing filter argument (e.g. name=chart1)"
+          exit 1
+        fi
+        helmfile -e {{ .DEPLOYMENT_ENV }} -l {{ .ARGS }} destroy
 
   apply:
     env:
@@ -191,4 +200,8 @@ tasks:
       - |
         if [ ! -f .sops.yaml ]; then 
           cp .sops.example.yaml .sops.yaml
+        fi
+      - |
+        if [ ! -f ./envs/dev/secrets.yaml ]; then 
+          cat "---" > ./envs/dev/secrets.yaml
         fi

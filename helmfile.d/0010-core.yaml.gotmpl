@@ -118,7 +118,7 @@ releases:
       group: core
 
   - name: seaweedfs
-    installed: {{ not (.Values.seaweedfs.enabled | default true) }}
+    installed: {{ .Values.seaweedfs.enabled | default true }}
     namespace: celine-{{ .Environment.Name }}
     chart: seaweedfs/seaweedfs
     version: 4.0.398

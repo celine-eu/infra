@@ -47,6 +47,8 @@ flows:
         value: "TODO"
       - name: ADSAPI_KEY
         value: "TODO"
+      - name: AWS_BUCKET
+        value: celine_pipelines_copernicus
 
   - name: osm
     path: /pipelines/apps/osm/flows/pipeline.py
@@ -54,7 +56,9 @@ flows:
     image: ghcr.io/celine-eu/pipeline-osm:latest
     schedule:
       cron: "0 0,6,12,18 * * *"
-    env: []
+    env:
+      - name: S3_BUCKET
+        value: celine_pipelines_osm
 
   - name: owm
     path: /pipelines/apps/owm/flows/pipeline.py
@@ -63,5 +67,7 @@ flows:
     schedule:
       cron: "2 * * * *"
     env:
+      - name: S3_BUCKET
+        value: celine_pipelines_owm
       - name: TAP_OPENWEATHERMAP_API_KEY
         value: "TODO"

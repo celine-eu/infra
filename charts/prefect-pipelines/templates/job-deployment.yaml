@@ -13,7 +13,7 @@ spec:
       containers:
         - name: prefect-deploy-{{ .name }}
           image: {{ .image }}
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: {{ .pullPolicy | default "IfNotPresent" }}
           env:
             # Render all global envs
             {{- range $.Values.global.env }}

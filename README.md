@@ -18,7 +18,7 @@ Install locally those tools:
 
 Add to `/etc/hosts`
 
-`192.168.49.2 dashboard.celine.local s3.celine.local keycloak.celine.local mqtt.celine.local sso.celine.local prefect.celine.local superset.celine.local`
+`192.168.49.2 dashboard.celine.local s3.celine.local keycloak.celine.local mqtt.celine.local sso.celine.local prefect.celine.local superset.celine.local s3.celine.local`
 
 
 **Running**

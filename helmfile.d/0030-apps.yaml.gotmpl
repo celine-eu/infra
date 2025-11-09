@@ -75,7 +75,7 @@ releases:
   - name: mqtt-ingestor
     namespace: celine-{{ .Environment.Name }}
     chart: ../charts/mqtt-ingestor
-    installed: {{ not (.Values.mqtt_ingestor.enabled | default true) }}
+    installed: {{ .Values.mqtt_ingestor.enabled | default true }}
     createNamespace: true
     missingFileHandler: Warn
     needs:

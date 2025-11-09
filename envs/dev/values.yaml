@@ -1,7 +1,13 @@
 domain: celine.local
 
 seaweedfs:
-  enabled: false
+  enabled: true
+  buckets:
+    # - name: public-bucket
+    #   anonymous: true
+    - name: celine-pipelines-owm
+    - name: celine-pipelines-osm
+    - name: celine-pipelines-copernicus
 
 tls_setup:
   enabled: false
@@ -30,7 +36,7 @@ postgres_db:
   marquez: marquez
 
 s3_accounts:
-  endpoint: http://seaweedfs:8333
+  endpoint: http://seaweedfs-s3:8333
   users:
     - name: admin
       accessKey: admin-access-key
@@ -51,7 +57,7 @@ s3_accounts:
 auth_setup:
   clientID: oauth2_proxy
   clientSecret: oauth2_proxy
-  cookieSecret: s3cret
+  cookieSecret: 3d749938f5b65074ea3c7359a06ab108
 
 keycloak:
   username: admin
@@ -86,6 +92,7 @@ superset:
   secretKey: 2tm1FyGHSgy8P2IeQ2aH5+3w9S0ue87v43lmjrtl4oE0PHC1zLqA4Ifoa
 
 pipelines:
+  s3_secret: s3-account-user-rw
   CDSAPI_KEY: todo
   ADSAPI_KEY: todo
   OWM_APIKEY: todo

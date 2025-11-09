@@ -1,4 +1,5 @@
 master:
+  enabled: true
   replicas: 1
   persistence:
     enabled: true
@@ -23,6 +24,20 @@ filer:
   env:
     WEED_LEVELDB2_ENABLED: "true"
     WEED_LEVELDB2_DIR: "/data"
+  s3:
+    enabled: true
+    {{- $buckets := .Environment.Values.seaweedfs.buckets | default list }}
+    {{- if and $buckets (gt (len $buckets) 0) }}
+    createBuckets:
+      {{- range $buckets }}
+      - name: {{ .name | quote }}
+        {{- if hasKey . "anonymous" }}
+        anonymousRead: {{ .anonymous | default false }}
+        {{- else }}
+        anonymousRead: false
+        {{- end }}
+      {{- end }}
+    {{- end }}
 
 s3:
   enabled: true
