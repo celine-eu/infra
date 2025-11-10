@@ -26,6 +26,8 @@ filer:
     WEED_LEVELDB2_DIR: "/data"
   s3:
     enabled: true
+    enableAuth: false
+    existingConfigSecret: "seaweedfs-s3-config"
     {{- $buckets := .Environment.Values.seaweedfs.buckets | default list }}
     {{- if and $buckets (gt (len $buckets) 0) }}
     createBuckets:
