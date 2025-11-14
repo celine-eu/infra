@@ -14,6 +14,10 @@ spec:
         - name: prefect-deploy-{{ .name }}
           image: {{ .image }}
           imagePullPolicy: {{ .pullPolicy | default "IfNotPresent" }}
+          {{- if .imageSecret }}
+          imagePullSecrets:
+            - name: {{ .imageSecret }}
+          {{- end }}
           env:
             # Render all global envs
             {{- range $.Values.global.env }}
@@ -64,6 +68,9 @@ spec:
                     job_variables:
                       image: {{ .image }}
                       namespace: {{ $.Values.global.namespace }}
+                      {{- if .imageSecret }}
+                      registry_credentials: {{ .imageSecret }}
+                      {{- end }}
                       env:
               {{- range (concat $.Values.global.env .env) }}
               {{- if .value }}
