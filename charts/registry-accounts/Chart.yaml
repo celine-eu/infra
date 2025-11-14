@@ -1,0 +1,15 @@
+apiVersion: v2
+name: ghcr-secret
+description: Helm chart that creates a docker-registry secret (type kubernetes.io/dockerconfigjson) for one or more registries (e.g. ghcr.io) using supplied credentials.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - docker
+  - registry
+  - secret
+  - ghcr
+maintainers:
+  - name: Your Name
+    email: you@example.com
+home: https://github.com/yourorg/ghcr-secret-chart

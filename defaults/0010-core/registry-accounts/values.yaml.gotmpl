@@ -1,0 +1,4 @@
+secretName: registry-secrets
+
+registries: 
+{{ toYaml .Environment.Values.registry_accounts.registries | indent 2 }}

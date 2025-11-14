@@ -35,6 +35,11 @@ postgres_db:
   keycloak: keycloak
   marquez: marquez
 
+registries: []
+  # - server: ghcr.io
+  #   username: "oauth2"
+  #   password: "YOUR_GITHUB_TOKEN"
+
 s3_accounts:
   endpoint: http://seaweedfs-s3:8333
   users:

@@ -1,0 +1,6 @@
+secretName: registry-secrets
+
+registries: []
+  # - server: ghcr.io
+  #   username: "oauth2"
+  #   password: "YOUR_GITHUB_TOKEN"
