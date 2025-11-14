@@ -10,14 +10,14 @@ spec:
     spec:
       restartPolicy: Never
       serviceAccountName: prefect-worker
+      {{- if .imageSecret }}
+      imagePullSecrets:
+        - name: {{ .imageSecret }}
+      {{- end }}
       containers:
         - name: prefect-deploy-{{ .name }}
           image: {{ .image }}
           imagePullPolicy: {{ .pullPolicy | default "IfNotPresent" }}
-          {{- if .imageSecret }}
-          imagePullSecrets:
-            - name: {{ .imageSecret }}
-          {{- end }}
           env:
             # Render all global envs
             {{- range $.Values.global.env }}

@@ -49,6 +49,7 @@ tasks:
     cmds:
       - kubectl config use-context minikube
       - kubectl config set-context --current --namespace=celine-dev
+
   helm:apply:*:
     vars:
       DEPLOYMENT_ENV: "{{ index .MATCH 0 }}"
