@@ -72,10 +72,10 @@ releases:
     labels:
       group: apps
 
+{{- if .Values.mqtt_ingestor.enabled }}
   - name: mqtt-ingestor
     namespace: celine-{{ .Environment.Name }}
     chart: ../charts/mqtt-ingestor
-    installed: {{ .Values.mqtt_ingestor.enabled | default true }}
     createNamespace: true
     missingFileHandler: Warn
     needs:
@@ -85,3 +85,4 @@ releases:
       - ../envs/{{ .Environment.Name }}/0030-apps/mqtt-ingestor/values.yaml.gotmpl
     labels:
       group: apps
+{{- end }}

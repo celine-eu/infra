@@ -51,17 +51,15 @@ kind: Ingress
 metadata:
   name: dashboard
   annotations:
-    cert-manager.io/issuer: letsencrypt-prod
+    cert-manager.io/issuer: {{ .Values.issuer | default "celine-tls" }}
     nginx.ingress.kubernetes.io/rewrite-target: /
-    nginx.ingress.kubernetes.io/auth-url: "https://sso.celine.local/oauth2/auth"
-    nginx.ingress.kubernetes.io/auth-signin: "https://sso.celine.local/oauth2/start?rd=$scheme://$host$request_uri"
+    nginx.ingress.kubernetes.io/auth-url: "https://sso.{{ .Values.domain }}/oauth2/auth"
+    nginx.ingress.kubernetes.io/auth-signin: "https://sso.{{ .Values.domain }}/oauth2/start?rd=$scheme://$host$request_uri"
     nginx.ingress.kubernetes.io/auth-response-headers: "Authorization, X-Auth-Request-Email, X-Auth-Request-User"
-    # nginx.ingress.kubernetes.io/auth-snippet: |
-    #   proxy_set_header X-Auth-Request-Redirect $request_uri;
 spec:
   ingressClassName: nginx
   rules:
-    - host: dashboard.celine.local
+    - host: dashboard.{{ .Values.domain }}
       http:
         paths:
           - path: /
@@ -71,14 +69,7 @@ spec:
                 name: dashboard
                 port:
                   number: 80
-          - path: /oauth2/
-            pathType: Prefix
-            backend:
-              service:
-                name: oauth2-proxy
-                port:
-                  number: 80
   tls:
     - hosts:
-        - dashboard.celine.local
-      secretName: celine-tls
+        - dashboard.{{ .Values.domain }}
+      secretName: dashboard-tls

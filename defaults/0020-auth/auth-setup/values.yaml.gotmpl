@@ -2,6 +2,7 @@ secure: false
 
 realm: celine
 domain: "{{ .Environment.Values.domain }}"
+issuer: {{ .Environment.Values.tls_setup.issuer }}
 
 oauth2Proxy:
   clientID: {{ .Environment.Values.auth_setup.clientID | default "oauth2_proxy"  }}

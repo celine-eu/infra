@@ -129,8 +129,8 @@ releases:
     labels:
       group: core
 
+{{- if .Values.seaweedfs.enabled }}
   - name: seaweedfs
-    installed: {{ .Values.seaweedfs.enabled | default true }}
     namespace: celine-{{ .Environment.Name }}
     chart: seaweedfs/seaweedfs
     version: 4.0.398
@@ -141,3 +141,4 @@ releases:
       - ../envs/{{ .Environment.Name }}/0010-core/seaweedfs/values.yaml.gotmpl
     labels:
       group: core
+{{- end }}

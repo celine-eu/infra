@@ -2,6 +2,7 @@ secure: false
 
 realm: celine
 domain: celine.local
+issuer: celine-tls
 
 oauth2Proxy:
   clientID: oauth2_proxy
