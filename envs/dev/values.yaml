@@ -16,6 +16,7 @@ tls_setup:
 
 mqtt_ingestor:
   enabled: false
+  imageTag: latest
   secret: "mqtt-account-readonly"
   env:
     LOG_LEVEL: INFO
