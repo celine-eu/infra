@@ -61,10 +61,12 @@ spec:
                 - name: {{ .name }}-flow
                   description: "{{ .name }} Prefect deployment"
                   entrypoint: "{{ .path }}:{{ .callback }}"
+                  schedule:
+                  {{- with .schedule }}
+                  {{ toYaml . | indent 2 }}
+                  {{- end }}
                   work_pool:
                     name: {{ $.Values.global.work_pool }}
-                    schedule:
-              {{ toYaml .schedule | indent 10 }}
                     job_variables:
                       image: {{ .image }}
                       namespace: {{ $.Values.global.namespace }}

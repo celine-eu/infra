@@ -26,6 +26,6 @@ spec:
   tls:
     - hosts:
         - {{ .Values.ingress.host }}
-      secretName: {{ default "celine-tls" .Values.ingress.tlsSecret }}
+      secretName: {{ default "marquez-tls" .Values.ingress.tlsSecret }}
   {{- end }}
 {{- end }}

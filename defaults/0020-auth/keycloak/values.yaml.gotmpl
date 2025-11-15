@@ -55,7 +55,7 @@ ingress:
   tls:
     - hosts:
         - "keycloak.{{ .Environment.Values.domain }}"
-      secretName: celine-tls
+      secretName: keycloak-tls
 
 extraEnv: |
   - name: KEYCLOAK_ADMIN

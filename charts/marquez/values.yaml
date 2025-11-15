@@ -29,7 +29,7 @@ ingress:
   className: nginx
   host: marquez.celine.local
   tlsEnabled: true
-  tlsSecret: celine-tls
+  tlsSecret: marquez-tls
   annotations:
     cert-manager.io/issuer: letsencrypt-prod
     nginx.ingress.kubernetes.io/rewrite-target: /
