@@ -68,6 +68,8 @@ spec:
                   work_pool:
                     name: {{ $.Values.global.work_pool }}
                     job_variables:
+                      finished_job_ttl: {{ .finishedJobTTL | default "60" }}
+                      image_pull_policy: IfNotPresent
                       image: {{ .image }}
                       namespace: {{ $.Values.global.namespace }}
                       {{- if .imageSecret }}

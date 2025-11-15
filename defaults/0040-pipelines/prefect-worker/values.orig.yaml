@@ -139,13 +139,14 @@ worker:
       # -- the name of an existing ConfigMap containing a base job template. NOTE - the key must be 'baseJobTemplate.json'
       existingConfigMapName: ""
       # -- JSON formatted base job template. If data is provided here, the chart will generate a configmap and mount it to the worker pod
-      configuration: |
-        {
-          "variables": {},
-          "job_configuration": {
-            "ttlSecondsAfterFinished": 60
-          }
-        }
+      # configuration: |
+      #   {
+      #     "variables": {},
+      #     "job_configuration": {
+
+      #       "ttlSecondsAfterFinished": 60
+      #     }
+      #   }
       # -- optionally override the default name of the generated configmap
       # name: ""
 
