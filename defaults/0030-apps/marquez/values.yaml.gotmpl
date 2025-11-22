@@ -29,7 +29,7 @@ ingress:
   className: nginx
   host: "marquez.{{ .Environment.Values.domain }}"
   tlsEnabled: true
-  tlsSecret: celine-tls
+  tlsSecret: marquez-tls
   annotations:
     cert-manager.io/issuer: {{ .Environment.Values.tls_setup.issuer | default "celine-tls" }}
     nginx.ingress.kubernetes.io/rewrite-target: /
