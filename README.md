@@ -13,6 +13,7 @@ Install locally those tools:
 - `kubectl` https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/
 - `helm` https://helm.sh/docs/intro/install/
 - `helm-diff` needed by helmfile, eg `helm plugin install https://github.com/databus23/helm-diff`
+- `helm-secrets` needed by helmfile, eg `helm plugin install https://github.com/jkroepke/helm-secrets --version v4.7.4`
 - `helmfile` https://helmfile.readthedocs.io/en/latest/#installation
 - `skaffold` https://skaffold.dev/docs/install/#standalone-binary
 
