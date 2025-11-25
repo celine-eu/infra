@@ -1,57 +1,67 @@
 {{- range .Values.flows }}
-apiVersion: v1
-kind: Pod
+apiVersion: apps/v1
+kind: Deployment
 metadata:
   name: pipeline-{{ .name }}-shell
   namespace: {{ $.Values.global.namespace }}
   labels:
     app: pipeline-{{ .name }}-shell
 spec:
-  serviceAccountName: prefect-worker
-  restartPolicy: Never
-  {{- if .imageSecret }}
-  imagePullSecrets:
-    - name: {{ .imageSecret }}
-  {{- end }}
-  containers:
-    - name: pipeline-{{ .name }}-shell
-      image: {{ .image }}
-      imagePullPolicy: {{ .pullPolicy | default "IfNotPresent" }}
-      command:
-        - "bash"
-        - "-c"
-        - |
-          echo "Shell pod for pipeline {{ .name }} ready."
-          # keep the container alive for manual exec
-          tail -f /dev/null
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pipeline-{{ .name }}-shell
+  template:
+    metadata:
+      labels:
+        app: pipeline-{{ .name }}-shell
+    spec:
+      serviceAccountName: prefect-worker
+      {{- if .imageSecret }}
+      imagePullSecrets:
+        - name: {{ .imageSecret }}
+      {{- end }}
 
-      env:
-        # Global envs
-        {{- range $.Values.global.env }}
-        {{- if .value }}
-        - name: {{ .name }}
-          value: "{{ .value }}"
-        {{- else if .secret }}
-        - name: {{ .name }}
-          valueFrom:
-            secretKeyRef:
-              name: {{ .secret }}
-              key: {{ default .name .key }}
-        {{- end }}
-        {{- end }}
+      containers:
+        - name: pipeline-{{ .name }}-shell
+          image: {{ .image }}
+          imagePullPolicy: {{ .pullPolicy | default "IfNotPresent" }}
+          command:
+            - "bash"
+            - "-c"
+            - |
+              echo "Shell pod for pipeline {{ .name }} ready."
+              # keep the container alive for exec sessions
+              tail -f /dev/null
 
-        # Flow-specific envs
-        {{- range .env }}
-        {{- if .value }}
-        - name: {{ .name }}
-          value: "{{ .value }}"
-        {{- else if .secret }}
-        - name: {{ .name }}
-          valueFrom:
-            secretKeyRef:
-              name: {{ .secret }}
-              key: {{ default .name .key }}
-        {{- end }}
-        {{- end }}
+          env:
+            # Global envs
+            {{- range $.Values.global.env }}
+            {{- if .value }}
+            - name: {{ .name }}
+              value: "{{ .value }}"
+            {{- else if .secret }}
+            - name: {{ .name }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .secret }}
+                  key: {{ default .name .key }}
+            {{- end }}
+            {{- end }}
+
+            # Flow-specific envs
+            {{- range .env }}
+            {{- if .value }}
+            - name: {{ .name }}
+              value: "{{ .value }}"
+            {{- else if .secret }}
+            - name: {{ .name }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .secret }}
+                  key: {{ default .name .key }}
+            {{- end }}
+            {{- end }}
+
 ---
 {{- end }}
