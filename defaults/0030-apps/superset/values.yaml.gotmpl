@@ -14,6 +14,7 @@ extraSecretEnv:
   SUPERSET_SECRET_KEY: {{ .Environment.Values.superset.secretKey }}
   CUSTOM_SECURITY_MANAGER_SSO_BASE_URL: https://sso.{{ .Environment.Values.domain }}
   CUSTOM_SECURITY_MANAGER_SKIP_SSL_VERIFY: {{ .Environment.Values.superset.acceptSelfSignedCerts }}
+  MAPBOX_API_KEY: {{ .Environment.Values.superset.mapboxApiKey }}
   SUPERSET_LOG_LEVEL: DEBUG
 
 secretEnv:
