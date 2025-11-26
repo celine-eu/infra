@@ -1,3 +1,4 @@
 .sops/*/key.txt
 envs/*/secrets*.yaml
+envs/*/secrets*.yaml.*
 .sops.yaml

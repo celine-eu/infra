@@ -148,6 +148,26 @@ tasks:
             continue
           fi
 
+          # --- Backup existing secrets.yaml if present ---
+          if [ -f "$out" ]; then
+            ts=$(date +"%Y%m%d%H%M")
+            backup="${out}.${ts}"
+            echo "Backing up existing $out -> $backup"
+            cp "$out" "$backup"
+
+            # Keep only last 5 backups
+            backups=( $(ls -1t "${out}".20* 2>/dev/null || true) )
+            if [ ${#backups[@]} -gt 5 ]; then
+              to_delete=( "${backups[@]:5}" )
+              echo "Pruning old backups:"
+              for del in "${to_delete[@]}"; do
+                echo "  removing $del"
+                rm -f "$del"
+              done
+            fi
+          fi
+
+
           echo "Decrypting $f → $out"
           SOPS_AGE_KEY_FILE="$key" sops --decrypt "$f" > "$out"
         done
