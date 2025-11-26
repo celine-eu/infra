@@ -94,6 +94,8 @@ mosquitto:
           access: read
 
 superset:
+  image: ghcr.io/celine-eu/superset
+  imageTag: 5.0.0-1.0.0
   acceptSelfSignedCerts: true
   secretKey: 2tm1FyGHSgy8P2IeQ2aH5+3w9S0ue87v43lmjrtl4oE0PHC1zLqA4Ifoa
   mapboxApiKey: ""

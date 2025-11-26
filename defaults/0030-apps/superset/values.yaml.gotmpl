@@ -1,13 +1,13 @@
 configMountPath: "/foobar"
 
 image:
-  repository: ghcr.io/celine-eu/superset
-  tag: latest
+  repository: {{ .Environment.Values.superset.image | default "ghcr.io/celine-eu/superset" }}
+  tag: {{ .Environment.Values.superset.imageTag | default "latest" }}
   pullPolicy: IfNotPresent
 
 initImage:
-  repository: ghcr.io/celine-eu/superset
-  tag: latest
+  repository: {{ .Environment.Values.superset.image | default "ghcr.io/celine-eu/superset" }}
+  tag: {{ .Environment.Values.superset.imageTag | default "latest" }}
   pullPolicy: IfNotPresent
 
 extraSecretEnv:
