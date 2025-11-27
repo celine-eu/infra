@@ -3,7 +3,7 @@ cluster:
   image: ghcr.io/cloudnative-pg/postgis:17
   instances: 1
   storage:
-    size: 10Gi
+    size: {{ .Environment.Values.postgres_db.storage_size | default "10Gi" }}
   parameters:
     log_statement: ddl
 
