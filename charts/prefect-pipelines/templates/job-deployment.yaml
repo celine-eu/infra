@@ -75,6 +75,11 @@ spec:
                       {{- if .imageSecret }}
                       registry_credentials: {{ .imageSecret }}
                       {{- end }}
+                      {{- if .imageSecret }}
+                      pod_override:
+                        imagePullSecrets:
+                          - name: {{ .imageSecret }}
+                      {{- end }}
                       env:
               {{- range (concat $.Values.global.env .env) }}
               {{- if .value }}
