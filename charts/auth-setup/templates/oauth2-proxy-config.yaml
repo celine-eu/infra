@@ -20,6 +20,11 @@ data:
     pass_access_token = true
     pass_user_headers = true
     reverse_proxy = true
+    
+    # allow service account access using a token
+    skip_jwt_bearer_tokens = true
+    insecure_oidc_allow_unverified_email = true
+
     {{ if .Values.secure -}}
     cookie_secure = true
     ssl_insecure_skip_verify = false
