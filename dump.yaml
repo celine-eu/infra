@@ -1,0 +1,9 @@
+contents:
+  - README.md
+  - taskfile.yaml
+  - helmfile.d
+  - defaults
+  - charts
+  - envs
+
+output: sources.txt

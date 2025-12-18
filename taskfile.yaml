@@ -226,3 +226,7 @@ tasks:
         if [ ! -f ./envs/dev/secrets.yaml ]; then 
           cat "---" > ./envs/dev/secrets.yaml
         fi
+
+  dump-source:
+    cmds:
+      - python3 scripts/dump_source.py
