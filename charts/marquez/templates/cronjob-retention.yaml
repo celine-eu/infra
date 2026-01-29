@@ -105,4 +105,12 @@ spec:
                   USING to_delete t
                   WHERE r.uuid = t.uuid;
 
+                  VACUUM (ANALYZE) public.dataset_versions;
+                  VACUUM (ANALYZE) public.dataset_facets;
+                  VACUUM (ANALYZE) public.dataset_versions_field_mapping;
+                  VACUUM (ANALYZE) public.job_versions;
+                  VACUUM (ANALYZE) public.runs;
+                  VACUUM (ANALYZE) public.run_facets;
+                  VACUUM (ANALYZE) public.run_states;
+
                   SQL
