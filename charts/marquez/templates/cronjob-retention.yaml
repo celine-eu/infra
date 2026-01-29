@@ -1,9 +1,9 @@
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: {{ include "marquez.fullname" . }}-cronjob-retention
+  name: marquez-lineage-retention
 spec:
-  schedule: "0 * * * *"   # hourly
+  schedule: "0 * * * *"
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 2
   failedJobsHistoryLimit: 2
@@ -21,7 +21,7 @@ spec:
                 - name: PGHOST
                   value: "{{ .Values.postgres.host }}"
                 - name: PGPORT
-                  value: "{{ .Values.postgres.port | quote }}"
+                  value: "{{ .Values.postgres.port }}"
                 - name: PGDATABASE
                   value: "{{ .Values.postgres.database }}"
                 - name: PGUSER
@@ -29,8 +29,8 @@ spec:
                 - name: PGPASSWORD
                   valueFrom:
                     secretKeyRef:
-                      name: {{ .Values.postgres.existingSecret | default "postgres-secret" }}
-                      key: postgres-password
+                      name: {{ .Values.postgres.existingSecret }}
+                      key: {{ .Values.postgres.existingSecretKey }}
               command:
                 - /bin/sh
                 - -c
@@ -39,11 +39,9 @@ spec:
 
                   psql -v ON_ERROR_STOP=1 <<'SQL'
                   SET lock_timeout = '5s';
-                  SET statement_timeout = '30min';
+                  SET statement_timeout = '20min';
 
-                  ------------------------------------------------------------
                   -- DATASET VERSIONS: keep last 5, delete max 10k
-                  ------------------------------------------------------------
                   WITH ranked AS (
                     SELECT
                       dv.uuid,
@@ -67,9 +65,7 @@ spec:
                   USING to_delete t
                   WHERE dv.uuid = t.uuid;
 
-                  ------------------------------------------------------------
                   -- JOB VERSIONS: keep last 5, delete max 10k
-                  ------------------------------------------------------------
                   WITH ranked AS (
                     SELECT
                       jv.uuid,
@@ -93,9 +89,7 @@ spec:
                   USING to_delete t
                   WHERE jv.uuid = t.uuid;
 
-                  ------------------------------------------------------------
                   -- OPTIONAL: RUN AGE CAP (30 days, max 10k)
-                  ------------------------------------------------------------
                   WITH to_delete AS (
                     SELECT r.uuid
                     FROM public.runs r
