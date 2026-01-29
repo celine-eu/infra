@@ -1,0 +1,114 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "marquez.fullname" . }}-cronjob-retention
+spec:
+  schedule: "0 * * * *"   # hourly
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: cleanup
+              image: postgres:16
+              imagePullPolicy: IfNotPresent
+              env:
+                - name: PGHOST
+                  value: "{{ .Values.postgres.host }}"
+                - name: PGPORT
+                  value: "{{ .Values.postgres.port | quote }}"
+                - name: PGDATABASE
+                  value: "{{ .Values.postgres.database }}"
+                - name: PGUSER
+                  value: "{{ .Values.postgres.user }}"
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.postgres.existingSecret | default "postgres-secret" }}
+                      key: postgres-password
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -euo pipefail
+
+                  psql -v ON_ERROR_STOP=1 <<'SQL'
+                  SET lock_timeout = '5s';
+                  SET statement_timeout = '30min';
+
+                  ------------------------------------------------------------
+                  -- DATASET VERSIONS: keep last 5, delete max 10k
+                  ------------------------------------------------------------
+                  WITH ranked AS (
+                    SELECT
+                      dv.uuid,
+                      d.current_version_uuid,
+                      ROW_NUMBER() OVER (
+                        PARTITION BY dv.dataset_uuid
+                        ORDER BY dv.created_at DESC, dv.uuid DESC
+                      ) AS rn
+                    FROM public.dataset_versions dv
+                    JOIN public.datasets d ON d.uuid = dv.dataset_uuid
+                  ),
+                  to_delete AS (
+                    SELECT uuid
+                    FROM ranked
+                    WHERE rn > 5
+                      AND uuid IS DISTINCT FROM current_version_uuid
+                    ORDER BY uuid
+                    LIMIT 10000
+                  )
+                  DELETE FROM public.dataset_versions dv
+                  USING to_delete t
+                  WHERE dv.uuid = t.uuid;
+
+                  ------------------------------------------------------------
+                  -- JOB VERSIONS: keep last 5, delete max 10k
+                  ------------------------------------------------------------
+                  WITH ranked AS (
+                    SELECT
+                      jv.uuid,
+                      j.current_version_uuid,
+                      ROW_NUMBER() OVER (
+                        PARTITION BY jv.job_uuid
+                        ORDER BY jv.created_at DESC, jv.uuid DESC
+                      ) AS rn
+                    FROM public.job_versions jv
+                    JOIN public.jobs j ON j.uuid = jv.job_uuid
+                  ),
+                  to_delete AS (
+                    SELECT uuid
+                    FROM ranked
+                    WHERE rn > 5
+                      AND uuid IS DISTINCT FROM current_version_uuid
+                    ORDER BY uuid
+                    LIMIT 10000
+                  )
+                  DELETE FROM public.job_versions jv
+                  USING to_delete t
+                  WHERE jv.uuid = t.uuid;
+
+                  ------------------------------------------------------------
+                  -- OPTIONAL: RUN AGE CAP (30 days, max 10k)
+                  ------------------------------------------------------------
+                  WITH to_delete AS (
+                    SELECT r.uuid
+                    FROM public.runs r
+                    LEFT JOIN public.jobs j ON j.current_run_uuid = r.uuid
+                    LEFT JOIN public.job_versions jv ON jv.latest_run_uuid = r.uuid
+                    WHERE r.created_at < now() - interval '30 days'
+                      AND j.uuid IS NULL
+                      AND jv.uuid IS NULL
+                    ORDER BY r.created_at
+                    LIMIT 10000
+                  )
+                  DELETE FROM public.runs r
+                  USING to_delete t
+                  WHERE r.uuid = t.uuid;
+
+                  SQL
