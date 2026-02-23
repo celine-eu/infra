@@ -4,6 +4,4 @@ contents:
   - helmfile.d
   - defaults
   - charts
-  - envs
-
-output: sources.txt
+  - envs/dev
