@@ -12,7 +12,11 @@ oauth2Proxy:
   clientCLISecret: 2e19c0fe82cbda7acbe509e88a52beb3
 
 dashboard_items:
-  - name: Dashboards (Superset)
+  - name: Webapp
+    host: webapp
+  - name: AI Assistant
+    host: assistant
+  - name: BI Dashboards (Superset)
     host: superset
   - name: Data Lineage (Marquez)
     host: marquez
@@ -20,5 +24,3 @@ dashboard_items:
     host: keycloak
   - name: Data Pipelines (Prefect)
     host: prefect
-  # - name: Monitoring (Prometheus)
-  #   host: prometheus
