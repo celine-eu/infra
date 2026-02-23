@@ -1,0 +1,71 @@
+# defaults/0030-apps/mosquitto-go-auth/values.yaml.gotmpl
+# Baseline values for mosquitto-go-auth across all environments.
+# Override only what differs in envs/<env>/0030-apps/mosquitto-go-auth/values.yaml.gotmpl
+
+# Keep the Service name stable so mqtt-setup and mqtt-ingestor don't need changes.
+# mqtt-setup uses host: mqtt-mosquitto, mqtt-ingestor uses mqtt-account-readonly Secret.
+fullnameOverride: mqtt-mosquitto
+
+mosquitto:
+  allowAnonymous: false
+  logDest: stdout
+  logType: warning
+  maxInflightMessages: 20
+  maxQueuedMessages: 1000
+  persistence: true
+  persistenceLocation: /data/
+
+listeners:
+  mqtt:
+    port: 1883
+  websocket:
+    port: 1884
+
+goAuth:
+  logLevel: info
+  logDest: stdout
+  disableSuperuser: false
+
+  jwt:
+    host: "celine-policies"
+    port: 8009
+    httpTimeout: 5
+    getUserUri: "/user"
+    aclUri: "/acl"
+    superuserUri: "/superuser"
+
+  files:
+    enabled: true
+
+  cache:
+    enabled: false
+    reset: true
+    refresh: true
+    type: redis
+    host: "redis-master"
+    port: 6379
+    db: 3
+    password: ""
+    authCacheSeconds: 30
+    aclCacheSeconds: 30
+    authJitterSeconds: 3
+    aclJitterSeconds: 3
+
+persistence:
+  data:
+    enabled: true
+    size: 1Gi
+    storageClass: ""
+
+service:
+  type: ClusterIP
+
+podSecurityContext:
+  fsGroup: 1883
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1883
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: [ALL]

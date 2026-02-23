@@ -1,0 +1,94 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mosquitto-go-auth.fullname" . }}
+  labels:
+    {{- include "mosquitto-go-auth.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "mosquitto-go-auth.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "mosquitto-go-auth.selectorLabels" . | nindent 8 }}
+      annotations:
+        # Restart pod when mosquitto.conf or auth files change
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- if .Values.goAuth.files.enabled }}
+        checksum/auth-files: {{ include (print $.Template.BasePath "/secret-auth-files.yaml") . | sha256sum }}
+        {{- end }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: mosquitto
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: mqtt
+              containerPort: {{ .Values.listeners.mqtt.port }}
+              protocol: TCP
+            - name: websocket
+              containerPort: {{ .Values.listeners.websocket.port }}
+              protocol: TCP
+          volumeMounts:
+            - name: config
+              mountPath: /etc/mosquitto/mosquitto.conf
+              subPath: mosquitto.conf
+              readOnly: true
+            {{- if .Values.goAuth.files.enabled }}
+            - name: auth-files
+              mountPath: /etc/mosquitto/auth
+              readOnly: true
+            {{- end }}
+            {{- if .Values.persistence.data.enabled }}
+            - name: data
+              mountPath: /data
+            {{- end }}
+          livenessProbe:
+            tcpSocket:
+              port: mqtt
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            tcpSocket:
+              port: mqtt
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "mosquitto-go-auth.fullname" . }}-config
+        {{- if .Values.goAuth.files.enabled }}
+        - name: auth-files
+          secret:
+            secretName: {{ include "mosquitto-go-auth.fullname" . }}-auth-files
+        {{- end }}
+        {{- if .Values.persistence.data.enabled }}
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "mosquitto-go-auth.fullname" . }}-data
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "mosquitto-go-auth.fullname" . }}
+  labels:
+    {{- include "mosquitto-go-auth.labels" . | nindent 4 }}
+  {{- with .Values.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    {{- include "mosquitto-go-auth.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: mqtt
+      port: {{ .Values.listeners.mqtt.port }}
+      targetPort: mqtt
+      protocol: TCP
+    - name: websocket
+      port: {{ .Values.listeners.websocket.port }}
+      targetPort: websocket
+      protocol: TCP

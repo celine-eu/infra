@@ -1,0 +1,11 @@
+apiVersion: v2
+name: celine-digital-twin
+description: CELINE Digital Twin service
+type: application
+version: 0.1.0
+appVersion: "latest"
+
+dependencies:
+  - name: celine-services
+    version: "0.1.0"
+    repository: "file://../../celine-services"

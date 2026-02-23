@@ -18,7 +18,7 @@ tasks:
   dev:reset:
     cmds:
       - minikube delete
-      - task: reset:pipelines
+      # - task: reset:pipelines
 
   build:pipelines:
     cmds:
@@ -32,11 +32,11 @@ tasks:
         eval $(minikube -p minikube docker-env)
         cd ../processing/services/superset && skaffold build || true
 
-  reset:pipelines:
-    cmds:
-      - |
-        eval $(minikube -p minikube docker-env)
-        cd ../processing/services/pipelines && skaffold delete
+  # reset:pipelines:
+  #   cmds:
+  #     - |
+  #       eval $(minikube -p minikube docker-env)
+  #       cd ../processing/services/pipelines && skaffold delete
 
   reset:superset:
     cmds:

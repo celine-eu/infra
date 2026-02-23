@@ -1,0 +1,157 @@
+## ----------------------------------------------------------------------------
+## charts/mosquitto-go-auth — values.yaml
+##
+## Auth backends (go-auth plugin):
+##   1. jwt (primary)   — JWT remote mode → celine-policies/mqtt_auth
+##   2. files (legacy)  — username/password file for existing clients
+##
+## The `users` block is intentionally compatible with the existing
+## `mosquitto:` key in envs/dev/values.yaml so both charts can share
+## the same user/ACL definitions without duplication.
+##
+## Password hashes are generated with:
+##   task mqtt:passwd   (wraps mosquitto_passwd -H sha512-pbkdf2)
+## ----------------------------------------------------------------------------
+
+image:
+  repository: ghcr.io/lhns/mosquitto-go-auth
+  tag: "3.3.0-mosquitto_2.0.22"
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+# ------------------------------------------------------------------------------
+# Listeners
+# ------------------------------------------------------------------------------
+listeners:
+  mqtt:
+    port: 1883
+  websocket:
+    port: 1884
+
+# ------------------------------------------------------------------------------
+# General mosquitto settings
+# ------------------------------------------------------------------------------
+mosquitto:
+  allowAnonymous: false
+  logDest: stdout
+  logType: warning
+  maxInflightMessages: 20
+  maxQueuedMessages: 1000
+  persistence: true
+  persistenceLocation: /data/
+
+# ------------------------------------------------------------------------------
+# mosquitto-go-auth plugin
+# ------------------------------------------------------------------------------
+goAuth:
+  logLevel: info
+  logDest: stdout
+
+  # Superuser checks delegated to mqtt_auth (/superuser).
+  # Set true to disable entirely.
+  disableSuperuser: false
+
+  # ----------------------------------------------------------------------------
+  # JWT backend — primary auth for new JWT clients
+  # host must point to the ClusterIP Service of celine-policies release.
+  # Default matches release name "celine-policies" in the same namespace.
+  # ----------------------------------------------------------------------------
+  jwt:
+    host: "celine-policies"
+    port: 8009
+    httpTimeout: 1
+
+    # Paths match FastAPI routes in celine.mqtt_auth.routes
+    getUserUri: "/user"
+    aclUri: "/acl"
+    superuserUri: "/superuser"
+
+  # ----------------------------------------------------------------------------
+  # Files backend — legacy username/password auth for existing clients
+  # When enabled, go-auth checks jwt first, then falls back to files.
+  # Passwords must be sha512-pbkdf2 hashes (mosquitto_passwd -H sha512-pbkdf2).
+  # ----------------------------------------------------------------------------
+  files:
+    enabled: true
+
+  # ----------------------------------------------------------------------------
+  # Redis decision cache
+  # Disabled by default (matching docker-compose dev config).
+  # Enable in production to reduce round-trips to mqtt_auth.
+  # ----------------------------------------------------------------------------
+  cache:
+    enabled: false
+    reset: true
+    refresh: true
+    type: redis
+    host: "redis-master"
+    port: 6379
+    db: 3
+    password: ""
+    authCacheSeconds: 30
+    aclCacheSeconds: 30
+    authJitterSeconds: 3
+    aclJitterSeconds: 3
+
+# ------------------------------------------------------------------------------
+# Password-file users
+#
+# Compatible with the existing `mosquitto:` block in envs/dev/values.yaml.
+# Each entry becomes one line in /etc/mosquitto/passwd and one stanza
+# in /etc/mosquitto/acl.
+#
+# access values: read | write | readwrite
+#
+# These are intentionally the same defaults as the current dev environment.
+# Override in envs/<env>/values.yaml under the `mosquitto-go-auth:` key.
+# ------------------------------------------------------------------------------
+users:
+  - username: admin
+    # "admin" — generate with: task mqtt:passwd
+    password: "$7$101$T1RBXD5MGIImHq8g$hSCHVAyZtAif0qN9Fhuam9mVCd0xLomREHIwzdreGjjADCQewz9VpfhK6AumcZyVFHFpHd2EhZdqU+Lq7393Xw=="
+    acl:
+      - topic: "#"
+        access: readwrite
+  - username: readonly
+    # "readonly"
+    password: "$7$101$7BjHYB04irOjQSjW$4Wqgc1ZjUb14suJril94g8S5PzgoAXwSWRrI81etv4XHHryqzljiWFt59MFpCKnYRCaLzYulS80Tj0imGkA3cQ=="
+    acl:
+      - topic: "#"
+        access: read
+
+# ------------------------------------------------------------------------------
+# Service
+# ------------------------------------------------------------------------------
+service:
+  type: ClusterIP
+  annotations: {}
+
+# ------------------------------------------------------------------------------
+# Persistence
+# ------------------------------------------------------------------------------
+persistence:
+  data:
+    enabled: true
+    size: 1Gi
+    storageClass: ""
+
+# ------------------------------------------------------------------------------
+# Pod
+# ------------------------------------------------------------------------------
+podAnnotations: {}
+
+podSecurityContext:
+  fsGroup: 1883
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1883
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: [ALL]
+
+resources: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

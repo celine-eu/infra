@@ -50,14 +50,14 @@ releases:
     labels:
       group: apps
 
-  - name: mqtt
+  - name: mosquitto-go-auth
     namespace: celine-{{ .Environment.Name }}
-    chart: vicsufer/mosquitto
+    chart: ../charts/mosquitto-go-auth
     createNamespace: true
     missingFileHandler: Warn
     values:
-      - ../defaults/0030-apps/mosquitto/values.yaml.gotmpl
-      - ../envs/{{ .Environment.Name }}/0030-apps/mosquitto/values.yaml.gotmpl
+      - ../defaults/0030-apps/mosquitto-go-auth/values.yaml.gotmpl
+      - ../envs/{{ .Environment.Name }}/0030-apps/mosquitto-go-auth/values.yaml.gotmpl
     labels:
       group: apps
 

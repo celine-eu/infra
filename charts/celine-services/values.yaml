@@ -1,0 +1,187 @@
+## ----------------------------------------------------------------------------
+## charts/celine-services — values.yaml
+##
+## Umbrella chart for CELINE application services.
+## Services are deployed as separate Deployments within a single release so
+## that shared config (OIDC, etc.) is expressed once and overridden per env.
+##
+## ENV VAR REFERENCE — mqtt_auth (celine.mqtt_auth)
+## --------------------------------------------------
+## MqttAuthSettings  env_prefix="CELINE_"
+##
+##   From celine-sdk OidcSettings  env_prefix="CELINE_OIDC_"
+##   (OidcSettings has its own prefix and is read independently)
+##
+##     CELINE_OIDC_BASE_URL                  → oidc.baseUrl
+##     CELINE_OIDC_JWKS_URI                  → oidc.jwksUri
+##     CELINE_OIDC_CLIENT_ID                 → oidc.clientId
+##     CELINE_OIDC_CLIENT_SECRET             → oidc.clientSecret   [secret]
+##     CELINE_OIDC_AUDIENCE                  → oidc.audience
+##     CELINE_OIDC_ALLOWED_AUDIENCES         → oidc.allowedAudiences
+##     CELINE_OIDC_INCLUDE_CLIENT_ID_AS_AUDIENCE → oidc.includeClientIdAsAudience
+##     CELINE_OIDC_TIMEOUT                   → oidc.timeout
+##     CELINE_OIDC_SCOPE                     → oidc.scope
+##
+##   Policy engine  (flat on MqttAuthSettings, NOT via PoliciesSettings)
+##     CELINE_POLICIES_DIR                   → policiesDir
+##     CELINE_POLICIES_DATA_DIR              → policiesDataDir
+##     CELINE_POLICIES_CACHE_ENABLED         → policiesCacheEnabled
+##     CELINE_POLICIES_CACHE_TTL             → policiesCacheTtl
+##     CELINE_POLICIES_CACHE_MAXSIZE         → policiesCacheMaxsize
+##
+##   MQTT auth-specific
+##     CELINE_MQTT_POLICY_PACKAGE            → mqttPolicyPackage
+##     CELINE_MQTT_SUPERUSER_SCOPE           → mqttSuperuserScope
+##
+##   Application
+##     CELINE_LOG_LEVEL                      → logLevel
+##
+## NOTE: CELINE_OIDC_* vars are shared across all celine-sdk services.
+##       They live under the top-level `oidc:` block here and will be
+##       reused verbatim by future services added to this chart.
+## ----------------------------------------------------------------------------
+
+# ==============================================================================
+# Shared OIDC settings — apply to all services using celine-sdk
+# Rendered as CELINE_OIDC_* env vars in every container.
+# ==============================================================================
+oidc:
+  # Base URL of the Keycloak realm (used for token endpoints, discovery, etc.)
+  # env: CELINE_OIDC_BASE_URL
+  baseUrl: "http://keycloak/realms/celine"
+
+  # JWKS endpoint for JWT signature verification.
+  # env: CELINE_OIDC_JWKS_URI
+  jwksUri: "http://keycloak/realms/celine/protocol/openid-connect/certs"
+
+  # Client ID of this service's Keycloak client.
+  # env: CELINE_OIDC_CLIENT_ID
+  clientId: ""
+
+  # Client secret — prefer existingSecret in production.
+  # env: CELINE_OIDC_CLIENT_SECRET
+  # clientSecret: ""  # do not set here; use mqttAuth.existingSecret
+
+  # Expected JWT audience claim.
+  # env: CELINE_OIDC_AUDIENCE
+  audience: ""
+
+  # Extra accepted audiences (comma-separated), rarely needed.
+  # env: CELINE_OIDC_ALLOWED_AUDIENCES
+  allowedAudiences: ""
+
+  # If true, also accept CELINE_OIDC_CLIENT_ID as audience.
+  # env: CELINE_OIDC_INCLUDE_CLIENT_ID_AS_AUDIENCE
+  includeClientIdAsAudience: true
+
+  # HTTP timeout for OIDC/JWKS requests.
+  # env: CELINE_OIDC_TIMEOUT
+  timeout: 10.0
+
+# ==============================================================================
+# mqtt_auth service
+# ==============================================================================
+mqttAuth:
+  enabled: true
+
+  image:
+    # Image built from celine-policies Dockerfile (CMD: celine.mqtt_auth.main:create_app)
+    repository: ghcr.io/celine-eu/celine-policies
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  # Service — ClusterIP only; mosquitto-go-auth reaches it in-cluster.
+  service:
+    type: ClusterIP
+    port: 8009
+
+  # --------------------------------------------------------------------------
+  # Policy engine
+  # Flat fields on MqttAuthSettings (env_prefix="CELINE_", not via SDK class)
+  # --------------------------------------------------------------------------
+  policies:
+    # Directory containing .rego files baked into the image.
+    # env: CELINE_POLICIES_DIR
+    dir: "/app/policies"
+
+    # Optional external data dir (JSON files for OPA data documents).
+    # env: CELINE_POLICIES_DATA_DIR
+    dataDir: ""
+
+    # In-memory decision cache — reduces repeated OPA evaluations.
+    # env: CELINE_POLICIES_CACHE_ENABLED
+    cacheEnabled: true
+
+    # env: CELINE_POLICIES_CACHE_TTL
+    cacheTtl: 300
+
+    # env: CELINE_POLICIES_CACHE_MAXSIZE
+    cacheMaxsize: 10000
+
+  # --------------------------------------------------------------------------
+  # MQTT auth-specific
+  # --------------------------------------------------------------------------
+  mqtt:
+    # OPA package to evaluate for topic ACL decisions.
+    # env: CELINE_MQTT_POLICY_PACKAGE
+    policyPackage: "celine.mqtt.acl"
+
+    # OAuth scope that grants MQTT superuser access.
+    # env: CELINE_MQTT_SUPERUSER_SCOPE
+    superuserScope: "mqtt.admin"
+
+  # --------------------------------------------------------------------------
+  # Application
+  # --------------------------------------------------------------------------
+  # env: CELINE_LOG_LEVEL
+  logLevel: "INFO"
+
+  # --------------------------------------------------------------------------
+  # Secrets
+  # Provide either an existingSecret name (preferred) or set values directly.
+  # The Secret must contain: CELINE_OIDC_CLIENT_SECRET
+  # --------------------------------------------------------------------------
+  existingSecret: ""
+  # Example: create a secret manually:
+  #   kubectl create secret generic celine-services-mqtt-auth \
+  #     --from-literal=CELINE_OIDC_CLIENT_SECRET=<your-secret>
+
+  # --------------------------------------------------------------------------
+  # Health check — matches the /health endpoint in create_app()
+  # --------------------------------------------------------------------------
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 8009
+    initialDelaySeconds: 15
+    periodSeconds: 30
+    failureThreshold: 3
+
+  readinessProbe:
+    httpGet:
+      path: /health
+      port: 8009
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    failureThreshold: 3
+
+  # --------------------------------------------------------------------------
+  # Pod
+  # --------------------------------------------------------------------------
+  podAnnotations: {}
+
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false  # OPA/regorus may write temp files
+
+  resources: {}
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}

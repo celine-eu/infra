@@ -1,0 +1,9 @@
+apiVersion: v2
+name: mosquitto-go-auth
+description: |
+  Mosquitto MQTT broker with mosquitto-go-auth plugin.
+  Supports dual auth: JWT remote backend (celine-policies/mqtt_auth)
+  and files backend (username/password) for legacy clients.
+type: application
+version: 0.1.0
+appVersion: "3.3.0-mosquitto_2.0.22"
