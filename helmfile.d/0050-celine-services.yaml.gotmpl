@@ -1,0 +1,32 @@
+environments:
+  dev:
+    values:
+      - ../envs/dev/values.yaml
+    secrets:
+      - ../envs/dev/secrets.sops.yaml
+  staging:
+    values:
+      - ../envs/staging/values.yaml
+    secrets:
+      - ../envs/staging/secrets.sops.yaml
+  prod:
+    values:
+      - ../envs/prod/values.yaml
+    secrets:
+      - ../envs/prod/secrets.sops.yaml
+---
+# repositories:
+#   - name: prefect
+#     url: https://prefecthq.github.io/prefect-helm
+
+releases:
+  - name: digital-twin
+    namespace: celine-{{ .Environment.Name }}
+    chart: ../charts/celine-digital-twin
+    createNamespace: true
+    missingFileHandler: Warn
+    values:
+      - ../defaults/0050-celine-services/digital-twin/values.yaml.gotmpl
+      - ../envs/{{ .Environment.Name }}/0050-celine-services/digital-twin/values.yaml.gotmpl
+    labels:
+      group: celine-services

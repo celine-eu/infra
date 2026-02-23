@@ -18,31 +18,6 @@ tasks:
   dev:reset:
     cmds:
       - minikube delete
-      # - task: reset:pipelines
-
-  build:pipelines:
-    cmds:
-      - |
-        eval $(minikube -p minikube docker-env)
-        cd ../processing/services/pipelines && skaffold build || true
-
-  build:superset:
-    cmds:
-      - |
-        eval $(minikube -p minikube docker-env)
-        cd ../processing/services/superset && skaffold build || true
-
-  # reset:pipelines:
-  #   cmds:
-  #     - |
-  #       eval $(minikube -p minikube docker-env)
-  #       cd ../processing/services/pipelines && skaffold delete
-
-  reset:superset:
-    cmds:
-      - |
-        eval $(minikube -p minikube docker-env)
-        cd ../processing/services/superset && skaffold delete
 
   set-context:
     desc: Set kubectl default namespace to celine
@@ -92,12 +67,12 @@ tasks:
       - helmfile -e {{.CLI_ARGS}} -l group=auth apply
       - helmfile -e {{.CLI_ARGS}} -l group=apps apply
       - helmfile -e {{.CLI_ARGS}} -l group=pipelines apply
+      - helmfile -e {{.CLI_ARGS}} -l group=celine-services apply
 
   apply:dev:
     deps:
       - sops:copy-dev-keys
       - set-context
-      - build:pipelines
     cmds:
       - task apply -- dev
 
@@ -112,6 +87,7 @@ tasks:
   postgres:forward:
     cmds:
       - kubectl port-forward svc/postgis1-rw 5432:5432
+
   sops:encrypt:
     desc: Encrypt secrets.yaml -> secrets.sops.yaml (per-env key)
     cmds:
@@ -226,7 +202,3 @@ tasks:
         if [ ! -f ./envs/dev/secrets.yaml ]; then 
           cat "---" > ./envs/dev/secrets.yaml
         fi
-
-  dump-source:
-    cmds:
-      - python3 scripts/dump_source.py

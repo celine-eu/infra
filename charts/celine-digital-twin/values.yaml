@@ -61,9 +61,9 @@ oidc:
 
   # -- per-service --
   service:
-    clientId: "" # default: svc-<release-name>  e.g. svc-celine-digital-twin
-    audience: "" # default: svc-<release-name>
-    clientSecret: "" # [secret] — set via SOPS in envs/<env>/secrets.yaml
+    clientId: "svc-digital-twin" # default: svc-<release-name>  e.g. svc-celine-digital-twin
+    audience: "svc-digital-twin" # default: svc-<release-name>
+    clientSecret: "svc-digital-twin" # [secret] — set via SOPS in envs/<env>/secrets.yaml
 
 # ------------------------------------------------------------------------------
 # Policies — celine-sdk PoliciesSettings (CELINE_POLICIES_*)
