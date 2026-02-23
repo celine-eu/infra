@@ -1,4 +1,4 @@
 secretName: registry-secrets
 
 registries: 
-{{ toYaml .Environment.Values.registry_accounts.registries | indent 2 }}
+{{ .Environment.Values | dig "registry_accounts" "registries" list | toYaml | indent 2 }}

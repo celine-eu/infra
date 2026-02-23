@@ -36,6 +36,12 @@ postgres_db:
   keycloak: keycloak
   marquez: marquez
 
+  # celine services
+  nudging: nudging
+  datasets_api: datasets_api
+  rec_registry: rec_registry
+  ai_assistant: ai_assistant
+
 registries: []
   # - server: ghcr.io
   #   username: "oauth2"

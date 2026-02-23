@@ -3,7 +3,7 @@ cluster:
   image: ghcr.io/cloudnative-pg/postgis:17
   instances: 1
   storage:
-    size: {{ .Environment.Values.postgres_db.storage_size | default "10Gi" }}
+    size: {{ .Environment.Values | dig "postgres_db" "storage_size" "10Gi" }}
   parameters:
     log_statement: ddl
 
@@ -26,6 +26,15 @@ roles:
     password: {{ .Environment.Values.postgres_db.keycloak | quote }}
   - name: marquez
     password: {{ .Environment.Values.postgres_db.marquez | quote }}
+
+  - name: nudging
+    password: {{ .Environment.Values.postgres_db.nudging | quote }}
+  - name: datasets_api
+    password: {{ .Environment.Values.postgres_db.datasets_api | quote }}
+  - name: rec_registry
+    password: {{ .Environment.Values.postgres_db.rec_registry | quote }}
+  - name: ai_assistant
+    password: {{ .Environment.Values.postgres_db.ai_assistant | quote }}
 
 databases:
   - name: datasets
@@ -51,6 +60,15 @@ databases:
   - name: marquez
     owner: marquez
 
+  - name: nudging
+    owner: nudging
+  - name: datasets_api
+    owner: datasets_api
+  - name: rec_registry
+    owner: rec_registry
+  - name: ai_assistant
+    owner: ai_assistant
+
 connection_strings:
   - database: datasets
     user: datasets_owner
@@ -59,6 +77,16 @@ connection_strings:
     dialect: postgresql+asyncpg
 
   - database: meltano
+
+  - database: nudging
+    dialect: postgres+asyncpg
+  - database: datasets_api
+    dialect: postgres+asyncpg
+  - database: rec_registry
+    dialect: postgres+asyncpg
+  - database: ai_assistant
+    dialect: postgres+asyncpg
+
 
 grants:
   enabled: true
