@@ -1,8 +1,161 @@
 worker:
   apiConfig: selfHostedServer
   replicaCount: 2
+  selfHostedServerApiConfig:
+    apiUrl: http://prefect-server:4200/api
   config:
     workPool: celine
     jobNamespace: celine-{{ .Environment.Name }}
-  selfHostedServerApiConfig:
-    apiUrl: http://prefect-server:4200/api
+    baseJobTemplate:
+      configuration: |
+        {
+          "variables": {
+            "type": "object",
+            "properties": {
+              "env": {
+                "type": "object",
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "image": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "namespace": {
+                "type": "string",
+                "default": "default"
+              },
+              "image_pull_policy": {
+                "enum": [
+                  "IfNotPresent",
+                  "Always",
+                  "Never"
+                ],
+                "default": "IfNotPresent"
+              },
+              "image_pull_secrets": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {"type": "string"}
+                  }
+                },
+                "default": []
+              },
+              "service_account_name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "finished_job_ttl": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": 60
+              },
+              "backoff_limit": {
+                "type": "integer",
+                "default": 0
+              },
+              "stream_output": {
+                "type": "boolean",
+                "default": true
+              },
+              "pod_watch_timeout_seconds": {
+                "type": "integer",
+                "default": 60
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Name"
+              },
+              "command": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Command"
+              },
+              "labels": {
+                "type": "object",
+                "title": "Labels",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "job_configuration": {
+            "namespace": "{{ namespace }}",
+            "stream_output": "{{ stream_output }}",
+            "job_watch_timeout_seconds": null,
+            "pod_watch_timeout_seconds": "{{ pod_watch_timeout_seconds }}",
+            "job_manifest": {
+              "apiVersion": "batch/v1",
+              "kind": "Job",
+              "metadata": {
+                "namespace": "{{ namespace }}",
+                "generateName": "{{ name }}-",
+                "labels": "{{ labels }}"
+              },
+              "spec": {
+                "backoffLimit": "{{ backoff_limit }}",
+                "ttlSecondsAfterFinished": "{{ finished_job_ttl }}",
+                "template": {
+                  "spec": {
+                    "parallelism": 1,
+                    "completions": 1,
+                    "restartPolicy": "Never",
+                    "serviceAccountName": "{{ service_account_name }}",
+                    "imagePullSecrets": "{{ image_pull_secrets }}",
+                    "containers": [
+                      {
+                        "name": "prefect-job",
+                        "image": "{{ image }}",
+                        "imagePullPolicy": "{{ image_pull_policy }}",
+                        "args": "{{ command }}",
+                        "env": "{{ env }}"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
