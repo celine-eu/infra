@@ -1,0 +1,110 @@
+## ----------------------------------------------------------------------------
+## celine-ai-assistant — values.yaml
+##
+## Differences from other celine-services charts:
+##   - Two extra PVCs: data (SQLite/cache) and qdrant (vector store)
+##   - S3 for document storage
+##   - No alembic migrate — schema managed by the app on startup
+## ----------------------------------------------------------------------------
+
+image:
+  repository: ghcr.io/celine-eu/celine-ai-assistant
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  port: 8012
+
+ingress:
+  enabled: true
+  domain: celine.local
+  host: "assistant.celine.local"
+  issuer: celine-tls
+  auth:
+    enabled: true
+  tls:
+    enabled: true
+    secretName: ""
+  annotations: {}
+
+oidc:
+  baseUrl: "http://keycloak/realms/celine"
+  jwksUri: "http://keycloak/realms/celine/protocol/openid-connect/certs"
+  allowedAudiences: ""
+  includeClientIdAsAudience: true
+  timeout: 10.0
+  service:
+    clientId: "svc-celine-ai-assistant"
+    audience: "svc-celine-ai-assistant"
+    clientSecret: "svc-celine-ai-assistant" # [secret]
+
+policies:
+  dir: "/app/policies"
+  dataDir: ""
+  cacheEnabled: true
+  cacheTtl: 300
+  cacheMaxsize: 10000
+
+postgres:
+  existingSecret: "ai-assistant-connection-string"
+  dsnEnvVar: "DATABASE_URL"
+  secretKey: "connection-string"
+
+s3:
+  endpointUrl: ""
+  region: "us-east-1"
+  existingSecret: "s3-account-user-rw"
+
+migrate:
+  enabled: false
+  command: ["alembic", "upgrade", "head"]
+  extraEnv: []
+
+healthCheck:
+  enabled: true
+  path: /health
+  initialDelaySeconds: 15
+  periodSeconds: 30
+  failureThreshold: 3
+
+# ------------------------------------------------------------------------------
+# Extra persistent volumes
+# data  — SQLite db + local cache (mounted at /app/data)
+# qdrant — qdrant vector store (mounted at /app/qdrant)
+# ------------------------------------------------------------------------------
+persistence:
+  data:
+    enabled: true
+    size: 5Gi
+    storageClass: ""
+    mountPath: /app/data
+  qdrant:
+    enabled: true
+    size: 10Gi
+    storageClass: ""
+    mountPath: /app/qdrant
+
+configMap:
+  enabled: false
+  name: ""
+  mountPath: /app/config
+  data: {}
+
+# Populated by deployment.yaml from persistence above — do not set manually.
+volumeMounts: []
+volumes: []
+
+logLevel: "INFO"
+extraEnv: []
+extraSecrets: {}
+
+podAnnotations: {}
+podSecurityContext:
+  runAsUser: 1000
+resources: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

@@ -1,10 +1,9 @@
 apiVersion: v2
-name: celine-digital-twin
-description: CELINE Digital Twin service
+name: celine-rec-registry
+description: CELINE REC Registry service
 type: application
 version: 0.1.0
 appVersion: "latest"
-
 dependencies:
   - name: celine-services
     version: "0.1.0"

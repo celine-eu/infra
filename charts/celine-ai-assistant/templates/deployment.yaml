@@ -1,0 +1,14 @@
+{{- /* Inject data and qdrant PVCs into volumes/volumeMounts before rendering */ -}}
+{{- if .Values.persistence.data.enabled }}
+{{- $vol := dict "name" "data" "persistentVolumeClaim" (dict "claimName" (printf "%s-data" (include "celine-services.fullname" .))) }}
+{{- $mnt := dict "name" "data" "mountPath" .Values.persistence.data.mountPath }}
+{{- $_ := set .Values "volumes" (append .Values.volumes $vol) }}
+{{- $_ := set .Values "volumeMounts" (append .Values.volumeMounts $mnt) }}
+{{- end }}
+{{- if .Values.persistence.qdrant.enabled }}
+{{- $vol := dict "name" "qdrant" "persistentVolumeClaim" (dict "claimName" (printf "%s-qdrant" (include "celine-services.fullname" .))) }}
+{{- $mnt := dict "name" "qdrant" "mountPath" .Values.persistence.qdrant.mountPath }}
+{{- $_ := set .Values "volumes" (append .Values.volumes $vol) }}
+{{- $_ := set .Values "volumeMounts" (append .Values.volumeMounts $mnt) }}
+{{- end }}
+{{ include "celine-services.deployment" . }}

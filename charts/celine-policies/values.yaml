@@ -1,0 +1,99 @@
+## ----------------------------------------------------------------------------
+## celine-policies — values.yaml
+##
+## Hosts the mqtt_auth FastAPI app (celine.mqtt_auth.main:create_app).
+## Internal service only — no public ingress.
+## mosquitto-go-auth reaches it via ClusterIP at port 8009.
+## ----------------------------------------------------------------------------
+
+image:
+  repository: ghcr.io/celine-eu/celine-policies
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  port: 8009
+
+# No public ingress — in-cluster only
+ingress:
+  enabled: false
+  domain: celine.local
+  host: ""
+  issuer: celine-tls
+  auth:
+    enabled: false
+  tls:
+    enabled: false
+    secretName: ""
+  annotations: {}
+
+oidc:
+  baseUrl: "http://keycloak/realms/celine"
+  jwksUri: "http://keycloak/realms/celine/protocol/openid-connect/certs"
+  allowedAudiences: ""
+  includeClientIdAsAudience: true
+  timeout: 10.0
+  service:
+    clientId: "svc-celine-policies"
+    audience: "svc-celine-policies"
+    clientSecret: "svc-celine-policies" # [secret]
+
+policies:
+  dir: "/app/policies"
+  dataDir: ""
+  cacheEnabled: true
+  cacheTtl: 300
+  cacheMaxsize: 10000
+
+postgres:
+  existingSecret: ""
+  dsnEnvVar: "DATABASE_URL"
+  secretKey: "connection-string"
+
+s3:
+  endpointUrl: ""
+  region: "us-east-1"
+  existingSecret: ""
+
+migrate:
+  enabled: false
+  command: ["alembic", "upgrade", "head"]
+  extraEnv: []
+
+healthCheck:
+  enabled: true
+  path: /health
+  initialDelaySeconds: 10
+  periodSeconds: 30
+  failureThreshold: 3
+
+configMap:
+  enabled: false
+  name: ""
+  mountPath: /app/config
+  data: {}
+
+volumeMounts: []
+volumes: []
+
+logLevel: "INFO"
+
+# mqtt_auth-specific — passed as plain env vars
+extraEnv:
+  - name: CELINE_MQTT_POLICY_PACKAGE
+    value: "celine.mqtt.acl"
+  - name: CELINE_MQTT_SUPERUSER_SCOPE
+    value: "mqtt.admin"
+
+extraSecrets: {}
+
+podAnnotations: {}
+podSecurityContext:
+  runAsUser: 1000
+resources: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

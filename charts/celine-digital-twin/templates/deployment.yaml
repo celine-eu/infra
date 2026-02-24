@@ -1,9 +1,7 @@
-{{- /*
-  Extends the library default deployment by injecting the config ConfigMap
-  volume. Everything else is handled by celine-services.deployment.
-*/ -}}
+{{- if .Values.configMap.enabled }}
 {{- $vol := list (fromYaml (include "celine-services.configVolume" .)) }}
 {{- $mnt := list (fromYaml (include "celine-services.configVolumeMount" .)) }}
 {{- $_ := set .Values "volumes" (concat .Values.volumes $vol) }}
 {{- $_ := set .Values "volumeMounts" (concat .Values.volumeMounts $mnt) }}
+{{- end }}
 {{ include "celine-services.deployment" . }}

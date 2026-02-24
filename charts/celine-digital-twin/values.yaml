@@ -117,9 +117,58 @@ healthCheck:
 # DT mounts a ConfigMap at /app/config (replaces ./config in docker-compose).
 # The ConfigMap name must match what is deployed in the cluster.
 # ------------------------------------------------------------------------------
+# defaults/0030-apps/celine-digital-twin/values.yaml.gotmpl
+
 configMap:
-  name: "celine-digital-twin-config"
-  mountPath: "/app/config"
+  enabled: true
+  name: celine-digital-twin-config
+  data:
+    brokers.yaml: |
+      brokers:
+        celine_mqtt:
+          enabled: true
+          auth_with_token: true
+          config:
+            host: "${MQTT_HOST:-mqtt-mosquitto}"
+            port: "${MQTT_PORT:-1883}"
+            use_tls: "${MQTT_USE_TLS:-false}"
+            keepalive: 60
+            clean_session: true
+            token_refresh_margin: 30.0
+      default_broker: celine_mqtt
+
+    domains.yaml: |
+      domains:
+        - name: it-energy-community
+          import: celine.dt.domains.energy_community.domain:domain
+          enabled: true
+          overrides:
+            broker: "${MQTT_BROKER:-celine_mqtt}"
+        - name: it-participant
+          import: celine.dt.domains.participant.domain:domain
+          enabled: true
+          overrides:
+            broker: "${MQTT_BROKER:-celine_mqtt}"
+    clients.yaml: |
+      clients:
+        dataset_api:
+          class: celine.dt.core.clients.dataset_api:DatasetSqlApiClient
+          scope: dataset.query
+          config:
+            base_url: "${DATASET_API_BASE_URL:-http://datasets_api:8001}"
+            timeout: 30.0
+        rec_registry_admin:
+          class: celine.sdk.rec_registry:RecRegistryAdminClient
+          scope: "rec-registry.lookup"
+          config:
+            base_url: "${REC_REGISTRY_URL:-http://rec_registry:8004}"
+            timeout: 5.0
+        nudging_admin_client:
+          class: celine.sdk.nudging.client:NudgingAdminClient
+          scope: "nudging.ingest"
+          config:
+            base_url: "${NUDGING_URL:-http://nudging:8016}"
+            timeout: 5.0
 
 # volumeMounts and volumes are populated by deployment.yaml using the
 # celine-services.configVolume* helpers — do not set manually here.
