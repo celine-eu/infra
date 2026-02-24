@@ -1,7 +1,8 @@
 {{- if .Values.configMap.enabled }}
-{{- $vol := list (fromYaml (include "celine-services.configVolume" .)) }}
-{{- $mnt := list (fromYaml (include "celine-services.configVolumeMount" .)) }}
-{{- $_ := set .Values "volumes" (concat .Values.volumes $vol) }}
-{{- $_ := set .Values "volumeMounts" (concat .Values.volumeMounts $mnt) }}
+{{- $cmName := default (printf "%s-config" (include "celine-services.fullname" .)) .Values.configMap.name }}
+{{- $vol := dict "name" "config" "configMap" (dict "name" $cmName) }}
+{{- $mnt := dict "name" "config" "mountPath" (.Values.configMap.mountPath | default "/app/config") "readOnly" true }}
+{{- $_ := set .Values "volumes" (append .Values.volumes $vol) }}
+{{- $_ := set .Values "volumeMounts" (append .Values.volumeMounts $mnt) }}
 {{- end }}
 {{ include "celine-services.deployment" . }}

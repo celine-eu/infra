@@ -2,6 +2,11 @@
     "files.associations": {
         "**/*.gotmpl": "helm",
         "**/helmfile.d/*.yaml": "helm",
-        "**/charts/*.yaml": "jinja-yaml",
-    }
+        "**/charts/*.yaml": "helm",
+        "**/charts/**/*.yaml": "helm",
+        "**/charts/**/templates/*.yaml": "helm",
+        "**/charts/**/templates/*.yml": "helm",
+        "**/charts/**/templates/*.tpl": "helm"
+    },
+    "yaml.validate": false
 }

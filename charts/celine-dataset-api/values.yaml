@@ -3,7 +3,7 @@
 ## ----------------------------------------------------------------------------
 
 image:
-  repository: ghcr.io/celine-eu/celine-dataset-api
+  repository: ghcr.io/celine-eu/dataset-api
   tag: "latest"
   pullPolicy: IfNotPresent
 
@@ -16,7 +16,7 @@ service:
 ingress:
   enabled: true
   domain: celine.local
-  host: "datasets.celine.local"
+  host: "dataset-api.celine.local"
   issuer: celine-tls
   auth:
     enabled: true
@@ -32,9 +32,9 @@ oidc:
   includeClientIdAsAudience: true
   timeout: 10.0
   service:
-    clientId: "svc-celine-dataset-api"
-    audience: "svc-celine-dataset-api"
-    clientSecret: "svc-celine-dataset-api" # [secret]
+    clientId: "svc-dataset-api"
+    audience: "svc-dataset-api"
+    clientSecret: "svc-dataset-api" # [secret]
 
 policies:
   dir: "/app/policies"
@@ -44,7 +44,7 @@ policies:
   cacheMaxsize: 10000
 
 postgres:
-  existingSecret: "datasets-api-connection-string"
+  existingSecret: "dataset-api-connection-string"
   dsnEnvVar: "DATABASE_URL"
   secretKey: "connection-string"
 

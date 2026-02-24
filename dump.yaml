@@ -1,3 +1,9 @@
+extensions:
+  - .yaml
+  - .yml
+  - .tpl
+  - .gotpl
+
 contents:
   - README.md
   - taskfile.yaml

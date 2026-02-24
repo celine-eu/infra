@@ -1,5 +1,5 @@
 image:
-  repository: ghcr.io/celine-eu/celine-digital-twin
+  repository: ghcr.io/celine-eu/digital-twin
   tag: {{ .Environment.Values.digital_twin.image_tag | default "latest" | quote }}
   pullPolicy: IfNotPresent
 
@@ -13,4 +13,4 @@ oidc:
   service:
     clientId: {{ .Environment.Values | dig "digital_twin" "client_id" "svc-digital-twin" | quote }}
     audience: {{ .Environment.Values | dig "digital_twin" "client_id" "svc-digital-twin" | quote }}
-    clientSecret: {{ .Environment.Values | dig "digital_twin" "client_secret" "" | quote }}
+    clientSecret: {{ .Environment.Values | dig "digital_twin" "client_secret" "svc-digital-twin" | quote }}
