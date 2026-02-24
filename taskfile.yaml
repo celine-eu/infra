@@ -3,6 +3,9 @@ version: "3"
 vars:
   K8S_VERSION: v1.33.0
 
+env:
+  HELM_DATA_HOME: "{{.HOME}}/.local/share/helm"
+
 tasks:
   dev:start:
     cmds:
@@ -18,31 +21,6 @@ tasks:
   dev:reset:
     cmds:
       - minikube delete
-      - task: reset:pipelines
-
-  build:pipelines:
-    cmds:
-      - |
-        eval $(minikube -p minikube docker-env)
-        cd ../processing/services/pipelines && skaffold build || true
-
-  build:superset:
-    cmds:
-      - |
-        eval $(minikube -p minikube docker-env)
-        cd ../processing/services/superset && skaffold build || true
-
-  reset:pipelines:
-    cmds:
-      - |
-        eval $(minikube -p minikube docker-env)
-        cd ../processing/services/pipelines && skaffold delete
-
-  reset:superset:
-    cmds:
-      - |
-        eval $(minikube -p minikube docker-env)
-        cd ../processing/services/superset && skaffold delete
 
   set-context:
     desc: Set kubectl default namespace to celine
@@ -97,7 +75,6 @@ tasks:
     deps:
       - sops:copy-dev-keys
       - set-context
-      - build:pipelines
     cmds:
       - task apply -- dev
 

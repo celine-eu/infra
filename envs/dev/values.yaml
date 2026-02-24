@@ -28,6 +28,7 @@ mqtt_ingestor:
     POSTGRES_TABLE: mqtt_messages
 
 postgres_db:
+  storage_size: "10Gi"
   datasets_owner: datasets_owner
   datasets_ro: datasets_ro
   meltano: meltano
@@ -36,10 +37,11 @@ postgres_db:
   keycloak: keycloak
   marquez: marquez
 
-registries: []
-  # - server: ghcr.io
-  #   username: "oauth2"
-  #   password: "YOUR_GITHUB_TOKEN"
+registry_accounts:
+  registries: []
+    # - server: ghcr.io
+    #   username: "oauth2"
+    #   password: "YOUR_GITHUB_TOKEN"
 
 s3_accounts:
   endpoint: http://seaweedfs-s3:8333
