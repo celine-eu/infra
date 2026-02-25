@@ -69,7 +69,7 @@ spec:
                   work_pool:
                     name: {{ $.Values.global.work_pool }}
                     job_variables:
-                      name: {{ .name }}
+                      name: pipeline-run-{{ .name }}
                       {{- if .imageSecret }}
                       image_pull_secrets:
                         - name: {{ .imageSecret }}

@@ -23,7 +23,7 @@ releases:
   - name: prefect-server
     namespace: celine-{{ .Environment.Name }}
     chart: prefect/prefect-server
-    version: 2026.2.24223655
+    version: 2026.2.19200223
     createNamespace: true
     missingFileHandler: Warn
     values:
@@ -35,7 +35,7 @@ releases:
   - name: prefect-worker
     namespace: celine-{{ .Environment.Name }}
     chart: prefect/prefect-worker
-    version: 2026.2.24223655
+    version: 2026.2.19200223
     createNamespace: true
     missingFileHandler: Warn
     needs:
