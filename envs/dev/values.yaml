@@ -85,7 +85,7 @@ mqtt_setup:
     - username: readonly
       password: readonly
 
-mosquitto-go-auth:
+mosquitto:
   users:
     - username: admin
       # "admin" password in sha512-pbkdf2 format, generated with mosquitto_passwd
@@ -112,7 +112,3 @@ pipelines:
   CDSAPI_KEY: todo
   ADSAPI_KEY: todo
   OWM_APIKEY: todo
-
-digital_twin:
-  image_tag: v1.0.0
-  client_secret: svc-digital-twin

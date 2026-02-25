@@ -6,6 +6,7 @@ global:
   env:
     - name: PREFECT_MODE
       value: prod
+
     - name: PREFECT_API_URL
       value: "http://prefect-server:4200/api"
 
@@ -85,3 +86,11 @@ flows:
         value: {{ .Environment.Values.pipelines.OWM_APIKEY | quote }}
       - name: S3_BUCKET
         value: celine-pipelines-owm
+
+  - name: om
+    path: /pipelines/apps/om/flows/pipeline.py
+    callback: om_flow
+    image: ghcr.io/celine-eu/pipeline-om:latest
+    schedule:
+      cron: "0 0,6,12,18 * * *"
+    env: []

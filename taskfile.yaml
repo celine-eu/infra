@@ -3,6 +3,9 @@ version: "3"
 vars:
   K8S_VERSION: v1.33.0
 
+env:
+  HELM_DATA_HOME: "{{.HOME}}/.local/share/helm"
+
 tasks:
   dev:start:
     cmds:
