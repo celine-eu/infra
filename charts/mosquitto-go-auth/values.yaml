@@ -1,16 +1,7 @@
-## ----------------------------------------------------------------------------
 ## charts/mosquitto-go-auth — values.yaml
 ##
-## Auth backends (go-auth plugin):
-##   1. jwt (primary)   — JWT remote mode → celine-policies/mqtt_auth
-##   2. files (legacy)  — username/password file for existing clients
-##
-## The `users` block is intentionally compatible with the existing
-## `mosquitto:` key in envs/dev/values.yaml so both charts can share
-## the same user/ACL definitions without duplication.
-##
-## Password hashes are generated with:
-##   task mqtt:passwd   (wraps mosquitto_passwd -H sha512-pbkdf2)
+## Updated: goAuth.jwt.host now points to the dedicated celine-mqtt-auth
+## release instead of the old celine-policies/celine-services embedding.
 ## ----------------------------------------------------------------------------
 
 image:
@@ -47,18 +38,16 @@ mosquitto:
 goAuth:
   logLevel: info
   logDest: stdout
-
-  # Superuser checks delegated to mqtt_auth (/superuser).
-  # Set true to disable entirely.
   disableSuperuser: false
 
   # ----------------------------------------------------------------------------
   # JWT backend — primary auth for new JWT clients
-  # host must point to the ClusterIP Service of celine-policies release.
-  # Default matches release name "celine-policies" in the same namespace.
+  # Points to the dedicated celine-mqtt-auth ClusterIP Service.
+  # If you change the celine-mqtt-auth release name or fullnameOverride,
+  # update this host accordingly.
   # ----------------------------------------------------------------------------
   jwt:
-    host: "celine-policies"
+    host: "celine-mqtt-auth"
     port: 8009
     httpTimeout: 1
 
@@ -69,16 +58,12 @@ goAuth:
 
   # ----------------------------------------------------------------------------
   # Files backend — legacy username/password auth for existing clients
-  # When enabled, go-auth checks jwt first, then falls back to files.
-  # Passwords must be sha512-pbkdf2 hashes (mosquitto_passwd -H sha512-pbkdf2).
   # ----------------------------------------------------------------------------
   files:
     enabled: true
 
   # ----------------------------------------------------------------------------
-  # Redis decision cache
-  # Disabled by default (matching docker-compose dev config).
-  # Enable in production to reduce round-trips to mqtt_auth.
+  # Redis decision cache (disabled by default)
   # ----------------------------------------------------------------------------
   cache:
     enabled: false
@@ -96,15 +81,8 @@ goAuth:
 
 # ------------------------------------------------------------------------------
 # Password-file users
-#
-# Compatible with the existing `mosquitto:` block in envs/dev/values.yaml.
-# Each entry becomes one line in /etc/mosquitto/passwd and one stanza
-# in /etc/mosquitto/acl.
-#
-# access values: read | write | readwrite
-#
-# These are intentionally the same defaults as the current dev environment.
-# Override in envs/<env>/values.yaml under the `mosquitto-go-auth:` key.
+# Compatible with the mosquitto: block in envs/dev/values.yaml.
+# Override per-env under the mosquitto-go-auth: key.
 # ------------------------------------------------------------------------------
 users:
   - username: admin

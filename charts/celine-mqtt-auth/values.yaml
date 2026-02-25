@@ -1,0 +1,131 @@
+## ----------------------------------------------------------------------------
+## celine-mqtt-auth — values.yaml
+##
+## Dedicated chart for the MQTT auth FastAPI service.
+## Replaces the mqttAuth block previously embedded in celine-services.
+##
+## The release name drives the ClusterIP Service name, which must match
+## mosquitto-go-auth's goAuth.jwt.host value.  Default release name should
+## be "celine-mqtt-auth"; update mosquitto-go-auth accordingly if you rename.
+## ----------------------------------------------------------------------------
+
+# Override to get a predictable Service name.
+# mosquitto-go-auth's goAuth.jwt.host must equal this value.
+fullnameOverride: celine-mqtt-auth
+
+image:
+  repository: ghcr.io/celine-eu/celine-policies
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+# ClusterIP only — in-cluster access from mosquitto-go-auth
+service:
+  type: ClusterIP
+  port: 8009
+
+# No public ingress
+ingress:
+  enabled: false
+  domain: celine.local
+  host: ""
+  issuer: celine-tls
+  auth:
+    enabled: false
+  tls:
+    enabled: false
+    secretName: ""
+  annotations: {}
+
+# --------------------------------------------------------------------------
+# OIDC  (CELINE_OIDC_* env vars)
+# --------------------------------------------------------------------------
+oidc:
+  baseUrl: "http://keycloak/realms/celine"
+  jwksUri: "http://keycloak/realms/celine/protocol/openid-connect/certs"
+  allowedAudiences: ""
+  includeClientIdAsAudience: true
+  timeout: 10.0
+  service:
+    clientId: "svc-celine-policies"
+    audience: "svc-celine-policies"
+    clientSecret: "svc-celine-policies"  # [secret] — override via existingSecret
+
+# --------------------------------------------------------------------------
+# Policy engine  (CELINE_POLICIES_* env vars)
+# --------------------------------------------------------------------------
+policies:
+  dir: "/app/policies"
+  dataDir: ""
+  cacheEnabled: true
+  cacheTtl: 300
+  cacheMaxsize: 10000
+
+# --------------------------------------------------------------------------
+# MQTT auth-specific  (CELINE_MQTT_* env vars)
+# --------------------------------------------------------------------------
+extraEnv:
+  - name: CELINE_MQTT_POLICY_PACKAGE
+    value: "celine.mqtt.acl"
+  - name: CELINE_MQTT_SUPERUSER_SCOPE
+    value: "mqtt.admin"
+
+# --------------------------------------------------------------------------
+# Secrets
+# Must contain: CELINE_OIDC_CLIENT_SECRET
+# --------------------------------------------------------------------------
+existingSecret: ""
+extraSecrets: {}
+
+# --------------------------------------------------------------------------
+# Health check
+# --------------------------------------------------------------------------
+healthCheck:
+  enabled: true
+  path: /health
+  initialDelaySeconds: 10
+  periodSeconds: 30
+  failureThreshold: 3
+
+# --------------------------------------------------------------------------
+# Misc
+# --------------------------------------------------------------------------
+logLevel: "INFO"
+
+configMap:
+  enabled: false
+  name: ""
+  mountPath: /app/config
+  data: {}
+
+volumeMounts: []
+volumes: []
+
+migrate:
+  enabled: false
+  command: []
+  extraEnv: []
+
+postgres:
+  existingSecret: ""
+  dsnEnvVar: "DATABASE_URL"
+  secretKey: "connection-string"
+
+s3:
+  endpointUrl: ""
+  region: "us-east-1"
+  existingSecret: ""
+
+podAnnotations: {}
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false   # OPA/regorus may write temp files
+
+resources: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

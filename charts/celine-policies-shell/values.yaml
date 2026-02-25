@@ -1,0 +1,94 @@
+## ----------------------------------------------------------------------------
+## celine-policies-shell — values.yaml
+##
+## Long-running shell pod for maintenance tasks against celine-policies.
+## Primary use case: running the celine-policies CLI to sync Keycloak
+## clients/scopes from clients.yaml.
+##
+## Usage after deploy:
+##   # Copy clients.yaml into the pod
+##   kubectl cp clients.yaml <pod>:/tmp/clients.yaml
+##
+##   # Run the sync
+##   kubectl exec -it <pod> -- \
+##     .venv/bin/celine-policies keycloak sync /tmp/clients.yaml
+##
+##   # Or use the bootstrap command (requires admin user/password)
+##   kubectl exec -it <pod> -- \
+##     .venv/bin/celine-policies keycloak bootstrap /tmp/clients.yaml
+## ----------------------------------------------------------------------------
+
+image:
+  repository: ghcr.io/celine-eu/celine-policies
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# --------------------------------------------------------------------------
+# Keycloak connection settings
+# All fields map to CELINE_KEYCLOAK_* environment variables (KeycloakSettings).
+# --------------------------------------------------------------------------
+keycloak:
+  # Base URL of the Keycloak instance reachable from within the cluster.
+  baseUrl: "http://keycloak/realms/celine"
+  realm: "celine"
+
+  # Admin credentials — typically injected from the keycloak secret.
+  # If existingSecret is set, adminUser and adminPassword are read from there.
+  adminUser: "admin"
+
+  # Reference an existing Secret that holds the admin password and
+  # optionally the admin client secret (for service-account auth).
+  # The Secret must contain the keys defined by adminPasswordKey /
+  # adminClientSecretKey below.
+  existingSecret: "keycloak-admin-credentials"
+  adminPasswordKey: "admin-password"
+  adminClientSecretKey: "admin-client-secret"  # optional; only if using client-credentials flow
+
+# --------------------------------------------------------------------------
+# Extra environment variables (plain value or secretKeyRef)
+# --------------------------------------------------------------------------
+extraEnv: []
+# Example:
+#   - name: SOME_VAR
+#     value: "some-value"
+#   - name: SECRET_VAR
+#     secret: my-secret
+#     key: secret-key
+
+# --------------------------------------------------------------------------
+# Extra volume mounts — useful for mounting a ConfigMap with clients.yaml
+# so you don't have to kubectl cp every time.
+# --------------------------------------------------------------------------
+volumeMounts: []
+volumes: []
+
+# Example — mount clients.yaml from a ConfigMap:
+#
+# volumeMounts:
+#   - name: clients-config
+#     mountPath: /etc/celine-policies
+#     readOnly: true
+#
+# volumes:
+#   - name: clients-config
+#     configMap:
+#       name: celine-policies-clients
+
+# --------------------------------------------------------------------------
+# Pod
+# --------------------------------------------------------------------------
+podAnnotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+
+resources: {}
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

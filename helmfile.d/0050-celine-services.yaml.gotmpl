@@ -63,3 +63,21 @@ releases:
       - ../envs/{{ .Environment.Name }}/0050-celine-services/celine-rec-registry/values.yaml.gotmpl
     labels:
       group: celine-services
+
+  - name: celine-mqtt-auth
+    namespace: celine-{{ .Environment.Name }}
+    chart: ./charts/celine-mqtt-auth
+    values:
+      - ../defaults/0050-celine-services/celine-mqtt-auth/values.yaml.gotmpl
+      - ../envs/{{ .Environment.Name }}/0050-celine-services/celine-mqtt-auth/values.yaml.gotmpl
+    labels:
+      group: celine-services
+
+  - name: celine-policies-shell
+    namespace: celine-{{ .Environment.Name }}
+    chart: ./charts/celine-policies-shell
+    labels:
+      group: celine-services
+    values:
+      - ../defaults/0050-celine-services/celine-policies-shell/values.yaml.gotmpl
+      - ../envs/{{ .Environment.Name }}/0050-celine-services/celine-policies-shell/values.yaml.gotmpl

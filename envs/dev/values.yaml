@@ -112,3 +112,17 @@ pipelines:
   CDSAPI_KEY: todo
   ADSAPI_KEY: todo
   OWM_APIKEY: todo
+
+mqtt_auth:
+  image_tag: latest
+  logLevel: DEBUG
+  oidc:
+    clientSecret: "svc-mqtt-auth"
+
+policies_shell:
+  image_tag: latest
+
+digital_twin:
+  image_tag: latest
+  oidc:
+    clientSecret: "svc-digital-twin"
