@@ -79,13 +79,13 @@ spec:
                       image: {{ .image }}
                       namespace: {{ $.Values.global.namespace }}
                       env:
-              {{- range (concat $.Values.global.env .env) }}
-              {{- if .value }}
-                        {{ .name }}: "{{ .value }}"
-              {{- else }}
-                        {{ .name }}: "$${{ .name }}"
-              {{- end }}
-              {{- end }}
+                      {{- range (concat $.Values.global.env .env) }}
+                      {{- if .value }}
+                                {{ .name }}: "{{ .value }}"
+                      {{- else }}
+                                {{ .name }}: "$${{ .name }}"
+                      {{- end }}
+                      {{- end }}
               EOF
 
               echo "Generated /config/prefect.yaml:"

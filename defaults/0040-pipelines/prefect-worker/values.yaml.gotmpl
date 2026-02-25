@@ -18,51 +18,57 @@ worker:
                 "type": "object",
                 "additionalProperties": {
                   "anyOf": [
-                    { "type": "string" },
-                    { "type": "null" }
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
                   ]
                 }
               },
               "name": {
-                "anyOf": [{ "type": "string" }, { "type": "null" }],
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
                 "title": "Name"
               },
               "image": {
-                "anyOf": [{ "type": "string" }, { "type": "null" }]
-              },
-              "command": {
-                "anyOf": [{ "type": "string" }, { "type": "null" }],
-                "title": "Command"
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "labels": {
                 "type": "object",
                 "title": "Labels",
-                "additionalProperties": { "type": "string" }
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "command": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Command"
               },
               "namespace": {
                 "type": "string",
-                "default": "celine-{{ .Environment.Name }}"
-              },
-              "image_pull_policy": {
-                "enum": ["IfNotPresent", "Always", "Never"],
-                "default": "IfNotPresent"
-              },
-              "image_pull_secrets": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "name": { "type": "string" }
-                  }
-                },
-                "default": []
-              },
-              "service_account_name": {
-                "anyOf": [{ "type": "string" }, { "type": "null" }]
-              },
-              "finished_job_ttl": {
-                "anyOf": [{ "type": "integer" }, { "type": "null" }],
-                "default": 60
+                "default": "celine-staging"
               },
               "backoff_limit": {
                 "type": "integer",
@@ -72,72 +78,135 @@ worker:
                 "type": "boolean",
                 "default": true
               },
+              "cluster_config": {
+                "anyOf": [
+                  {
+                    "$ref": "#/definitions/KubernetesClusterConfig"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "finished_job_ttl": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": 60
+              },
+              "image_pull_policy": {
+                "enum": [
+                  "IfNotPresent",
+                  "Always",
+                  "Never"
+                ],
+                "default": "IfNotPresent"
+              },
+              "image_pull_secrets": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "name"
+                  ],
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "default": []
+              },
+              "service_account_name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "job_watch_timeout_seconds": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              },
               "pod_watch_timeout_seconds": {
                 "type": "integer",
                 "default": 60
-              },
-              "job_watch_timeout_seconds": {
-                "anyOf": [{ "type": "integer" }, { "type": "null" }],
-                "default": null
-              },
-              "cluster_config": {
-                "anyOf": [
-                  { "$ref": "#/definitions/KubernetesClusterConfig" },
-                  { "type": "null" }
-                ]
               }
             },
             "definitions": {
               "KubernetesClusterConfig": {
                 "type": "object",
                 "title": "KubernetesClusterConfig",
-                "required": ["config", "context_name"],
+                "required": [
+                  "config",
+                  "context_name"
+                ],
                 "properties": {
-                  "config": { "type": "object", "additionalProperties": true },
-                  "context_name": { "type": "string" }
+                  "config": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "context_name": {
+                    "type": "string"
+                  }
                 },
-                "block_type_slug": "kubernetes-cluster-config",
                 "secret_fields": [],
+                "block_type_slug": "kubernetes-cluster-config",
                 "block_schema_references": {}
               }
             }
           },
           "job_configuration": {
-            "namespace": "{{ `{{ namespace }}` }}",
-            "stream_output": "{{ `{{ stream_output }}` }}",
-            "cluster_config": "{{ `{{ cluster_config }}` }}",
-            "job_watch_timeout_seconds": "{{ `{{ job_watch_timeout_seconds }}` }}",
-            "pod_watch_timeout_seconds": "{{ `{{ pod_watch_timeout_seconds }}` }}",
+            "env": "{{ env }}",
+            "namespace": "{{ namespace }}",
             "job_manifest": {
-              "apiVersion": "batch/v1",
               "kind": "Job",
-              "metadata": {
-                "namespace": "{{ `{{ namespace }}` }}",
-                "generateName": "{{ `{{ name }}` }}-",
-                "labels": "{{ `{{ labels }}` }}"
-              },
               "spec": {
-                "backoffLimit": "{{ `{{ backoff_limit }}` }}",
-                "ttlSecondsAfterFinished": "{{ `{{ finished_job_ttl }}` }}",
                 "template": {
                   "spec": {
-                    "parallelism": 1,
-                    "completions": 1,
-                    "restartPolicy": "Never",
-                    "serviceAccountName": "{{ `{{ service_account_name }}` }}",
-                    "imagePullSecrets": "{{ `{{ image_pull_secrets }}` }}",
                     "containers": [
                       {
+                        "args": "{{ command }}",
                         "name": "prefect-job",
-                        "image": "{{ `{{ image }}` }}",
-                        "imagePullPolicy": "{{ `{{ image_pull_policy }}` }}",
-                        "args": "{{ `{{ command }}` }}",
-                        "env": "{{ `{{ env }}` }}"
+                        "image": "{{ image }}",
+                        "imagePullPolicy": "{{ image_pull_policy }}"
                       }
-                    ]
+                    ],
+                    "completions": 1,
+                    "parallelism": 1,
+                    "restartPolicy": "Never",
+                    "imagePullSecrets": "{{ image_pull_secrets }}",
+                    "serviceAccountName": "{{ service_account_name }}"
                   }
-                }
-              }
-            }
+                },
+                "backoffLimit": "{{ backoff_limit }}",
+                "ttlSecondsAfterFinished": "{{ finished_job_ttl }}"
+              },
+              "metadata": {
+                "labels": "{{ labels }}",
+                "namespace": "{{ namespace }}",
+                "generateName": "{{ name }}-"
+              },
+              "apiVersion": "batch/v1"
+            },
+            "stream_output": "{{ stream_output }}",
+            "cluster_config": "{{ cluster_config }}",
+            "job_watch_timeout_seconds": "{{ job_watch_timeout_seconds }}",
+            "pod_watch_timeout_seconds": "{{ pod_watch_timeout_seconds }}"
           }
         }
