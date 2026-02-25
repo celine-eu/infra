@@ -2,6 +2,8 @@
 ## celine-dataset-api — values.yaml
 ## ----------------------------------------------------------------------------
 
+fullnameOverride: dataset-api
+
 image:
   repository: ghcr.io/celine-eu/dataset-api
   tag: "latest"
@@ -44,7 +46,7 @@ policies:
   cacheMaxsize: 10000
 
 postgres:
-  existingSecret: "dataset-api-connection-string"
+  existingSecret: "postgis1-dataset-api-connection-string"
   dsnEnvVar: "DATABASE_URL"
   secretKey: "connection-string"
 

@@ -7,6 +7,8 @@
 ##   - No alembic migrate — schema managed by the app on startup
 ## ----------------------------------------------------------------------------
 
+fullnameOverride: ai-assistant
+
 image:
   repository: ghcr.io/celine-eu/celine-ai-assistant
   tag: "latest"
@@ -49,7 +51,7 @@ policies:
   cacheMaxsize: 10000
 
 postgres:
-  existingSecret: "ai-assistant-connection-string"
+  existingSecret: "postgis1-ai-assistant-connection-string"
   dsnEnvVar: "DATABASE_URL"
   secretKey: "connection-string"
 

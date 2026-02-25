@@ -2,6 +2,8 @@
 ## celine-rec-registry — values.yaml
 ## ----------------------------------------------------------------------------
 
+fullnameOverride: rec-registry
+
 image:
   repository: ghcr.io/celine-eu/celine-rec-registry
   tag: "latest"
@@ -44,7 +46,7 @@ policies:
   cacheMaxsize: 10000
 
 postgres:
-  existingSecret: "rec-registry-connection-string"
+  existingSecret: "postgis1-rec-registry-connection-string"
   dsnEnvVar: "DATABASE_URL"
   secretKey: "connection-string"
 
@@ -75,7 +77,10 @@ volumeMounts: []
 volumes: []
 
 logLevel: "INFO"
-extraEnv: []
+extraEnv:
+  - name: REC_REGISTRY_URL
+    value: http://celine-rec-registry:8004
+
 extraSecrets: {}
 
 podAnnotations: {}

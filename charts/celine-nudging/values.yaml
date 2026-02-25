@@ -2,6 +2,7 @@
 ## celine-nudging — values.yaml
 ## ----------------------------------------------------------------------------
 
+fullnameOverride: nudging
 image:
   repository: ghcr.io/celine-eu/celine-nudging
   tag: "latest"
@@ -44,7 +45,7 @@ policies:
   cacheMaxsize: 10000
 
 postgres:
-  existingSecret: "nudging-connection-string"
+  existingSecret: "postgis1-nudging-connection-string"
   dsnEnvVar: "DATABASE_URL"
   secretKey: "connection-string"
 
