@@ -55,16 +55,20 @@ Local setup is **mandatory**. Install the following tools:
   https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/
 
 - `helm`  
-  https://helm.sh/docs/intro/install/  version v3
+  ```bash
+  curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-4 | bash
+  ```
 
 - `helm-diff` (required by Helmfile)  
   ```bash
-  helm plugin install https://github.com/databus23/helm-diff --version v3.9.14
+  helm plugin install https://github.com/databus23/helm-diff --verify=false
   ```
 
 - `helm-secrets` (required by Helmfile)  
   ```bash
-  helm plugin install https://github.com/jkroepke/helm-secrets --version v4.7.5
+    helm plugin install https://github.com/jkroepke/helm-secrets/releases/download/v4.7.5/secrets-4.7.5.tgz
+    helm plugin install https://github.com/jkroepke/helm-secrets/releases/download/v4.7.5/secrets-getter-4.7.5.tgz
+    helm plugin install https://github.com/jkroepke/helm-secrets/releases/download/v4.7.5/secrets-post-renderer-4.7.5.tgz
   ```
 
 - `helmfile`  
