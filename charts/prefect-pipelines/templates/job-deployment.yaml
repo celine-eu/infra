@@ -4,6 +4,9 @@ kind: Job
 metadata:
   name: prefect-deploy-{{ .name }}
   namespace: {{ $.Values.global.namespace }}
+  labels:
+    app: prefect-pipeline-deploy
+
 spec:
   ttlSecondsAfterFinished: 30
   template:
@@ -59,13 +62,22 @@ spec:
               name: {{ .name }}-deployment
               deployments:
                 - name: {{ .name }}-flow
-                  description: "{{ .name }} Prefect deployment"
+                  description: "{{ .name }} prefect deployment"
                   entrypoint: "{{ .path }}:{{ .callback }}"
+
+                  # run once at time, assume idempotency
                   concurrency_limit: {{ .concurrencyLimit | default 1 }}
+                  collision_strategy: CANCEL_NEW
+
+                  # Never backfill missed runs — only ever run the next scheduled one.
+                  # schedules:
+                  #   - cron: {{ (.schedule).cron | default "0 * * * *" | quote }}
+                  #     active: true
+                  #     catchup: false
+
                   schedule:
-                  {{- with .schedule }}
-                  {{ toYaml . | indent 2 }}
-                  {{- end }}
+                    cron: {{ (.schedule).cron | default "0 * * * *" | quote }}
+
                   work_pool:
                     name: {{ $.Values.global.work_pool }}
                     job_variables:
