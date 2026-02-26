@@ -61,10 +61,16 @@ spec:
                 - name: {{ .name }}-flow
                   description: "{{ .name }} Prefect deployment"
                   entrypoint: "{{ .path }}:{{ .callback }}"
+
+                  # run once at time, assume idempotency
+                  concurrency_limit: {{ .concurrencyLimit | default 1 }}
+
+                  # Never backfill missed runs — only ever run the next scheduled one.
                   schedule:
-                  {{- with .schedule }}
-                  {{ toYaml . | indent 2 }}
-                  {{- end }}
+                    cron: {{ (.schedule).cron | default "0 * * * *" | quote }}
+                    catchup: false
+
+
                   work_pool:
                     name: {{ $.Values.global.work_pool }}
                     job_variables:

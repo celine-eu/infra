@@ -12,9 +12,18 @@ data:
         - type: http
           port: ${MARQUEZ_PORT:-5000}
           httpCompliance: RFC7230_LEGACY
+          # Accept queue — stops requests being rejected under burst load
+          acceptQueueSize: 256
       adminConnectors:
         - type: http
           port: ${MARQUEZ_ADMIN_PORT:-5001}
+
+      # Dropwizard Jetty thread pool.
+      # Default min=8/max=1024 but unbounded max burns memory.
+      # With 4 concurrent pipelines writing lineage, 32 threads is plenty.
+      minThreads: 8
+      maxThreads: 32
+      maxQueuedRequests: 256
 
     db:
       driverClass: org.postgresql.Driver
@@ -22,18 +31,36 @@ data:
       user: ${POSTGRES_USER:-{{ .Values.postgres.user }}}
       password: ${POSTGRES_PASSWORD:-changeme}
 
-    migrateOnStartup: false
+      # Connection pool (HikariCP via Dropwizard)
+      # Default is minSize=1/maxSize=10 which causes queuing under concurrency.
+      minSize: 4
+      maxSize: 16
+      # Kill idle connections after 10 min to avoid PG idle connection limit
+      maxConnectionAge: 10m
+      # Fail fast if pool exhausted rather than waiting forever
+      minIdleTime: 1m
+      evictionInterval: 30s
+      checkConnectionOnBorrow: true
+      checkConnectionWhileIdle: true
+      maxWaitForConnection: 3s
+      # Validate connections before use (avoids stale conn errors after PG restart)
+      validationQuery: "SELECT 1"
+      validationQueryTimeout: 2s
+
+    migrateOnStartup: true
 
     graphql:
       enabled: true
 
     logging:
-      level: INFO
+      level: WARN
       appenders:
         - type: console
+          # Reduce log noise — INFO floods stdout with every lineage event
+          threshold: WARN
 
     search:
-      enabled: ${SEARCH_ENABLED:-true}
+      enabled: ${SEARCH_ENABLED:-false}
       scheme: http
       host: ${SEARCH_HOST:-{{ .Values.search.host }}}
       port: ${SEARCH_PORT:-{{ .Values.search.port }}}

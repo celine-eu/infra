@@ -32,14 +32,34 @@ ingress:
   tlsSecret: marquez-tls
   annotations:
     cert-manager.io/issuer: letsencrypt-prod
-    nginx.ingress.kubernetes.io/rewrite-target: /
+    # nginx.ingress.kubernetes.io/rewrite-target: /
     nginx.ingress.kubernetes.io/auth-url: "https://sso.celine.local/oauth2/auth"
     nginx.ingress.kubernetes.io/auth-signin: "https://sso.celine.local/oauth2/start?rd=$scheme://$host$request_uri"
     nginx.ingress.kubernetes.io/auth-response-headers: "Authorization, X-Auth-Request-Email, X-Auth-Request-User"
 
 persistence:
-  enabled: true
+  enabled: false
   size: 5Gi
   storageClass: ""
 
-resources: {}
+resources:
+  api:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+  web:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+# JVM tuning passed as env var to the api container.
+# Heap: 512m initial / 1.5g max — leaves ~512Mi headroom for off-heap (Netty, etc.)
+# G1GC is better than default ParallelGC for latency-sensitive workloads.
+# MaxGCPauseMillis=200 targets <200ms GC pauses.
+javaOpts: "-Xms512m -Xmx1536m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+ExitOnOutOfMemoryError"
