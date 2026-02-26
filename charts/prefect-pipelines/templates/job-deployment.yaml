@@ -61,7 +61,6 @@ spec:
                 - name: {{ .name }}-flow
                   description: "{{ .name }} Prefect deployment"
                   entrypoint: "{{ .path }}:{{ .callback }}"
-                  concurrency_limit: {{ .concurrencyLimit | default 1 }}
                   schedule:
                   {{- with .schedule }}
                   {{ toYaml . | indent 2 }}
