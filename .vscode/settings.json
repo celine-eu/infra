@@ -6,5 +6,6 @@
     "files.associations": {
         "**/*.gotmpl": "helm",
         "**/helmfile.d/*.yaml": "helm",
-    }
+    },
+    "yaml.validate": false
 }
