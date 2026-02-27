@@ -28,8 +28,28 @@ spec:
         - name: shell
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          # Keep the container alive indefinitely so operators can exec in.
-          command: ["/bin/sh", "-c", "echo 'celine-policies shell ready'; tail -f /dev/null"]
+          # Sync clients.yaml on startup with retry (Keycloak may not be ready),
+          # then stay alive for manual exec.
+          command:
+            - /bin/sh
+            - -c
+            - |
+              CLIENTS_FILE="{{ .Values.clientsFile | default "/app/clients.yaml" }}"
+              MAX_RETRIES=20
+              RETRY_DELAY=15
+              SECRET_FILE=/tmp/.secrets.yaml
+              i=0
+              until celine-policies keycloak sync --secrets-file "$SECRET_FILE" "$CLIENTS_FILE"; do
+                i=$((i + 1))
+                if [ "$i" -ge "$MAX_RETRIES" ]; then
+                  echo "ERROR: keycloak sync failed after $MAX_RETRIES attempts, giving up"
+                  break
+                fi
+                echo "Keycloak not ready, retrying in ${RETRY_DELAY}s ($i/$MAX_RETRIES)..."
+                sleep $RETRY_DELAY
+              done
+              echo "celine-policies shell ready"
+              tail -f /dev/null
           env:
             # ----------------------------------------------------------------
             # Keycloak connection  (CELINE_KEYCLOAK_* → KeycloakSettings)
@@ -43,16 +63,20 @@ spec:
               value: {{ .Values.keycloak.adminUser | quote }}
             {{- end }}
             {{- if .Values.keycloak.existingSecret }}
+            {{- if .Values.keycloak.adminPasswordKey }}
             - name: CELINE_KEYCLOAK_ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.keycloak.existingSecret }}
-                  key: {{ .Values.keycloak.adminPasswordKey | default "admin-password" }}
+                  key: {{ .Values.keycloak.adminPasswordKey }}
+            {{- end }}
+            {{- if .Values.keycloak.adminClientSecretKey }}
             - name: CELINE_KEYCLOAK_ADMIN_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.keycloak.existingSecret }}
-                  key: {{ .Values.keycloak.adminClientSecretKey | default "admin-client-secret" }}
+                  key: {{ .Values.keycloak.adminClientSecretKey }}
+            {{- end }}
             {{- end }}
             # ----------------------------------------------------------------
             # Extra env vars (for ad-hoc use)

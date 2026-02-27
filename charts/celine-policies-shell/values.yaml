@@ -25,7 +25,8 @@ image:
 
 imagePullSecrets: []
 nameOverride: ""
-fullnameOverride: ""
+
+fullnameOverride: "policies-shell"
 
 # --------------------------------------------------------------------------
 # Keycloak connection settings
@@ -33,7 +34,7 @@ fullnameOverride: ""
 # --------------------------------------------------------------------------
 keycloak:
   # Base URL of the Keycloak instance reachable from within the cluster.
-  baseUrl: "http://keycloak/realms/celine"
+  baseUrl: "http://keycloak"
   realm: "celine"
 
   # Admin credentials — typically injected from the keycloak secret.
@@ -46,7 +47,7 @@ keycloak:
   # adminClientSecretKey below.
   existingSecret: "keycloak-admin-credentials"
   adminPasswordKey: "admin-password"
-  adminClientSecretKey: "admin-client-secret"  # optional; only if using client-credentials flow
+  adminClientSecretKey: "" # optional; only if using client-credentials flow
 
 # --------------------------------------------------------------------------
 # Extra environment variables (plain value or secretKeyRef)

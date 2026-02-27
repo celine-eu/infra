@@ -1,6 +1,17 @@
 image:
   tag: {{ .Values.policies_shell.image_tag | default "latest" | quote }}
 
+keycloak:
+  # Base URL of the Keycloak instance reachable from within the cluster.
+  baseUrl: "http://keycloak-keycloakx-http/auth"
+  realm: {{ .Values.keycloak.realm | default "celine" | quote }}
+
+  adminUser: {{ .Values.keycloak.username | default "admin" | quote }}
+  existingSecret: "keycloak-keycloakx-keycloak-admin-secret"
+  adminPasswordKey: "password"
+  adminClientSecretKey: ""
+
+
 # keycloak:
 #   # In-cluster URL — not domain-based, always internal
 #   baseUrl: "http://keycloak"

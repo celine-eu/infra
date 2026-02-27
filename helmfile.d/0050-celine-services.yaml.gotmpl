@@ -56,6 +56,18 @@ releases:
     labels:
       group: celine-services
 
+  - name: nudging
+    namespace: celine-{{ .Environment.Name }}
+    chart: ../charts/celine-nudging
+    createNamespace: true
+    missingFileHandler: Warn
+    values:
+      - ../defaults/0050-celine-services/values.yaml.gotmpl
+      - ../defaults/0050-celine-services/celine-nudging/values.yaml.gotmpl
+      - ../envs/{{ .Environment.Name }}/0050-celine-services/celine-nudging/values.yaml.gotmpl
+    labels:
+      group: celine-services
+
   - name: rec-registry
     namespace: celine-{{ .Environment.Name }}
     chart: ../charts/celine-rec-registry
@@ -79,7 +91,7 @@ releases:
     labels:
       group: celine-services
 
-  - name: celine-policies-shell
+  - name: policies-shell
     namespace: celine-{{ .Environment.Name }}
     chart: ../charts/celine-policies-shell
     missingFileHandler: Warn

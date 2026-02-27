@@ -73,15 +73,17 @@ connection_strings:
   - database: datasets
     user: datasets_owner
 
+  - database: datasets
+    user: datasets_ro
+    name: datasets-readonly
+    dialect: postgresql+asyncpg
+
   - database: prefect
     dialect: postgresql+asyncpg
 
   - database: meltano
 
   - database: nudging
-    dialect: postgresql+asyncpg
-
-  - database: datasets_api
     dialect: postgresql+asyncpg
 
   - database: rec_registry

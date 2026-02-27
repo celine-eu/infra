@@ -1,7 +1,7 @@
 {{- $scheme := .Values.tls_setup.enabled | ternary "https" "http" }}
 
 image:
-  pullPolicy: Always
+  pullPolicy: IfNotPresent
 
 oidc:
   baseUrl: {{$scheme}}://keycloak/realms/{{ .Values.keycloak.realm | default "celine" }}
@@ -38,24 +38,3 @@ ingress:
   tls:
     enabled: true
     secretName: ""
-
-# podSecurityContext:
-#   runAsUser: 1000
-
-# logLevel: "INFO"
-# replicaCount: 1
-# image:
-#   pullPolicy: Always
-#   tag: "latest"
-
-# migrate:
-#   enabled: false
-#   command: ["alembic", "upgrade", "head"]
-#   extraEnv: []
-
-# configMap:
-#   enabled: false
-#   name: ""
-#   mountPath: /app/config
-#   data: {}
-

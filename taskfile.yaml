@@ -224,12 +224,44 @@ tasks:
     vars:
       SERVICE: "{{ index .MATCH 0 }}"
       BASEPATH: '{{ env "SERVICES_BASEPATH" | default "../celine-dev/repositories" }}'
+      REPO_PATH: '{{ env "REPO_PATH" | default "" }}'
+      IMAGE_NAME: '{{ env "IMAGE_NAME" | default "" }}'
     env:
       SOPS_AGE_KEY_FILE: "{{.PWD}}/.sops/dev/key.txt"
     cmds:
-      - eval $(minikube docker-env) && docker build -t ghcr.io/celine-eu/{{.SERVICE}}:local {{.BASEPATH}}/{{.SERVICE}}
-      - kubectl rollout restart deployment/{{.SERVICE}} -n celine-dev
+      - |
+
+        REPO_PATH={{ if .REPO_PATH }}{{ .REPO_PATH }}{{ else }}{{.BASEPATH}}/{{.SERVICE}}{{ end }}
+        IMAGE_NAME={{ if .IMAGE_NAME }}{{ .IMAGE_NAME }}{{ else }}{{.SERVICE}}{{ end }}
+        SERVICE_NAME={{ if .SERVICE_NAME }}{{ .SERVICE_NAME }}{{ else }}{{.SERVICE}}{{ end }}
+
+        eval $(minikube docker-env) && docker build -t ghcr.io/celine-eu/{{.SERVICE}}:local $REPO_PATH
+
+        helmfile -e dev -l name={{.SERVICE}} apply \
+          --set image.tag=local \
+          --set image.pullPolicy=Never
+        kubectl rollout restart deployment/{{.SERVICE}} -n celine-dev
 
   dev:build:rec-registry:
     cmds:
       - task dev:skaffold-build-image:rec-registry
+
+  dev:build:nudging:
+    cmds:
+      - REPO_PATH="../celine-dev/repositories/nudging-tool" task dev:skaffold-build-image:nudging
+
+  dev:build:digital-twin:
+    cmds:
+      - REPO_PATH="../celine-dev/repositories/digital-twin" task dev:skaffold-build-image:digital-twin
+
+  dev:build:dataset-api:
+    cmds:
+      - REPO_PATH="../celine-dev/repositories/dataset-api" task dev:skaffold-build-image:dataset-api
+
+  dev:build:policies-shell:
+    cmds:
+      - |
+        IMAGE_NAME=celine-policies \
+        SERVICE_NAME=policies-shell \
+        REPO_PATH="../celine-dev/repositories/celine-policies" \
+        task dev:skaffold-build-image:policies-shell
