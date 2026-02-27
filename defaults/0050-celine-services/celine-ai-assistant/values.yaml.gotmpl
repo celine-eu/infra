@@ -1,0 +1,7 @@
+image:
+  tag: {{ .Environment.Values.ai_assistant.image_tag | default "latest" | quote }}
+
+oidc:
+  service:
+    clientSecret: {{ .Environment.Values | dig "ai_assistant" "client_secret" "svc-ai-assistant" | quote }}
+

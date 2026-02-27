@@ -2,7 +2,7 @@ extensions:
   - .yaml
   - .yml
   - .tpl
-  - .gotpl
+  - .gotmpl
 
 contents:
   - README.md

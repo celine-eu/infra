@@ -1,0 +1,10 @@
+apiVersion: v2
+name: celine-frontend-assistant
+version: 0.1.0
+description: CELINE Assistant frontend service
+type: application
+appVersion: "latest"
+dependencies:
+  - name: celine-services
+    version: "0.1.0"
+    repository: file://../celine-services

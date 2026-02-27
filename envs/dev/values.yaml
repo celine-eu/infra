@@ -73,6 +73,7 @@ auth_setup:
   cookieSecret: 3d749938f5b65074ea3c7359a06ab108
 
 keycloak:
+  realm: celine
   username: admin
   password: admin
 
@@ -122,7 +123,33 @@ mqtt_auth:
 policies_shell:
   image_tag: latest
 
+ai_assistant:
+  image_tag: latest
+  oidc:
+    clientSecret: "svc-ai-assistant"
+
+dataset_api:
+  image_tag: latest
+  oidc:
+    clientSecret: "svc-dataset-api"
+
 digital_twin:
   image_tag: latest
   oidc:
     clientSecret: "svc-digital-twin"
+
+nudging:
+  image_tag: latest
+  oidc:
+    clientSecret: "svc-nudging"
+
+rec_registry:
+  image_tag: latest
+  oidc:
+    clientSecret: "svc-rec-registry"
+
+frontend_ai_assistant:
+  image_tag: "latest"
+
+frontend_webapp:
+  image_tag: "latest"

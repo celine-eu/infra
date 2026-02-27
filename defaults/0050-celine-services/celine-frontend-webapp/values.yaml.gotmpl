@@ -1,0 +1,7 @@
+# defaults/0050-celine-services/celine-frontend-webapp/values.yaml.gotmpl
+
+image:
+  tag: {{ .Environment.Values.frontend_webapp.image_tag | default "latest" | quote }}
+
+ingress:
+  host: webapp.{{ .Environment.Values.domain }}

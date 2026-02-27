@@ -1,0 +1,9 @@
+image:
+  tag: {{ .Environment.Values.rec_registry.image_tag | default "latest" | quote }}
+
+oidc:
+  service:
+    clientSecret: {{ .Environment.Values | dig "rec_registry" "client_secret" "svc-rec-registry" | quote }}
+
+migrate:
+  enabled: false

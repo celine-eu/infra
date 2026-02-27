@@ -1,0 +1,6 @@
+image:
+  tag: {{ .Environment.Values.nudging.image_tag | default "latest" | quote }}
+
+oidc:
+  service:
+    clientSecret: {{ .Environment.Values | dig "nudging" "client_secret" "svc-nudging" | quote }}

@@ -18,8 +18,8 @@ environments:
 repositories:
   - name: superset
     url: https://apache.github.io/superset
-  - name: vicsufer
-    url: https://charts.vicsufer.dev/
+  - name: qdrant
+    url: https://qdrant.github.io/qdrant-helm
 
 # hooks:
 #   - events: ["prepare"]
@@ -86,3 +86,15 @@ releases:
     labels:
       group: apps
 {{- end }}
+
+  - name: qdrant
+    namespace: celine-{{ .Environment.Name }}
+    chart: qdrant/qdrant
+    version: 1.17.0
+    createNamespace: true
+    missingFileHandler: Warn
+    values:
+      - ../defaults/0030-apps/qdrant/values.yaml.gotmpl
+      - ../envs/{{ .Environment.Name }}/0030-apps/qdrant/values.yaml.gotmpl
+    labels:
+      group: apps

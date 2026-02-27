@@ -32,7 +32,7 @@ service:
 # Ingress
 # ------------------------------------------------------------------------------
 ingress:
-  enabled: true
+  enabled: false
   domain: celine.local # overridden per env
   host: "dt.celine.local" # overridden per env
   issuer: celine-tls

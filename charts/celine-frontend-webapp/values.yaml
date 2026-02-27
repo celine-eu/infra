@@ -1,0 +1,22 @@
+image:
+    repository: ghcr.io/celine-eu/celine-frontend-webapp
+    tag: "latest"
+
+service:
+    type: ClusterIP
+    port: 3005
+
+ingress:
+    enabled: true
+    host: "webapp.celine.local"
+    auth:
+        enabled: true
+    tls:
+        enabled: true
+        secretName: "webapp-tls"
+    annotations:
+        nginx.ingress.kubernetes.io/auth-url: "https://sso.celine.local/oauth2/auth"
+        nginx.ingress.kubernetes.io/auth-signin: "https://sso.celine.local/oauth2/start?rd=$scheme://$host$request_uri"
+        nginx.ingress.kubernetes.io/auth-response-headers: "Authorization, X-Auth-Request-Email, X-Auth-Request-User"
+
+replicaCount: 1

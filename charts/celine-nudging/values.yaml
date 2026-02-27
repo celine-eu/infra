@@ -15,7 +15,7 @@ service:
   port: 8016
 
 ingress:
-  enabled: true
+  enabled: false
   domain: celine.local
   host: "nudging.celine.local"
   issuer: celine-tls

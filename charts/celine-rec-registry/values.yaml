@@ -5,7 +5,7 @@
 fullnameOverride: rec-registry
 
 image:
-  repository: ghcr.io/celine-eu/celine-rec-registry
+  repository: ghcr.io/celine-eu/rec-registry
   tag: "latest"
   pullPolicy: IfNotPresent
 
@@ -16,7 +16,7 @@ service:
   port: 8004
 
 ingress:
-  enabled: true
+  enabled: false
   domain: celine.local
   host: "rec-registry.celine.local"
   issuer: celine-tls
@@ -34,9 +34,9 @@ oidc:
   includeClientIdAsAudience: true
   timeout: 10.0
   service:
-    clientId: "svc-celine-rec-registry"
-    audience: "svc-celine-rec-registry"
-    clientSecret: "svc-celine-rec-registry" # [secret]
+    clientId: "svc-rec-registry"
+    audience: "svc-rec-registry"
+    clientSecret: "svc-rec-registry" # [secret]
 
 policies:
   dir: "/app/policies"
@@ -56,7 +56,7 @@ s3:
   existingSecret: ""
 
 migrate:
-  enabled: true
+  enabled: false
   command: ["alembic", "upgrade", "head"]
   extraEnv: []
 

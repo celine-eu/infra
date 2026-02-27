@@ -1,0 +1,6 @@
+image:
+  tag: {{ .Environment.Values.dataset_api.image_tag | default "latest" | quote }}
+
+oidc:
+  service:
+    clientSecret: {{ .Environment.Values | dig "dataset_api" "client_secret" "svc-dataset-api" | quote }}

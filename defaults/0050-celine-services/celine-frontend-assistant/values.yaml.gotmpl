@@ -1,0 +1,7 @@
+
+image:
+  tag: {{ .Environment.Values.frontend_ai_assistant.image_tag | default "latest" | quote }}
+
+
+ingress:
+  host: assistant.{{ .Environment.Values.domain }}

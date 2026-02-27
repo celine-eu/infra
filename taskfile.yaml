@@ -56,6 +56,19 @@ tasks:
         fi
         helmfile -e {{ .DEPLOYMENT_ENV }} -l {{ .ARGS }} destroy
 
+  helmfile:*:
+    vars:
+      DEPLOYMENT_ENV: "{{ index .MATCH 0 }}"
+    env:
+      SOPS_AGE_KEY_FILE: "{{.PWD}}/.sops/{{.DEPLOYMENT_ENV}}/key.txt"
+    cmds:
+      - |
+        if [ ! -d "./envs/{{.DEPLOYMENT_ENV}}" ]; then \
+          echo "Environment ./envs/{{.DEPLOYMENT_ENV}} not found"
+          exit 1
+        fi
+      - helmfile -e {{.DEPLOYMENT_ENV}} {{.CLI_ARGS}}
+
   apply:
     env:
       SOPS_AGE_KEY_FILE: "{{.PWD}}/.sops/{{.CLI_ARGS}}/key.txt"
@@ -205,3 +218,18 @@ tasks:
         if [ ! -f ./envs/dev/secrets.yaml ]; then 
           cat "---" > ./envs/dev/secrets.yaml
         fi
+
+  dev:skaffold-build-image:*:
+    desc: "Build and deploy a service locally. Set SERVICES_BASEPATH to your repos root (default: ..)"
+    vars:
+      SERVICE: "{{ index .MATCH 0 }}"
+      BASEPATH: '{{ env "SERVICES_BASEPATH" | default "../celine-dev/repositories" }}'
+    env:
+      SOPS_AGE_KEY_FILE: "{{.PWD}}/.sops/dev/key.txt"
+    cmds:
+      - eval $(minikube docker-env) && docker build -t ghcr.io/celine-eu/{{.SERVICE}}:local {{.BASEPATH}}/{{.SERVICE}}
+      - kubectl rollout restart deployment/{{.SERVICE}} -n celine-dev
+
+  dev:build:rec-registry:
+    cmds:
+      - task dev:skaffold-build-image:rec-registry

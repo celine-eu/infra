@@ -106,7 +106,7 @@ For local development, services are exposed under `*.celine.local`.
 Add the following entry to `/etc/hosts`:
 
 ```text
-192.168.49.2 dashboard.celine.local s3.celine.local keycloak.celine.local marquez.celine.local mqtt.celine.local sso.celine.local prefect.celine.local superset.celine.local
+192.168.49.2 api.celine.local webapp.celine.local assistant.celine.local dashboard.celine.local s3.celine.local keycloak.celine.local marquez.celine.local mqtt.celine.local sso.celine.local prefect.celine.local superset.celine.local
 ```
 
 Notes:

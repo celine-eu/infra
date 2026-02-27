@@ -1,0 +1,61 @@
+{{- $scheme := .Values.tls_setup.enabled | ternary "https" "http" }}
+
+image:
+  pullPolicy: Always
+
+oidc:
+  baseUrl: {{$scheme}}://keycloak/realms/{{ .Values.keycloak.realm | default "celine" }}
+  jwksUri: {{$scheme}}://keycloak/realms/{{ .Values.keycloak.realm | default "celine" }}/protocol/openid-connect/certs
+#   allowedAudiences: ""
+  includeClientIdAsAudience: true
+#   timeout: 10.0
+
+policies:
+  dir: "/app/policies"
+  dataDir: ""
+  cacheEnabled: true
+  cacheTtl: 300
+  cacheMaxsize: 10000
+
+s3:
+  endpointUrl: "{{ .Values.s3_accounts.endpoint }}"
+  region: "us-east-1"
+  existingSecret: ""
+
+healthCheck:
+  enabled: true
+  path: /health
+  initialDelaySeconds: 10
+  periodSeconds: 30
+  failureThreshold: 3
+
+ingress: 
+  enabled: false
+  domain: {{ .Values.domain }}
+  issuer: {{ .Values.tls_setup.issuer | default "celine-tls" }}
+  auth:
+    enabled: true
+  tls:
+    enabled: true
+    secretName: ""
+
+# podSecurityContext:
+#   runAsUser: 1000
+
+# logLevel: "INFO"
+# replicaCount: 1
+# image:
+#   pullPolicy: Always
+#   tag: "latest"
+
+# migrate:
+#   enabled: false
+#   command: ["alembic", "upgrade", "head"]
+#   extraEnv: []
+
+# configMap:
+#   enabled: false
+#   name: ""
+#   mountPath: /app/config
+#   data: {}
+

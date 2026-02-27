@@ -1,0 +1,6 @@
+dependencies:
+- name: celine-services
+  repository: file://../celine-services
+  version: 0.1.0
+digest: sha256:bb02bc5311552d1b3dc6094a14769dbdfd456610305083f84736701d18d0aaec
+generated: "2026-02-25T21:43:30.708282478+01:00"

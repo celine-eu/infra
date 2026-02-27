@@ -1,3 +1,4 @@
+{{- $scheme := .Values.secure | ternary "https" "http" }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -8,8 +9,8 @@ data:
   oauth2_proxy.cfg: |
     provider = "keycloak-oidc"
     upstreams = [ "file:///dev/null" ]
-    oidc_issuer_url = "https://keycloak.{{ .Values.domain }}/auth/realms/{{ .Values.realm | default "celine" }}"
-    redirect_url = "https://sso.{{ .Values.domain }}/oauth2/callback"
+    oidc_issuer_url = "{{ $scheme }}://keycloak.{{ .Values.domain }}/auth/realms/{{ .Values.realm | default "celine" }}"
+    redirect_url = "{{ $scheme }}://sso.{{ .Values.domain }}/oauth2/callback"
     email_domains = [ "*" ]
     cookie_domains = [ ".{{ .Values.domain }}" ]
     whitelist_domains = [ "*.{{ .Values.domain }}" ]
@@ -20,7 +21,7 @@ data:
     pass_access_token = true
     pass_user_headers = true
     reverse_proxy = true
-    
+
     # allow service account access using a token
     skip_jwt_bearer_tokens = true
     insecure_oidc_allow_unverified_email = true
@@ -37,4 +38,3 @@ data:
     cookie_samesite = "lax"
     session_store_type = "redis"
     redis_connection_url = "redis://redis:6379"
-

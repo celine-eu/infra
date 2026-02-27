@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "celine-frontend-assistant.fullname" . }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "celine-frontend-assistant.fullname" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "celine-frontend-assistant.fullname" . }}
+    spec:
+      containers:
+        - name: celine-frontend-assistant
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          ports:
+            - containerPort: {{ .Values.service.port }}

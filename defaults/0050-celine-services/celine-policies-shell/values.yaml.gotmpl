@@ -1,41 +1,28 @@
 image:
-  repository: ghcr.io/celine-eu/celine-policies
   tag: {{ .Values.policies_shell.image_tag | default "latest" | quote }}
-  pullPolicy: IfNotPresent
 
-keycloak:
-  # In-cluster URL — not domain-based, always internal
-  baseUrl: "http://keycloak"
-  realm: "celine"
-  adminUser: {{ .Values.keycloak.username | default "admin" | quote }}
-  # Secret created by postgres-db / auth-setup that holds the admin password.
-  # Key names must match what the secret actually contains.
-  existingSecret: "keycloak-admin-credentials"
-  adminPasswordKey: "admin-password"
-  adminClientSecretKey: "admin-client-secret"
-
-extraEnv: []
+# keycloak:
+#   # In-cluster URL — not domain-based, always internal
+#   baseUrl: "http://keycloak"
+#   realm: "celine"
+#   adminUser: {{ .Values.keycloak.username | default "admin" | quote }}
+#   # Secret created by postgres-db / auth-setup that holds the admin password.
+#   # Key names must match what the secret actually contains.
+#   existingSecret: "keycloak-admin-credentials"
+#   adminPasswordKey: "admin-password"
+#   adminClientSecretKey: "admin-client-secret"
 
 # Mount clients.yaml from a ConfigMap so no kubectl cp is needed.
 # The ConfigMap is managed separately (kubectl apply or another chart).
-volumeMounts:
-  - name: clients-config
-    mountPath: /etc/celine-policies
-    readOnly: true
+# volumeMounts:
+#   - name: clients-config
+#     mountPath: /etc/celine-policies
+#     readOnly: true
 
-volumes:
-  - name: clients-config
-    configMap:
-      name: celine-policies-clients
-      # If the ConfigMap doesn't exist yet the pod will stay Pending —
-      # set optional: true to allow the pod to start without it.
-      optional: true
-
-podSecurityContext:
-  runAsNonRoot: true
-  runAsUser: 1000
-
-resources: {}
-nodeSelector: {}
-tolerations: []
-affinity: {}
+# volumes:
+#   - name: clients-config
+#     configMap:
+#       name: celine-policies-clients
+#       # If the ConfigMap doesn't exist yet the pod will stay Pending —
+#       # set optional: true to allow the pod to start without it.
+#       optional: true

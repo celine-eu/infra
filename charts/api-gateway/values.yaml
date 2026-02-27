@@ -1,0 +1,44 @@
+domain: celine.local
+issuer: celine-tls
+
+auth:
+    enabled: true
+    url: "" # defaults to https://sso.{domain}/oauth2/auth
+    signin: "" # defaults to https://sso.{domain}/oauth2/start
+
+tls:
+    enabled: true
+    secretName: api-gateway-tls
+
+# Services exposed under api.{domain}/{name}
+# name:    path prefix and ingress rule identifier
+# service: k8s service name
+# port:    k8s service port
+services:
+    - name: rec-registry
+      service: rec-registry
+      port: 8004
+
+    - name: dataset-api
+      service: dataset-api
+      port: 8001
+
+    - name: ai-assistant
+      service: ai-assistant
+      port: 8012
+
+    - name: nudging
+      service: nudging
+      port: 8016
+
+    - name: digital-twin
+      service: digital-twin
+      port: 8005
+
+    - name: frontend-assistant
+      service: frontend-assistant
+      port: 3003
+
+    - name: frontend-webapp
+      service: frontend-webapp
+      port: 3005

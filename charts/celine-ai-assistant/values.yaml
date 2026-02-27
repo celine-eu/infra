@@ -21,7 +21,7 @@ service:
   port: 8012
 
 ingress:
-  enabled: true
+  enabled: false
   domain: celine.local
   host: "assistant.celine.local"
   issuer: celine-tls

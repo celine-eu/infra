@@ -16,7 +16,7 @@ service:
   port: 8001
 
 ingress:
-  enabled: true
+  enabled: false
   domain: celine.local
   host: "dataset-api.celine.local"
   issuer: celine-tls
