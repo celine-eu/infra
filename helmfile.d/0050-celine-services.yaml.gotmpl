@@ -56,6 +56,18 @@ releases:
     labels:
       group: celine-services
 
+  - name: webapp
+    namespace: celine-{{ .Environment.Name }}
+    chart: ../charts/celine-webapp
+    createNamespace: true
+    missingFileHandler: Warn
+    values:
+      - ../defaults/0050-celine-services/values.yaml.gotmpl
+      - ../defaults/0050-celine-services/celine-webapp/values.yaml.gotmpl
+      - ../envs/{{ .Environment.Name }}/0050-celine-services/celine-webapp/values.yaml.gotmpl
+    labels:
+      group: celine-services
+
   - name: nudging
     namespace: celine-{{ .Environment.Name }}
     chart: ../charts/celine-nudging
@@ -110,5 +122,27 @@ releases:
     values:
       - ../defaults/0050-celine-services/api-gateway/values.yaml.gotmpl
       - ../envs/{{ .Environment.Name }}/0050-celine-services/api-gateway/values.yaml.gotmpl
+    labels:
+      group: celine-services
+
+  - name: frontend-assistant
+    namespace: celine-{{ .Environment.Name }}
+    chart: ../charts/celine-frontend-assistant
+    createNamespace: true
+    missingFileHandler: Warn
+    values:
+      - ../defaults/0050-celine-services/celine-frontend-assistant/values.yaml.gotmpl
+      - ../envs/{{ .Environment.Name }}/0050-frontends/celine-frontend-assistant/values.yaml.gotmpl
+    labels:
+      group: celine-services
+
+  - name: frontend-webapp
+    namespace: celine-{{ .Environment.Name }}
+    chart: ../charts/celine-frontend-webapp
+    createNamespace: true
+    missingFileHandler: Warn
+    values:
+      - ../defaults/0050-celine-services/celine-frontend-webapp/values.yaml.gotmpl
+      - ../envs/{{ .Environment.Name }}/0050-frontends/celine-frontend-webapp/values.yaml.gotmpl
     labels:
       group: celine-services

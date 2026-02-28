@@ -235,7 +235,7 @@ tasks:
         IMAGE_NAME={{ if .IMAGE_NAME }}{{ .IMAGE_NAME }}{{ else }}{{.SERVICE}}{{ end }}
         SERVICE_NAME={{ if .SERVICE_NAME }}{{ .SERVICE_NAME }}{{ else }}{{.SERVICE}}{{ end }}
 
-        eval $(minikube docker-env) && docker build -t ghcr.io/celine-eu/{{.SERVICE}}:local $REPO_PATH
+        eval $(minikube docker-env) && docker build -t ghcr.io/celine-eu/$IMAGE_NAME:local $REPO_PATH
 
         helmfile -e dev -l name={{.SERVICE}} apply \
           --set image.tag=local \
@@ -258,6 +258,18 @@ tasks:
     cmds:
       - REPO_PATH="../celine-dev/repositories/dataset-api" task dev:skaffold-build-image:dataset-api
 
+  dev:build:ai-assistant:
+    cmds:
+      - |
+        IMAGE_NAME=celine-ai-assistant \
+        REPO_PATH="../celine-dev/repositories/celine-ai-assistant" task dev:skaffold-build-image:ai-assistant
+
+  dev:build:webapp:
+    cmds:
+      - |
+        IMAGE_NAME=celine-webapp \
+        REPO_PATH="../celine-dev/repositories/celine-webapp" task dev:skaffold-build-image:webapp
+
   dev:build:policies-shell:
     env:
       SOPS_AGE_KEY_FILE: "{{.PWD}}/.sops/dev/key.txt"
@@ -272,3 +284,32 @@ tasks:
           --set image.tag=local \
           --set image.pullPolicy=Never
         kubectl rollout restart deployment/mqtt-auth -n celine-dev
+
+  dev:build:frontend-webapp:
+    env:
+      SOPS_AGE_KEY_FILE: "{{.PWD}}/.sops/dev/key.txt"
+    cmds:
+      - |
+        IMAGE_NAME=celine-frontend-webapp \
+        REPO_PATH="../celine-dev/repositories/celine-frontends" \
+        task dev:skaffold-build-image:frontend-webapp
+  dev:build:frontend-assistant:
+    env:
+      SOPS_AGE_KEY_FILE: "{{.PWD}}/.sops/dev/key.txt"
+    cmds:
+      - |
+        IMAGE_NAME=celine-frontend-assistant \
+        REPO_PATH="../celine-dev/repositories/celine-frontends" \
+        task dev:skaffold-build-image:frontend-assistant
+
+  dev:build:all:
+    cmds:
+      - task: dev:build:rec-registry
+      - task: dev:build:nudging
+      - task: dev:build:digital-twin
+      - task: dev:build:dataset-api
+      - task: dev:build:ai-assistant
+      - task: dev:build:webapp
+      - task: dev:build:policies-shell
+      - task: dev:build:frontend-webapp
+      - task: dev:build:frontend-assistant

@@ -1,6 +1,15 @@
+## ----------------------------------------------------------------------------
+## celine-frontend-assistant — values.yaml
+## ----------------------------------------------------------------------------
+
+fullnameOverride: frontend-assistant
+
 image:
     repository: ghcr.io/celine-eu/celine-frontend-assistant
     tag: "latest"
+    pullPolicy: IfNotPresent
+
+replicaCount: 1
 
 service:
     type: ClusterIP
@@ -8,15 +17,53 @@ service:
 
 ingress:
     enabled: true
+    domain: celine.local
     host: "assistant.celine.local"
+    issuer: celine-tls
     auth:
         enabled: true
     tls:
         enabled: true
-        secretName: "assistant-tls"
-    annotations:
-        nginx.ingress.kubernetes.io/auth-url: "https://sso.celine.local/oauth2/auth"
-        nginx.ingress.kubernetes.io/auth-signin: "https://sso.celine.local/oauth2/start?rd=$scheme://$host$request_uri"
-        nginx.ingress.kubernetes.io/auth-response-headers: "Authorization, X-Auth-Request-Email, X-Auth-Request-User"
+        secretName: ""
+    annotations: {}
 
-replicaCount: 1
+healthCheck:
+    enabled: true
+    path: /
+    initialDelaySeconds: 10
+    periodSeconds: 30
+    failureThreshold: 3
+
+# Not used but required by celine-services shared templates
+oidc:
+    baseUrl: ""
+    jwksUri: ""
+    allowedAudiences: ""
+    includeClientIdAsAudience: false
+    timeout: 10.0
+    service:
+        clientId: ""
+        audience: ""
+        clientSecret: ""
+
+policies:
+    dir: "/app/policies"
+    dataDir: ""
+    cacheEnabled: false
+    cacheTtl: 300
+    cacheMaxsize: 10000
+
+extraEnv: []
+extraSecrets: {}
+podAnnotations: {}
+podSecurityContext:
+    runAsUser: 1000
+resources: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+volumeMounts: []
+volumes: []
+logLevel: "INFO"
+migrate:
+    enabled: false

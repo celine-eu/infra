@@ -6,7 +6,10 @@
         "**/charts/**/*.yaml": "helm",
         "**/charts/**/templates/*.yaml": "helm",
         "**/charts/**/templates/*.yml": "helm",
-        "**/charts/**/templates/*.tpl": "helm"
+        "**/charts/**/templates/*.tpl": "helm",
+        "*/templates/*.yaml": "helm",
+        "*.yaml.gotmpl": "helm",
     },
+    "editor.formatOnSave": false,
     "yaml.validate": false
 }

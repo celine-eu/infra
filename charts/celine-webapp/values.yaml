@@ -1,0 +1,117 @@
+## ----------------------------------------------------------------------------
+## celine-webapp — values.yaml
+##
+## FastAPI BFF for the CELINE REC Participant Webapp.
+## Deployed behind oauth2-proxy; JWT arrives via X-Auth-Request-Access-Token.
+## ----------------------------------------------------------------------------
+
+fullnameOverride: webapp
+
+image:
+  repository: ghcr.io/celine-eu/celine-webapp
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  port: 8014
+
+# --------------------------------------------------------------------------
+# Ingress — oauth2-proxy auth enabled (same pattern as other CELINE services)
+# --------------------------------------------------------------------------
+ingress:
+  enabled: false
+  domain: celine.local
+  host: "webapp.celine.local"
+  issuer: celine-tls
+  auth:
+    enabled: true
+  tls:
+    enabled: true
+    secretName: ""
+  annotations: {}
+
+# --------------------------------------------------------------------------
+# OIDC  (CELINE_OIDC_* env vars — passed through to celine-sdk)
+# The webapp does not verify JWT signatures itself; oauth2-proxy does.
+# These are kept for SDK compatibility.
+# --------------------------------------------------------------------------
+oidc:
+  baseUrl: "http://keycloak/realms/celine"
+  jwksUri: "http://keycloak/realms/celine/protocol/openid-connect/certs"
+  allowedAudiences: ""
+  includeClientIdAsAudience: true
+  timeout: 10.0
+  service:
+    clientId: "svc-webapp"
+    audience: "svc-webapp"
+    clientSecret: "svc-webapp" # [secret] — override via existingSecret
+
+# --------------------------------------------------------------------------
+# Postgres — DSN injected from the connection-string Secret produced by
+# the postgres-db chart.  Maps to DATABASE_URL env var.
+# --------------------------------------------------------------------------
+postgres:
+  existingSecret: "postgis1-webapp-connection-string"
+  dsnEnvVar: "DATABASE_URL"
+  secretKey: "connection-string"
+
+# --------------------------------------------------------------------------
+# Alembic migration init-container
+# --------------------------------------------------------------------------
+migrate:
+  enabled: true
+  command: ["alembic", "upgrade", "head"]
+  extraEnv: []
+
+# --------------------------------------------------------------------------
+# Health check — hits the /health endpoint added to the FastAPI app
+# --------------------------------------------------------------------------
+healthCheck:
+  enabled: true
+  path: /health
+  initialDelaySeconds: 10
+  periodSeconds: 30
+  failureThreshold: 3
+
+# --------------------------------------------------------------------------
+# Policies — required by celine-services helpers even if not actively used
+# --------------------------------------------------------------------------
+policies:
+  dir: "/app/policies"
+  dataDir: ""
+  cacheEnabled: false
+  cacheTtl: 300
+  cacheMaxsize: 10000
+
+# --------------------------------------------------------------------------
+# Application-specific env vars
+# --------------------------------------------------------------------------
+extraEnv:
+  - name: CELINE_WEBAPP_DIGITAL_TWIN_API_URL
+    value: "http://celine-digital-twin:8001"
+  - name: CELINE_WEBAPP_NUDGING_API_URL
+    value: "http://celine-nudging:8006"
+  - name: CELINE_WEBAPP_CORS_ORIGINS
+    value: ""
+
+# --------------------------------------------------------------------------
+# Extra secrets — e.g. VAPID keys if needed later
+# --------------------------------------------------------------------------
+extraSecrets: {}
+
+podAnnotations: {}
+podSecurityContext:
+  runAsUser: 1000
+
+resources: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+volumeMounts: []
+volumes: []
+
+logLevel: "INFO"

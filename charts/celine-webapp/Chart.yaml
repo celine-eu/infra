@@ -1,6 +1,8 @@
 apiVersion: v2
-name: celine-frontend-assistant
-description: CELINE Assistant frontend service
+name: celine-webapp
+description: >
+  CELINE REC Participant Webapp (FastAPI BFF).
+  Deployed behind oauth2-proxy; JWT forwarded via X-Auth-Request-Access-Token.
 type: application
 version: 0.1.0
 appVersion: "latest"

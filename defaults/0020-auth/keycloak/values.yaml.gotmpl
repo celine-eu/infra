@@ -59,7 +59,7 @@ ingress:
 
 proxy:
   enabled: true
-  mode: forwarded   # sets KC_PROXY_HEADERS=xforwarded
+  mode: xforwarded   # sets KC_PROXY_HEADERS=xforwarded
   http:
     enabled: {{ not .Values.tls_setup.enabled }}   # sets KC_HTTP_ENABLED=true
 

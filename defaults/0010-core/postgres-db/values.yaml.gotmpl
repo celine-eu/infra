@@ -35,6 +35,8 @@ roles:
     password: {{ .Environment.Values.postgres_db.rec_registry | quote }}
   - name: ai_assistant
     password: {{ .Environment.Values.postgres_db.ai_assistant | quote }}
+  - name: webapp
+    password: {{ .Environment.Values.postgres_db.webapp | quote }}
 
 databases:
   - name: datasets
@@ -68,6 +70,8 @@ databases:
     owner: rec_registry
   - name: ai_assistant
     owner: ai_assistant
+  - name: webapp
+    owner: webapp
 
 connection_strings:
   - database: datasets
@@ -90,6 +94,9 @@ connection_strings:
     dialect: postgresql+asyncpg
 
   - database: ai_assistant
+    dialect: postgresql+asyncpg
+
+  - database: webapp
     dialect: postgresql+asyncpg
 
 

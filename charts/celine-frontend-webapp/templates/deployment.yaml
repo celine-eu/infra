@@ -1,19 +1,71 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "celine-frontend-webapp.fullname" . }}
+  name: {{ include "celine-services.fullname" . }}
+  labels:
+    {{- include "celine-services.labels" . | nindent 4 }}
 spec:
-  replicas: {{ .Values.replicaCount }}
+  replicas: {{ .Values.replicaCount | default 1 }}
   selector:
     matchLabels:
-      app: {{ include "celine-frontend-webapp.fullname" . }}
+      {{- include "celine-services.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        app: {{ include "celine-frontend-webapp.fullname" . }}
+        {{- include "celine-services.selectorLabels" . | nindent 8 }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: {{ .Values.podSecurityContext.runAsUser | default 1000 }}
       containers:
-        - name: celine-frontend-webapp
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        - name: {{ include "celine-services.name" . }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default "latest" }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
           ports:
-            - containerPort: {{ .Values.service.port }}
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          env:
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- if .Values.healthCheck.enabled }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.healthCheck.path | default "/" }}
+              port: http
+            initialDelaySeconds: {{ .Values.healthCheck.initialDelaySeconds | default 10 }}
+            periodSeconds: {{ .Values.healthCheck.periodSeconds | default 30 }}
+            failureThreshold: {{ .Values.healthCheck.failureThreshold | default 3 }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.healthCheck.path | default "/" }}
+              port: http
+            initialDelaySeconds: {{ .Values.healthCheck.initialDelaySeconds | default 5 }}
+            periodSeconds: {{ .Values.healthCheck.periodSeconds | default 10 }}
+            failureThreshold: {{ .Values.healthCheck.failureThreshold | default 3 }}
+          {{- end }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

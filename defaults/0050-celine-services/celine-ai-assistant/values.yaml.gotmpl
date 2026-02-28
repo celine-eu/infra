@@ -5,3 +5,8 @@ oidc:
   service:
     clientSecret: {{ .Environment.Values | dig "ai_assistant" "client_secret" "svc-ai-assistant" | quote }}
 
+extraEnv:
+  - name: QDRANT_URL
+    value: http://qdrant:6333
+  - name: OPENAI_API_KEY
+    value: {{ .Environment.Values.ai_assistant.openai_api_key | quote }}
