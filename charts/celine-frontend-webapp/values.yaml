@@ -20,6 +20,9 @@ ingress:
   domain: celine.local
   host: "webapp.celine.local"
   issuer: celine-tls
+  apiBackend:
+    service: webapp
+    port: 8014
   auth:
     enabled: true
   tls:

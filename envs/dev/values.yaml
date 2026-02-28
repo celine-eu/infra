@@ -72,6 +72,8 @@ auth_setup:
   clientSecret: oauth2_proxy
   clientCLISecret: celine-cli
   cookieSecret: 3d749938f5b65074ea3c7359a06ab108
+  realmAdminUser: admin
+  realmAdminPassword: admin
 
 keycloak:
   realm: celine

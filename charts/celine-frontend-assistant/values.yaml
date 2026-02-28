@@ -20,6 +20,9 @@ ingress:
     domain: celine.local
     host: "assistant.celine.local"
     issuer: celine-tls
+    apiBackend:
+        service: ai-assistant
+        port: 8012
     auth:
         enabled: true
     tls:

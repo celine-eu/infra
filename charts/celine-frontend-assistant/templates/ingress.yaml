@@ -1,1 +1,44 @@
-{{ include "celine-services.ingress" . }}
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "celine-services.fullname" . }}
+  labels:
+    {{- include "celine-services.labels" . | nindent 4 }}
+  annotations:
+    cert-manager.io/issuer: {{ .Values.ingress.issuer | default "celine-tls" }}
+    {{- if .Values.ingress.auth.enabled }}
+    nginx.ingress.kubernetes.io/auth-url: "https://sso.{{ .Values.ingress.domain }}/oauth2/auth"
+    nginx.ingress.kubernetes.io/auth-signin: "https://sso.{{ .Values.ingress.domain }}/oauth2/start?rd=$scheme://$host$request_uri"
+    nginx.ingress.kubernetes.io/auth-response-headers: "Authorization, X-Auth-Request-Email, X-Auth-Request-User, X-Auth-Request-Access-Token"
+    {{- end }}
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.ingress.apiBackend.service }}
+                port:
+                  number: {{ .Values.ingress.apiBackend.port }}
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "celine-services.fullname" . }}
+                port:
+                  number: {{ .Values.service.port }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host }}
+      secretName: {{ .Values.ingress.tls.secretName | default (printf "%s-tls" (include "celine-services.fullname" .)) }}
+  {{- end }}
+{{- end }}

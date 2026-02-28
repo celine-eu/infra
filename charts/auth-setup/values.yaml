@@ -4,6 +4,11 @@ realm: celine
 domain: celine.local
 issuer: celine-tls
 
+realmAdmin:
+  username: "celine-admin"
+  email: "admin@celine.local"
+  password: "celine-admin"
+
 oauth2Proxy:
   clientID: oauth2_proxy
   # openssl rand -hex 16

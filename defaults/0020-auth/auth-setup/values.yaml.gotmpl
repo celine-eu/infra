@@ -4,6 +4,11 @@ realm: celine
 domain: "{{ .Environment.Values.domain }}"
 issuer: {{ .Environment.Values.tls_setup.issuer }}
 
+realmAdmin:
+  username: {{ .Environment.Values | dig "auth_setup" "realmAdminUser" "celine-admin" }}
+  email: {{ .Environment.Values | dig "auth_setup" "realmAdminEmail" "admin@celine.local" }}
+  password: {{ .Environment.Values | dig "auth_setup" "realmAdminPassword" "celine-admin" }}
+
 oauth2Proxy:
   clientID: {{ .Environment.Values.auth_setup.clientID | default "oauth2_proxy"  }}
   # openssl rand -hex 16

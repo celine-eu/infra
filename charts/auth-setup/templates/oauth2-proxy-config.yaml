@@ -1,4 +1,3 @@
-{{- $scheme := .Values.secure | ternary "https" "http" }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -9,8 +8,8 @@ data:
   oauth2_proxy.cfg: |
     provider = "keycloak-oidc"
     upstreams = [ "file:///dev/null" ]
-    oidc_issuer_url = "{{ $scheme }}://keycloak.{{ .Values.domain }}/auth/realms/{{ .Values.realm | default "celine" }}"
-    redirect_url = "{{ $scheme }}://sso.{{ .Values.domain }}/oauth2/callback"
+    oidc_issuer_url = "https://keycloak.{{ .Values.domain }}/auth/realms/{{ .Values.realm | default "celine" }}"
+    redirect_url = "https://sso.{{ .Values.domain }}/oauth2/callback"
     email_domains = [ "*" ]
     cookie_domains = [ ".{{ .Values.domain }}" ]
     whitelist_domains = [ "*.{{ .Values.domain }}" ]

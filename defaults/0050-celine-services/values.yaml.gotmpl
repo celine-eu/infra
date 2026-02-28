@@ -1,17 +1,11 @@
-{{- $keycloakBase := "" }}
-
-{{- if .Values.tls_setup.enabled }}
-  {{- $keycloakBase = printf "https://keycloak.%s/auth/realms/%s" .Values.domain (.Values.keycloak.realm | default "celine") }}
-{{- else }}
-  {{- $keycloakBase = printf "http://keycloak-keycloakx-http:80/auth/realms/%s" (.Values.keycloak.realm | default "celine") }}
-{{- end }}
+{{- $keycloakPublic := printf "https://keycloak.%s/auth/realms/%s" .Values.domain (.Values.keycloak.realm | default "celine") }}
 
 image:
   pullPolicy: IfNotPresent
 
 oidc:
-  baseUrl: {{$keycloakBase}}
-  jwksUri: {{$keycloakBase}}/protocol/openid-connect/certs
+  baseUrl: {{$keycloakPublic}}
+  jwksUri: {{$keycloakPublic}}/protocol/openid-connect/certs
 #   allowedAudiences: ""
   includeClientIdAsAudience: true
 #   timeout: 10.0
