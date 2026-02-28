@@ -11,7 +11,7 @@
 
 # Override to get a predictable Service name.
 # mosquitto-go-auth's goAuth.jwt.host must equal this value.
-fullnameOverride: celine-mqtt-auth
+fullnameOverride: mqtt-auth
 
 image:
   repository: ghcr.io/celine-eu/celine-policies
@@ -50,7 +50,7 @@ oidc:
   service:
     clientId: "svc-celine-policies"
     audience: "svc-celine-policies"
-    clientSecret: "svc-celine-policies"  # [secret] — override via existingSecret
+    clientSecret: "svc-celine-policies" # [secret] — override via existingSecret
 
 # --------------------------------------------------------------------------
 # Policy engine  (CELINE_POLICIES_* env vars)
@@ -123,7 +123,7 @@ podSecurityContext:
   runAsUser: 1000
 securityContext:
   allowPrivilegeEscalation: false
-  readOnlyRootFilesystem: false   # OPA/regorus may write temp files
+  readOnlyRootFilesystem: false # OPA/regorus may write temp files
 
 resources: {}
 nodeSelector: {}

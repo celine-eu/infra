@@ -80,7 +80,7 @@ releases:
     labels:
       group: celine-services
 
-  - name: celine-mqtt-auth
+  - name: mqtt-auth
     namespace: celine-{{ .Environment.Name }}
     chart: ../charts/celine-mqtt-auth
     missingFileHandler: Warn

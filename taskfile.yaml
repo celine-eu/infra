@@ -259,9 +259,16 @@ tasks:
       - REPO_PATH="../celine-dev/repositories/dataset-api" task dev:skaffold-build-image:dataset-api
 
   dev:build:policies-shell:
+    env:
+      SOPS_AGE_KEY_FILE: "{{.PWD}}/.sops/dev/key.txt"
     cmds:
       - |
         IMAGE_NAME=celine-policies \
         SERVICE_NAME=policies-shell \
         REPO_PATH="../celine-dev/repositories/celine-policies" \
         task dev:skaffold-build-image:policies-shell
+      - |
+        helmfile -e dev -l name=mqtt-auth apply \
+          --set image.tag=local \
+          --set image.pullPolicy=Never
+        kubectl rollout restart deployment/mqtt-auth -n celine-dev

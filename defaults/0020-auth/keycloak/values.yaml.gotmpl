@@ -61,7 +61,7 @@ proxy:
   enabled: true
   mode: forwarded   # sets KC_PROXY_HEADERS=xforwarded
   http:
-    enabled: true   # sets KC_HTTP_ENABLED=true
+    enabled: {{ not .Values.tls_setup.enabled }}   # sets KC_HTTP_ENABLED=true
 
 extraEnv: |
   - name: KEYCLOAK_ADMIN
@@ -77,16 +77,11 @@ extraEnv: |
   - name: KC_HOSTNAME
     value: "keycloak.{{ .Environment.Values.domain }}"
   - name: KC_HOSTNAME_STRICT
-    value: "false"
+    value: {{ .Values.tls_setup.enabled | quote }}
   - name: KEYCLOAK_IMPORT
     value: /opt/keycloak/data/import/celine-realm.json
   - name: KEYCLOAK_IMPORT_STRATEGY
     value: IGNORE_EXISTING  # prevents overwriting existing realm if already imported
-
-#  - name: KC_HTTP_ENABLED
-#    value: "true"
-#  - name: KC_PROXY_HEADERS
-#    value: "xforwarded"
 
 extraVolumeMounts: |
   - name: realm-import

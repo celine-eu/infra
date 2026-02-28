@@ -47,7 +47,7 @@ goAuth:
   # update this host accordingly.
   # ----------------------------------------------------------------------------
   jwt:
-    host: "celine-mqtt-auth"
+    host: "mqtt-auth"
     port: 8009
     httpTimeout: 1
 
