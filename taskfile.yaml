@@ -13,6 +13,7 @@ tasks:
       - minikube addons enable ingress
       - minikube addons enable ingress-dns
       - task: set-context
+      - task: dev:setup-certs
 
   dev:stop:
     cmds:
@@ -316,3 +317,67 @@ tasks:
       - task: dev:build:policies-shell
       - task: dev:build:frontend-webapp
       - task: dev:build:frontend-assistant
+
+
+  dev:setup-certs:
+    desc: "Generate self-signed CA + wildcard cert for *.celine.local and load into minikube"
+    cmds:
+      - |
+        set -e
+        DOMAIN="celine.local"
+        CERT_DIR=".certs"
+        mkdir -p "$CERT_DIR"
+
+        echo "🔑 Generating CA key and certificate..."
+        openssl genrsa -out "$CERT_DIR/ca.key" 4096
+        openssl req -new -x509 -days 3650 \
+          -key "$CERT_DIR/ca.key" \
+          -out "$CERT_DIR/ca.crt" \
+          -subj "/CN=celine-local-ca/O=CELINE/C=EU"
+
+        echo "🔑 Generating wildcard cert for *.${DOMAIN}..."
+        openssl genrsa -out "$CERT_DIR/tls.key" 2048
+        openssl req -new \
+          -key "$CERT_DIR/tls.key" \
+          -out "$CERT_DIR/tls.csr" \
+          -subj "/CN=*.${DOMAIN}/O=CELINE"
+        openssl x509 -req -days 825 \
+          -in "$CERT_DIR/tls.csr" \
+          -CA "$CERT_DIR/ca.crt" \
+          -CAkey "$CERT_DIR/ca.key" \
+          -CAcreateserial \
+          -out "$CERT_DIR/tls.crt" \
+          -extfile <(printf "subjectAltName=DNS:*.%s,DNS:%s\nbasicConstraints=CA:FALSE\nkeyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth" "$DOMAIN" "$DOMAIN")
+
+        echo "📦 Loading secrets into minikube (namespace: celine-dev)..."
+        kubectl create namespace celine-dev --dry-run=client -o yaml | kubectl apply -f -
+
+        # CA secret — mounted into pods as SSL_CERT_FILE
+        kubectl create secret generic celine-ca \
+          --from-file=ca.crt="$CERT_DIR/ca.crt" \
+          --namespace celine-dev \
+          --dry-run=client -o yaml | kubectl apply -f -
+
+        # Wildcard TLS secret — used by cert-manager CA issuer + ingress TLS
+        kubectl create secret tls celine-wildcard-tls \
+          --cert="$CERT_DIR/tls.crt" \
+          --key="$CERT_DIR/tls.key" \
+          --namespace celine-dev \
+          --dry-run=client -o yaml | kubectl apply -f -
+
+        # cert-manager CA issuer secret — needs tls.crt + tls.key of the CA itself
+        kubectl create secret tls celine-ca-issuer \
+          --cert=.certs/ca.crt \
+          --key=.certs/ca.key \
+          -n celine-dev \
+          --dry-run=client -o yaml | kubectl apply -f -
+
+        echo ""
+        echo "✅ Secrets created:"
+        echo "   celine-ca            → CA cert for pod SSL_CERT_FILE injection"
+        echo "   celine-wildcard-tls  → wildcard TLS cert for ingress + cert-manager CA issuer"
+        echo ""
+        echo "👉 To trust the CA in your browser/OS, add: $CERT_DIR/ca.crt"
+        echo "   macOS:   sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain $CERT_DIR/ca.crt"
+        echo "   Linux:   sudo cp $CERT_DIR/ca.crt /usr/local/share/ca-certificates/celine-ca.crt && sudo update-ca-certificates"
+        echo "   Firefox: Settings → Certificates → Import → $CERT_DIR/ca.crt"

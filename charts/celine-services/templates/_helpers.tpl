@@ -2,7 +2,7 @@
 ==============================================================================
   celine-services — library helpers
   All templates prefixed "celine-services.*".
-  Called from service charts via {{ include "celine-services.<name>" . }}
+  Called from service charts via {{ include "celine-services.<n>" . }}
 ==============================================================================
 */}}
 
@@ -150,6 +150,42 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 
 
 {{/* ----------------------------------------------------------------------------
+  CA env + volume — injects SSL_CERT_FILE and REQUESTS_CA_BUNDLE pointing at
+  the custom CA cert when .Values.caSecret is set.
+  Covers all httpx calls (OIDC, DT, nudging APIs) and the ssl module (aiomqtt)
+  without any SDK code changes.
+----------------------------------------------------------------------------- */}}
+
+{{- define "celine-services.caEnv" -}}
+{{- if .Values.caSecret }}
+- name: SSL_CERT_FILE
+  value: /etc/ssl/celine-ca/ca.crt
+- name: REQUESTS_CA_BUNDLE
+  value: /etc/ssl/celine-ca/ca.crt
+{{- end }}
+{{- end }}
+
+{{- define "celine-services.caVolumeMount" -}}
+{{- if .Values.caSecret }}
+- name: celine-ca
+  mountPath: /etc/ssl/celine-ca
+  readOnly: true
+{{- end }}
+{{- end }}
+
+{{- define "celine-services.caVolume" -}}
+{{- if .Values.caSecret }}
+- name: celine-ca
+  secret:
+    secretName: {{ .Values.caSecret }}
+    items:
+      - key: ca.crt
+        path: ca.crt
+{{- end }}
+{{- end }}
+
+
+{{/* ----------------------------------------------------------------------------
   Alembic migration initContainer
   Included only when .Values.migrate.enabled is true.
   Inherits the postgres env so alembic can reach the DB.
@@ -168,9 +204,14 @@ initContainers:
         drop: [ALL]
     env:
       {{- include "celine-services.postgresEnv" . | nindent 6 }}
+      {{- include "celine-services.caEnv" . | nindent 6 }}
       {{- with .Values.migrate.extraEnv }}
       {{- toYaml . | nindent 6 }}
       {{- end }}
+    {{- if .Values.caSecret }}
+    volumeMounts:
+      {{- include "celine-services.caVolumeMount" . | nindent 6 }}
+    {{- end }}
 {{- end }}
 {{- end }}
 
@@ -257,7 +298,7 @@ metadata:
     {{- if .Values.ingress.auth.enabled }}
     nginx.ingress.kubernetes.io/auth-url: "https://sso.{{ .Values.ingress.domain }}/oauth2/auth"
     nginx.ingress.kubernetes.io/auth-signin: "https://sso.{{ .Values.ingress.domain }}/oauth2/start?rd=$scheme://$host$request_uri"
-    nginx.ingress.kubernetes.io/auth-response-headers: "Authorization, X-Auth-Request-Email, X-Auth-Request-User"
+    nginx.ingress.kubernetes.io/auth-response-headers: "Authorization, X-Auth-Request-Email, X-Auth-Request-User, X-Auth-Request-Access-Token"
     {{- end }}
     {{- with .Values.ingress.annotations }}
     {{- toYaml . | nindent 4 }}
@@ -333,6 +374,7 @@ spec:
             {{- include "celine-services.policiesEnv" . | nindent 12 }}
             {{- include "celine-services.postgresEnv" . | nindent 12 }}
             {{- include "celine-services.s3Env" . | nindent 12 }}
+            {{- include "celine-services.caEnv" . | nindent 12 }}
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
@@ -352,18 +394,20 @@ spec:
             periodSeconds: {{ .Values.healthCheck.periodSeconds | default 10 }}
             failureThreshold: {{ .Values.healthCheck.failureThreshold | default 3 }}
           {{- end }}
-          {{- with .Values.volumeMounts }}
           volumeMounts:
+            {{- include "celine-services.caVolumeMount" . | nindent 12 }}
+            {{- with .Values.volumeMounts }}
             {{- toYaml . | nindent 12 }}
-          {{- end }}
+            {{- end }}
           {{- with .Values.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-      {{- with .Values.volumes }}
       volumes:
+        {{- include "celine-services.caVolume" . | nindent 8 }}
+        {{- with .Values.volumes }}
         {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

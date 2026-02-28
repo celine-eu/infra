@@ -1,4 +1,5 @@
-enabled: false
+selfSigned: false
+caSecret: ""
 
 issuer: letsencrypt-prod
 email: issuer@celine.local

@@ -2,4 +2,4 @@ domain: {{ .Values.domain }}
 issuer: {{ .Values.tls_setup.issuer | default "celine-tls" }}
 
 tls:
-  enabled: {{ .Values.tls_setup.enabled | default false }}
+  enabled: {{ .Values.tls_setup.self_signed | default false }}

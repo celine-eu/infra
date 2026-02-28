@@ -11,6 +11,17 @@ data:
     listener {{ .Values.listeners.mqtt.port }}
     protocol mqtt
 
+    {{- if .Values.listeners.mqtts.enabled }}
+    # -------------------------------------------------------------------------
+    # MQTTS — TLS listener (self-signed CA)
+    # -------------------------------------------------------------------------
+    listener {{ .Values.listeners.mqtts.port }}
+    protocol mqtt
+    cafile   /etc/mosquitto/tls/ca.crt
+    certfile /etc/mosquitto/tls/tls.crt
+    keyfile  /etc/mosquitto/tls/tls.key
+    {{- end }}
+
     listener {{ .Values.listeners.websocket.port }}
     protocol websockets
 

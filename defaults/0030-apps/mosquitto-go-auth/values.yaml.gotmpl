@@ -1,4 +1,3 @@
-# defaults/0030-apps/mosquitto-go-auth/values.yaml.gotmpl
 # Baseline values for mosquitto-go-auth across all environments.
 # Override only what differs in envs/<env>/0030-apps/mosquitto-go-auth/values.yaml.gotmpl
 
@@ -18,6 +17,11 @@ mosquitto:
 listeners:
   mqtt:
     port: 1883
+  mqtts:
+    enabled: {{ .Environment.Values.tls_setup.self_signed | default false }}
+    port: 8883
+    caSecret: {{ .Environment.Values.tls_setup.ca_secret | default "" | quote }}
+    certSecret: "celine-wildcard-tls"
   websocket:
     port: 1884
 

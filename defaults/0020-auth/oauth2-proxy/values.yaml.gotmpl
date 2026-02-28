@@ -20,8 +20,32 @@ sessionStorage:
       connectionUrl: "redis://redis:6379"
 
 extraEnv:
+{{- if .Environment.Values.tls_setup.self_signed }}
   - name: OAUTH2_PROXY_LOG_LEVEL
     value: debug
+  - name: SSL_CERT_FILE
+    value: /etc/ssl/celine-ca/ca.crt
+  - name: OAUTH2_PROXY_PROVIDER_CA_FILES
+    value: /etc/ssl/celine-ca/ca.crt
+{{- else }}
+  - name: OAUTH2_PROXY_LOG_LEVEL
+    value: info
+{{- end }}
+
+{{- if .Environment.Values.tls_setup.self_signed }}
+extraVolumes:
+  - name: celine-ca
+    secret:
+      secretName: {{ .Environment.Values.tls_setup.ca_secret | default "" }}
+      items:
+        - key: ca.crt
+          path: ca.crt
+
+extraVolumeMounts:
+  - name: celine-ca
+    mountPath: /etc/ssl/celine-ca
+    readOnly: true
+{{- end }}
 
 ingress:
   enabled: true

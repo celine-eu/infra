@@ -22,6 +22,11 @@ s3:
   region: "us-east-1"
   existingSecret: ""
 
+# Inject custom CA cert into all pods when tls_setup.self_signed is true.
+# SSL_CERT_FILE and REQUESTS_CA_BUNDLE are set automatically — covers httpx
+# (OIDC, DT, nudging) and the ssl module (aiomqtt) with no SDK changes.
+caSecret: "{{ .Environment.Values.tls_setup.ca_secret | default "" }}"
+
 healthCheck:
   enabled: true
   path: /health
@@ -29,7 +34,7 @@ healthCheck:
   periodSeconds: 30
   failureThreshold: 3
 
-ingress: 
+ingress:
   enabled: false
   domain: {{ .Values.domain }}
   issuer: {{ .Values.tls_setup.issuer | default "celine-tls" }}

@@ -6,3 +6,4 @@ envs/*/secrets*.yaml.*
 *.tgz
 # Dumpster output
 .dumpster
+.certs

@@ -10,9 +10,13 @@ seaweedfs:
     - name: celine-pipelines-copernicus
 
 tls_setup:
-  enabled: false
   issuer: celine-tls
   email: issuer@celine.local
+  self_signed: true
+  ca_secret: celine-ca
+  cert_manager:
+    # install cert-manager
+    enabled: true
 
 mqtt_ingestor:
   enabled: false

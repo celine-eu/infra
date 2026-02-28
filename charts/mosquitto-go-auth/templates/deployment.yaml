@@ -35,6 +35,11 @@ spec:
             - name: mqtt
               containerPort: {{ .Values.listeners.mqtt.port }}
               protocol: TCP
+            {{- if .Values.listeners.mqtts.enabled }}
+            - name: mqtts
+              containerPort: {{ .Values.listeners.mqtts.port }}
+              protocol: TCP
+            {{- end }}
             - name: websocket
               containerPort: {{ .Values.listeners.websocket.port }}
               protocol: TCP
@@ -46,6 +51,11 @@ spec:
             {{- if .Values.goAuth.files.enabled }}
             - name: auth-files
               mountPath: /etc/mosquitto/auth
+              readOnly: true
+            {{- end }}
+            {{- if .Values.listeners.mqtts.enabled }}
+            - name: tls-cert
+              mountPath: /etc/mosquitto/tls
               readOnly: true
             {{- end }}
             {{- if .Values.persistence.data.enabled }}
@@ -74,6 +84,23 @@ spec:
         - name: auth-files
           secret:
             secretName: {{ include "mosquitto-go-auth.fullname" . }}-auth-files
+        {{- end }}
+        {{- if .Values.listeners.mqtts.enabled }}
+        - name: tls-cert
+          projected:
+            sources:
+              - secret:
+                  name: {{ .Values.listeners.mqtts.certSecret }}
+                  items:
+                    - key: tls.crt
+                      path: tls.crt
+                    - key: tls.key
+                      path: tls.key
+              - secret:
+                  name: {{ .Values.listeners.mqtts.caSecret }}
+                  items:
+                    - key: ca.crt
+                      path: ca.crt
         {{- end }}
         {{- if .Values.persistence.data.enabled }}
         - name: data
