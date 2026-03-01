@@ -318,6 +318,10 @@ tasks:
       - task: dev:build:frontend-webapp
       - task: dev:build:frontend-assistant
 
+  dev:deploy-service:
+    cmds:
+      - task helmfile:dev -- -l name={{.CLI_ARGS}} sync
+      - task dev:build:{{.CLI_ARGS}}
 
   dev:setup-certs:
     desc: "Generate self-signed CA + wildcard cert for *.celine.local and load into minikube"

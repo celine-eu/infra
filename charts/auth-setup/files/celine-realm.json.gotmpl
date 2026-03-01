@@ -1,6 +1,12 @@
 {
   "id": "0c1045cc-7e38-4235-8a5b-502a2c4ae1ac",
   "realm": "{{ .Values.realm }}",
+  
+  "accessTokenLifespan": 3600,
+  "accessTokenLifespanForImplicitFlow": 3600,
+  "ssoSessionIdleTimeout": 86400,
+  "ssoSessionMaxLifespan": 86400,
+
   "enabled": true,
   "displayName": "{{ upper .Values.realm }}",
   "roles": {

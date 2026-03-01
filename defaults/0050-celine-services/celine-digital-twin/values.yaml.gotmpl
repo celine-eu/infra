@@ -1,6 +1,8 @@
 image:
   tag: {{ .Environment.Values.digital_twin.image_tag | default "latest" | quote }}
 
+logLevel: "DEBUG"
+
 oidc:
   service:
     clientSecret: {{ .Environment.Values | dig "digital_twin" "client_secret" "svc-digital-twin" | quote }}

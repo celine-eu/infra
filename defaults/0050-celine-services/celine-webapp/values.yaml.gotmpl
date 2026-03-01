@@ -1,0 +1,21 @@
+image:
+  tag: {{ .Environment.Values.webapp.image_tag | default "latest" | quote }}
+
+oidc:
+  service:
+    # skip client ID / secrets
+    passthrough: true
+    clientId: ""
+    audience: "oauth2_proxy"
+    clientSecret: ""
+
+  includeClientIdAsAudience: false
+  allowedAudiences: ""
+
+extraEnv:
+  - name: DIGITAL_TWIN_API_URL
+    value: "http://digital-twin:8002"
+  - name: NUDGING_API_URL
+    value: "http://nudging:8016"
+  - name: CORS_ORIGINS
+    value: '["https://webapp.{{ .Values.domain }}"]'

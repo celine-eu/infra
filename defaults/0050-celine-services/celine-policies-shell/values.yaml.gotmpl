@@ -3,7 +3,7 @@ image:
 
 keycloak:
   # Base URL of the Keycloak instance reachable from within the cluster.
-  baseUrl: "http://keycloak-keycloakx-http/auth"
+  baseUrl: "https://keycloak.{{ .Values.domain }}/auth"
   realm: {{ .Values.keycloak.realm | default "celine" | quote }}
 
   adminUser: {{ .Values.keycloak.username | default "admin" | quote }}
@@ -12,28 +12,39 @@ keycloak:
   adminClientSecretKey: ""
 
 
-# keycloak:
-#   # In-cluster URL — not domain-based, always internal
-#   baseUrl: "http://keycloak"
-#   realm: "celine"
-#   adminUser: {{ .Values.keycloak.username | default "admin" | quote }}
-#   # Secret created by postgres-db / auth-setup that holds the admin password.
-#   # Key names must match what the secret actually contains.
-#   existingSecret: "keycloak-admin-credentials"
-#   adminPasswordKey: "admin-password"
-#   adminClientSecretKey: "admin-client-secret"
+extraEnv:
 
-# Mount clients.yaml from a ConfigMap so no kubectl cp is needed.
-# The ConfigMap is managed separately (kubectl apply or another chart).
-# volumeMounts:
-#   - name: clients-config
-#     mountPath: /etc/celine-policies
-#     readOnly: true
+  - name: SVC_DT_SECRET
+    value: {{ .Environment.Values | dig "digital_twin" "oidc" "clientSecret" "svc-digital-twin" | quote }}
+  - name: SVC_PIPELINES_SECRET
+    value: {{ .Environment.Values | dig "pipelines" "oidc" "clientSecret" "svc-pipelines" | quote }}
+  - name: SVC_DATASET_SECRET
+    value: {{ .Environment.Values | dig "dataset_api" "oidc" "clientSecret" "svc-dataset-api" | quote }}
+  - name: SVC_NUDGING_SECRET
+    value: {{ .Environment.Values | dig "nudging" "oidc" "clientSecret" "svc-nudging" | quote }}
+  - name: SVC_REC_REGISTRY_SECRET
+    value: {{ .Environment.Values | dig "rec_registry" "oidc" "clientSecret" "svc-rec-registry" | quote }}
+  - name: CELINE_ADMIN_CLI_SECRET
+    value: {{ .Environment.Values | dig "auth_setup" "clientCLISecret" "celine-cli" | quote }}
 
-# volumes:
-#   - name: clients-config
-#     configMap:
-#       name: celine-policies-clients
-#       # If the ConfigMap doesn't exist yet the pod will stay Pending —
-#       # set optional: true to allow the pod to start without it.
-#       optional: true
+{{- if .Values.tls_setup.self_signed }}
+  - name: SSL_CERT_FILE
+    value: /etc/ssl/celine-ca/ca.crt
+  - name: REQUESTS_CA_BUNDLE
+    value: /etc/ssl/celine-ca/ca.crt
+{{- end }}
+
+{{- if .Values.tls_setup.self_signed }}
+volumeMounts:
+  - name: celine-ca
+    mountPath: /etc/ssl/celine-ca
+    readOnly: true
+
+volumes:
+  - name: celine-ca
+    secret:
+      secretName: {{ .Values.tls_setup.ca_secret | default "celine-ca" }}
+      items:
+        - key: ca.crt
+          path: ca.crt
+{{- end }}

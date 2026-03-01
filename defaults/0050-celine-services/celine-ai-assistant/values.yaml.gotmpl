@@ -3,7 +3,14 @@ image:
 
 oidc:
   service:
-    clientSecret: {{ .Environment.Values | dig "ai_assistant" "client_secret" "svc-ai-assistant" | quote }}
+    # skip client ID / secrets
+    passthrough: true
+    clientId: ""
+    audience: "oauth2_proxy"
+    clientSecret: ""
+
+  includeClientIdAsAudience: false
+  allowedAudiences: ""
 
 extraEnv:
   - name: QDRANT_URL

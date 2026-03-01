@@ -42,12 +42,14 @@ oidc:
   baseUrl: "http://keycloak/realms/celine"
   jwksUri: "http://keycloak/realms/celine/protocol/openid-connect/certs"
   allowedAudiences: ""
-  includeClientIdAsAudience: true
+  includeClientIdAsAudience: false
   timeout: 10.0
   service:
-    clientId: "svc-webapp"
-    audience: "svc-webapp"
-    clientSecret: "svc-webapp" # [secret] — override via existingSecret
+    # skip client ID / secrets
+    passthrough: true
+    clientId: ""
+    audience: "oauth2_proxy"
+    clientSecret: ""
 
 # --------------------------------------------------------------------------
 # Postgres — DSN injected from the connection-string Secret produced by
@@ -90,12 +92,11 @@ policies:
 # Application-specific env vars
 # --------------------------------------------------------------------------
 extraEnv:
-  - name: CELINE_WEBAPP_DIGITAL_TWIN_API_URL
-    value: "http://celine-digital-twin:8001"
-  - name: CELINE_WEBAPP_NUDGING_API_URL
-    value: "http://celine-nudging:8006"
-  - name: CELINE_WEBAPP_CORS_ORIGINS
-    value: ""
+  - name: DIGITAL_TWIN_API_URL
+    value: "http://digital-twin:8002"
+  - name: NUDGING_API_URL
+    value: "http://nudging:8016"
+
 
 # --------------------------------------------------------------------------
 # Extra secrets — e.g. VAPID keys if needed later

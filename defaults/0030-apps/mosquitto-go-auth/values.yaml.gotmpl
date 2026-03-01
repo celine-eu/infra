@@ -31,12 +31,13 @@ goAuth:
   disableSuperuser: false
 
   jwt:
-    host: "celine-policies"
+    host: "mqtt-auth"
     port: 8009
     httpTimeout: 5
     getUserUri: "/user"
     aclUri: "/acl"
     superuserUri: "/superuser"
+    disableSuperuser: true
 
   files:
     enabled: true

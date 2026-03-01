@@ -133,8 +133,9 @@ policies_shell:
 ai_assistant:
   image_tag: latest
   openai_api_key: your api key
-  oidc:
-    clientSecret: "svc-ai-assistant"
+
+webapp:
+  image_tag: latest
 
 dataset_api:
   image_tag: latest

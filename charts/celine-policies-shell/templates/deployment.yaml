@@ -38,6 +38,7 @@ spec:
               MAX_RETRIES=20
               RETRY_DELAY=15
               SECRET_FILE=/tmp/.secrets.yaml
+              
               i=0
               until celine-policies keycloak sync --secrets-file "$SECRET_FILE" "$CLIENTS_FILE"; do
                 i=$((i + 1))

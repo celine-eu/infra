@@ -66,6 +66,8 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   value: {{ .Values.oidc.baseUrl | quote }}
 - name: CELINE_OIDC_JWKS_URI
   value: {{ .Values.oidc.jwksUri | quote }}
+
+{{- if not (.Values.oidc.service | dig "passthrough" false) }}
 - name: CELINE_OIDC_CLIENT_ID
   value: {{ .Values.oidc.service.clientId | default $defaultSvcId | quote }}
 - name: CELINE_OIDC_AUDIENCE
@@ -75,15 +77,24 @@ app.kubernetes.io/instance: {{ .Release.Name }}
     secretKeyRef:
       name: {{ $secretName }}
       key: CELINE_OIDC_CLIENT_SECRET
+- name: CELINE_OIDC_INCLUDE_CLIENT_ID_AS_AUDIENCE
+  value: {{ .Values.oidc.includeClientIdAsAudience | toString | quote }}
+{{- else }}
+- name: CELINE_OIDC_AUDIENCE
+  value: {{ .Values.oidc.service | dig "audience" "oauth2_proxy" | quote }}
+- name: CELINE_OIDC_INCLUDE_CLIENT_ID_AS_AUDIENCE
+  value: "false"
+{{- end }}
+
 {{- if .Values.oidc.allowedAudiences }}
 - name: CELINE_OIDC_ALLOWED_AUDIENCES
   value: {{ .Values.oidc.allowedAudiences | quote }}
 {{- end }}
-- name: CELINE_OIDC_INCLUDE_CLIENT_ID_AS_AUDIENCE
-  value: {{ .Values.oidc.includeClientIdAsAudience | toString | quote }}
+
 - name: CELINE_OIDC_TIMEOUT
   value: {{ .Values.oidc.timeout | toString | quote }}
 {{- end }}
+
 
 
 {{/* ----------------------------------------------------------------------------
@@ -250,7 +261,9 @@ metadata:
     {{- include "celine-services.labels" . | nindent 4 }}
 type: Opaque
 stringData:
+  {{- if not (.Values.oidc.service | dig "passthrough" false) }}
   CELINE_OIDC_CLIENT_SECRET: {{ .Values.oidc.service.clientSecret | quote }}
+  {{- end }}
   {{- with .Values.extraSecrets }}
   {{- toYaml . | nindent 2 }}
   {{- end }}

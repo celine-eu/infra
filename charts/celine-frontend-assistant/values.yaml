@@ -45,6 +45,7 @@ oidc:
     includeClientIdAsAudience: false
     timeout: 10.0
     service:
+        passthrough: true
         clientId: ""
         audience: ""
         clientSecret: ""

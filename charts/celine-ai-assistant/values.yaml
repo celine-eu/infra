@@ -39,9 +39,11 @@ oidc:
   includeClientIdAsAudience: true
   timeout: 10.0
   service:
-    clientId: "svc-celine-ai-assistant"
-    audience: "svc-celine-ai-assistant"
-    clientSecret: "svc-celine-ai-assistant" # [secret]
+    # skip client ID / secrets
+    passthrough: true
+    clientId: ""
+    audience: "oauth2_proxy"
+    clientSecret: ""
 
 policies:
   dir: "/app/policies"
