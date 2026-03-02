@@ -1,0 +1,15 @@
+# Example REC — Renewable Energy Community registry YAML
+# Used by: task dev:sync-users -- recs/example-rec.yaml
+# Participants without user_id are skipped by the sync command.
+
+rec_id: example-rec
+name: Example REC
+
+participants:
+  ex-00001:
+    name: "Alice Example"
+    user_id: ex-00001
+
+  ex-00002:
+    name: "Bob Example"
+    user_id: ex-00002

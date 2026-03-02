@@ -1,5 +1,13 @@
 # See https://www.keycloak.org/server/configuration
 # See https://www.keycloak.org/server/all-config
+
+
+{{- if .Environment.Values | dig "keycloak" "theme" "login" "" }}
+image:
+  repository: ghcr.io/celine-eu/keycloak
+  tag: {{ .Environment.Values | dig "keycloak" "image_tag" "latest" | quote }}
+{{- end }}
+
 command:
   - "/opt/keycloak/bin/kc.sh"
   - "--verbose"

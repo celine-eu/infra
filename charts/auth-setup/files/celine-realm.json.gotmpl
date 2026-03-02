@@ -9,6 +9,151 @@
 
   "enabled": true,
   "displayName": "{{ upper .Values.realm }}",
+  "editUsernameAllowed": false,
+
+  {{- if .Values.theme.login }}
+  "loginTheme": {{ .Values.theme.login | quote }},
+  {{- end }}
+  {{- if .Values.theme.account }}
+  "accountTheme": {{ .Values.theme.account | quote }},
+  {{- end }}
+  {{- if .Values.theme.email }}
+  "emailTheme": {{ .Values.theme.email | quote }},
+  {{- end }}
+
+  {{- if .Values.smtp.enabled }}
+  {{- with .Values.smtp }}
+  "smtpServer": {
+    "host": {{ .host | quote }},
+    "port": {{ .port | toString | quote }},
+    "from": {{ .from | quote }},
+    "fromDisplayName": {{ .fromDisplayName | quote }},
+    "replyTo": {{ .replyTo | default "" | quote }},
+    "ssl": {{ .ssl | toString | quote }},
+    "starttls": {{ .starttls | toString | quote }},
+    "auth": {{ .auth | toString | quote }}
+    {{- if .auth }},
+    "user": {{ .user | quote }},
+    "password": {{ .password | quote }}
+    {{- end }}
+  },
+  {{- end }}
+  {{- end }}
+
+  {{- with .Values.bruteForce }}
+  "bruteForceProtected": {{ .enabled }},
+  {{- if .enabled }}
+  "permanentLockout": {{ .permanentLockout }},
+  "maxLoginFailures": {{ .maxLoginFailures }},
+  "waitIncrementSeconds": {{ .waitIncrementSeconds }},
+  "quickLoginCheckMilliSeconds": {{ .quickLoginCheckMilliSeconds }},
+  "minimumQuickLoginWaitSeconds": {{ .minimumQuickLoginWaitSeconds }},
+  "maxFailureWaitSeconds": {{ .maxFailureWaitSeconds }},
+  "failureFactor": {{ .failureFactor }},
+  {{- end }}
+  {{- end }}
+
+  "browserFlow": {{ if .Values.adminMfa.enabled }}"browser-with-otp-for-admins"{{ else }}"browser"{{ end }},
+
+  {{- if .Values.adminMfa.enabled }}
+  "authenticationFlows": [
+    {
+      "alias": "browser-with-otp-for-admins",
+      "description": "Browser flow — OTP required for admins group",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "auth-cookie",
+          "requirement": "ALTERNATIVE",
+          "priority": 10,
+          "autheticatorFlow": false
+        },
+        {
+          "authenticator": "auth-spnego",
+          "requirement": "DISABLED",
+          "priority": 20,
+          "autheticatorFlow": false
+        },
+        {
+          "authenticator": "identity-provider-redirector",
+          "requirement": "ALTERNATIVE",
+          "priority": 25,
+          "autheticatorFlow": false
+        },
+        {
+          "flowAlias": "browser-with-otp-for-admins forms",
+          "requirement": "ALTERNATIVE",
+          "priority": 30,
+          "autheticatorFlow": true
+        }
+      ]
+    },
+    {
+      "alias": "browser-with-otp-for-admins forms",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "auth-username-password-form",
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "autheticatorFlow": false
+        },
+        {
+          "flowAlias": "browser-with-otp-for-admins otp conditional",
+          "requirement": "CONDITIONAL",
+          "priority": 20,
+          "autheticatorFlow": true
+        }
+      ]
+    },
+    {
+      "alias": "browser-with-otp-for-admins otp conditional",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "condition-user-configured",
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "autheticatorFlow": false
+        },
+        {
+          "authenticator": "condition-user-role",
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "autheticatorFlow": false,
+          "authenticatorConfig": "admin-group-condition"
+        },
+        {
+          "authenticator": "auth-otp-form",
+          "requirement": "REQUIRED",
+          "priority": 30,
+          "autheticatorFlow": false
+        }
+      ]
+    }
+  ],
+  "authenticatorConfig": [
+    {
+      "alias": "admin-group-condition",
+      "config": {
+        "conditionProvider": "group",
+        "groupPath": {{ .Values.adminMfa.groupPath | quote }},
+        "negate": "false"
+      }
+    }
+  ],
+  {{- else }}
+  "authenticationFlows": [],
+  "authenticatorConfig": [],
+  {{- end }}
+
+
   "roles": {
     "realm": [
       {
@@ -29,6 +174,7 @@
       }
     ]
   },
+
   "users": [
     {
       "username": "{{ .Values.realmAdmin.username | default "celine-admin" }}",

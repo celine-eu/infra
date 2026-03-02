@@ -385,3 +385,38 @@ tasks:
         echo "   macOS:   sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain $CERT_DIR/ca.crt"
         echo "   Linux:   sudo cp $CERT_DIR/ca.crt /usr/local/share/ca-certificates/celine-ca.crt && sudo update-ca-certificates"
         echo "   Firefox: Settings → Certificates → Import → $CERT_DIR/ca.crt"
+
+
+  dev:sync-users:
+    desc: "Sync REC participants to Keycloak. Usage: task dev:sync-users -- recs/my-rec.yaml"
+    env:
+      CLI_DIR: "../celine-dev/repositories/celine-policies"
+    cmds:
+      - |
+        set -e
+        REC_YAML="{{ .CLI_ARGS }}"
+        test -n "$REC_YAML" || { echo "Usage: task dev:sync-users -- recs/my-rec.yaml"; exit 1; }
+        test -f "$REC_YAML" || { echo "File not found: $REC_YAML"; exit 1; }
+
+        REQUESTS_CA_BUNDLE=.certs/ca.crt \
+        SSL_CERT_FILE=.certs/ca.crt \
+        CELINE_KEYCLOAK_BASE_URL=https://keycloak.celine.local/auth \
+        CELINE_KEYCLOAK_REALM=celine \
+        CELINE_KEYCLOAK_ADMIN_USER={{ .KEYCLOAK_ADMIN_USER | default "admin" }} \
+        CELINE_KEYCLOAK_ADMIN_PASSWORD={{ .KEYCLOAK_ADMIN_PASSWORD | default "admin" }} \
+        CELINE_SYNC_USERS_GROUPS="/viewers" \
+        cd {{.CLI_DIR}} && uv run celine-policies keycloak sync-users "$REC_YAML"
+
+  dev:sync-clients:
+    desc: "Sync Keycloak clients from clients.yaml"
+    env:
+      CLI_DIR: "../celine-dev/repositories/celine-policies"
+    cmds:
+      - |
+        REQUESTS_CA_BUNDLE=.certs/ca.crt \
+        SSL_CERT_FILE=.certs/ca.crt \
+        CELINE_KEYCLOAK_BASE_URL=https://keycloak.celine.local/auth \
+        CELINE_KEYCLOAK_REALM=celine \
+        CELINE_KEYCLOAK_ADMIN_USER={{ .KEYCLOAK_ADMIN_USER | default "admin" }} \
+        CELINE_KEYCLOAK_ADMIN_PASSWORD={{ .KEYCLOAK_ADMIN_PASSWORD | default "admin" }} \
+        cd {{.CLI_DIR}} && uv run celine-policies keycloak sync clients.yaml

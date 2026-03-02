@@ -9,6 +9,37 @@ realmAdmin:
   email: "admin@celine.local"
   password: "celine-admin"
 
+smtp:
+  enabled: false
+  host: ""
+  port: 587
+  from: "no-reply@celine.local"
+  fromDisplayName: "CELINE Platform"
+  replyTo: ""
+  ssl: false
+  starttls: true
+  auth: false
+  user: ""
+  password: ""
+
+theme:
+  login: "rec"
+  account: ""
+  email: ""
+
+admin_mfa:
+  enabled: false
+
+brute_force:
+  enabled: false
+  maxLoginFailures: 5
+  waitIncrementSeconds: 60
+  quickLoginCheckMilliSeconds: 1000
+  minimumQuickLoginWaitSeconds: 60
+  maxFailureWaitSeconds: 900
+  failureFactor: 50
+  permanentLockout: false
+
 oauth2Proxy:
   clientID: oauth2_proxy
   # openssl rand -hex 16

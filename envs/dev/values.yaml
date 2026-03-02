@@ -83,6 +83,21 @@ keycloak:
   realm: celine
   username: admin
   password: admin
+  # theme: "celine"
+  # image_tag: 26.04.0-1.0.0
+  admin_mfa: false
+  smtp:
+    enabled: false
+    host: ""
+    port: 587
+    from: "no-reply@celine.local"
+    fromDisplayName: "CELINE Platform"
+    replyTo: ""
+    ssl: false
+    starttls: true
+    auth: false
+    user: ""
+    password: ""
 
 # NOTE: mqtt_setup and mosquitto users should be aligned.
 mqtt_setup:
