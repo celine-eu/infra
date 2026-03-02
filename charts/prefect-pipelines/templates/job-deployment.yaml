@@ -66,17 +66,17 @@ spec:
                   entrypoint: "{{ .path }}:{{ .callback }}"
 
                   # run once at time, assume idempotency
-                  concurrency_limit: {{ .concurrencyLimit | default 1 }}
-                  collision_strategy: CANCEL_NEW
+                  # concurrency_limit: {{ .concurrencyLimit | default 1 }}
+                  # collision_strategy: CANCEL_NEW
+                  # schedule:
+                  #   cron: {{ (.schedule).cron | default "0 * * * *" | quote }}
 
                   # Never backfill missed runs — only ever run the next scheduled one.
-                  # schedules:
-                  #   - cron: {{ (.schedule).cron | default "0 * * * *" | quote }}
-                  #     active: true
-                  #     catchup: false
-
-                  schedule:
-                    cron: {{ (.schedule).cron | default "0 * * * *" | quote }}
+                  schedules:
+                    - cron: {{ (.schedule).cron | default "0 * * * *" | quote }}
+                      active: true
+                      catchup: false
+                      max_concurrent_jobs: 3
 
                   work_pool:
                     name: {{ $.Values.global.work_pool }}
