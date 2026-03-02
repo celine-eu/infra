@@ -51,8 +51,9 @@ bruteForce:
   failureFactor: {{ .Environment.Values | dig "keycloak" "brute_force" "failureFactor" 50 }}
   permanentLockout: {{ .Environment.Values | dig "keycloak" "brute_force" "permanentLockout" false }}  
 
+{{- $adminMfa := .Environment.Values | dig "keycloak" "admin_mfa" (dict) }}
 adminMfa:
-  enabled: {{ .Environment.Values | dig "keycloak" "admin_mfa" "enabled" false }}
+  enabled: {{ if kindIs "map" $adminMfa }}{{ $adminMfa | dig "enabled" false }}{{ else }}false{{ end }}
   groupPath: "/admins"
 
 theme:

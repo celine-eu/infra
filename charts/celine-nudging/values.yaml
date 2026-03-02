@@ -4,7 +4,7 @@
 
 fullnameOverride: nudging
 image:
-  repository: ghcr.io/celine-eu/nudging
+  repository: ghcr.io/celine-eu/nudging-tool
   tag: "latest"
   pullPolicy: IfNotPresent
 
