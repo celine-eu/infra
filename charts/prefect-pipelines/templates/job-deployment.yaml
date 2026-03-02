@@ -76,7 +76,7 @@ spec:
                     - cron: {{ (.schedule).cron | default "0 * * * *" | quote }}
                       active: true
                       catchup: false
-                      max_concurrent_jobs: 3
+                      max_scheduled_runs: 3
 
                   work_pool:
                     name: {{ $.Values.global.work_pool }}
