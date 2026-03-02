@@ -323,6 +323,17 @@ tasks:
       - task helmfile:dev -- -l name={{.CLI_ARGS}} sync
       - task dev:build:{{.CLI_ARGS}}
 
+  dev:setup-dns:
+    deps: [dev:start]
+    desc: "Configure systemd-resolved to route *.test to minikube"
+    cmds:
+      - |
+        MINIKUBE_IP=$(minikube ip)
+        sudo mkdir -p /etc/systemd/resolved.conf.d/
+        printf '[Resolve]\nDNS=%s\nDomains=~test\n' "$MINIKUBE_IP" | sudo tee /etc/systemd/resolved.conf.d/minikube.conf
+        sudo systemctl restart systemd-resolved
+        echo "✅ DNS routing *.test → ${MINIKUBE_IP}"
+
   dev:setup-certs:
     desc: "Generate self-signed CA + wildcard cert for *.celine.test and load into minikube"
     cmds:
