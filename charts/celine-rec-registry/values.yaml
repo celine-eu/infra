@@ -17,8 +17,8 @@ service:
 
 ingress:
   enabled: false
-  domain: celine.local
-  host: "rec-registry.celine.local"
+  domain: celine.test
+  host: "rec-registry.celine.test"
   issuer: celine-tls
   auth:
     enabled: true

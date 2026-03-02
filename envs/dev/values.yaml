@@ -1,4 +1,4 @@
-domain: celine.local
+domain: celine.test
 
 seaweedfs:
   enabled: true
@@ -11,7 +11,7 @@ seaweedfs:
 
 tls_setup:
   issuer: celine-tls
-  email: issuer@celine.local
+  email: issuer@celine.test
   self_signed: true
   ca_secret: celine-ca
   cert_manager:
@@ -90,7 +90,7 @@ keycloak:
     enabled: false
     host: ""
     port: 587
-    from: "no-reply@celine.local"
+    from: "no-reply@celine.test"
     fromDisplayName: "CELINE Platform"
     replyTo: ""
     ssl: false

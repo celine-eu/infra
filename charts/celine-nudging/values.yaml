@@ -16,8 +16,8 @@ service:
 
 ingress:
   enabled: false
-  domain: celine.local
-  host: "nudging.celine.local"
+  domain: celine.test
+  host: "nudging.celine.test"
   issuer: celine-tls
   auth:
     enabled: true

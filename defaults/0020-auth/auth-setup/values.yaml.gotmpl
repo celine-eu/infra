@@ -6,7 +6,7 @@ issuer: {{ .Environment.Values.tls_setup.issuer }}
 
 realmAdmin:
   username: {{ .Environment.Values | dig "auth_setup" "realmAdminUser" "celine-admin" }}
-  email: {{ .Environment.Values | dig "auth_setup" "realmAdminEmail" "admin@celine.local" }}
+  email: {{ .Environment.Values | dig "auth_setup" "realmAdminEmail" "admin@celine.test" }}
   password: {{ .Environment.Values | dig "auth_setup" "realmAdminPassword" "celine-admin" }}
 
 oauth2Proxy:
@@ -32,7 +32,7 @@ smtp:
   enabled: {{ .Environment.Values | dig "keycloak" "smtp" "enabled" false }}
   host: {{ .Environment.Values | dig "keycloak" "smtp" "host" "" | quote }}
   port: {{ .Environment.Values | dig "keycloak" "smtp" "port" 587 }}
-  from: {{ .Environment.Values | dig "keycloak" "smtp" "from" "noreply@celine.local" | quote }}
+  from: {{ .Environment.Values | dig "keycloak" "smtp" "from" "noreply@celine.test" | quote }}
   fromDisplayName: {{ .Environment.Values | dig "keycloak" "smtp" "fromDisplayName" "CELINE Platform" | quote }}
   replyTo: {{ .Environment.Values | dig "keycloak" "smtp" "replyTo" "" | quote }}
   ssl: {{ .Environment.Values | dig "keycloak" "smtp" "ssl" false }}

@@ -1,19 +1,19 @@
 secure: false
 
 realm: celine
-domain: celine.local
+domain: celine.test
 issuer: celine-tls
 
 realmAdmin:
   username: "celine-admin"
-  email: "admin@celine.local"
+  email: "admin@celine.test"
   password: "celine-admin"
 
 smtp:
   enabled: false
   host: ""
   port: 587
-  from: "no-reply@celine.local"
+  from: "no-reply@celine.test"
   fromDisplayName: "CELINE Platform"
   replyTo: ""
   ssl: false

@@ -17,8 +17,8 @@ service:
 
 ingress:
     enabled: true
-    domain: celine.local
-    host: "assistant.celine.local"
+    domain: celine.test
+    host: "assistant.celine.test"
     issuer: celine-tls
     apiBackend:
         service: ai-assistant

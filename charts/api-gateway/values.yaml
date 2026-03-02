@@ -1,4 +1,4 @@
-domain: celine.local
+domain: celine.test
 issuer: celine-tls
 
 auth:

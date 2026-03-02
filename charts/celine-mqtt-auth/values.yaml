@@ -28,7 +28,7 @@ service:
 # No public ingress
 ingress:
   enabled: false
-  domain: celine.local
+  domain: celine.test
   host: ""
   issuer: celine-tls
   auth:

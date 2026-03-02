@@ -22,8 +22,8 @@ service:
 
 ingress:
   enabled: false
-  domain: celine.local
-  host: "assistant.celine.local"
+  domain: celine.test
+  host: "assistant.celine.test"
   issuer: celine-tls
   auth:
     enabled: true

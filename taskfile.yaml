@@ -324,11 +324,11 @@ tasks:
       - task dev:build:{{.CLI_ARGS}}
 
   dev:setup-certs:
-    desc: "Generate self-signed CA + wildcard cert for *.celine.local and load into minikube"
+    desc: "Generate self-signed CA + wildcard cert for *.celine.test and load into minikube"
     cmds:
       - |
         set -e
-        DOMAIN="celine.local"
+        DOMAIN="celine.test"
         CERT_DIR=".certs"
         mkdir -p "$CERT_DIR"
 
@@ -400,7 +400,7 @@ tasks:
 
         REQUESTS_CA_BUNDLE=.certs/ca.crt \
         SSL_CERT_FILE=.certs/ca.crt \
-        CELINE_KEYCLOAK_BASE_URL=https://keycloak.celine.local/auth \
+        CELINE_KEYCLOAK_BASE_URL=https://keycloak.celine.test/auth \
         CELINE_KEYCLOAK_REALM=celine \
         CELINE_KEYCLOAK_ADMIN_USER={{ .KEYCLOAK_ADMIN_USER | default "admin" }} \
         CELINE_KEYCLOAK_ADMIN_PASSWORD={{ .KEYCLOAK_ADMIN_PASSWORD | default "admin" }} \
@@ -415,7 +415,7 @@ tasks:
       - |
         REQUESTS_CA_BUNDLE=.certs/ca.crt \
         SSL_CERT_FILE=.certs/ca.crt \
-        CELINE_KEYCLOAK_BASE_URL=https://keycloak.celine.local/auth \
+        CELINE_KEYCLOAK_BASE_URL=https://keycloak.celine.test/auth \
         CELINE_KEYCLOAK_REALM=celine \
         CELINE_KEYCLOAK_ADMIN_USER={{ .KEYCLOAK_ADMIN_USER | default "admin" }} \
         CELINE_KEYCLOAK_ADMIN_PASSWORD={{ .KEYCLOAK_ADMIN_PASSWORD | default "admin" }} \

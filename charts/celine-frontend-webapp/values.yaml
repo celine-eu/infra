@@ -17,8 +17,8 @@ service:
 
 ingress:
   enabled: true
-  domain: celine.local
-  host: "webapp.celine.local"
+  domain: celine.test
+  host: "webapp.celine.test"
   issuer: celine-tls
   apiBackend:
     service: webapp

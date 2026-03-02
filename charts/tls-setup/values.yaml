@@ -2,4 +2,4 @@ selfSigned: false
 caSecret: ""
 
 issuer: letsencrypt-prod
-email: issuer@celine.local
+email: issuer@celine.test

@@ -23,8 +23,8 @@ service:
 # --------------------------------------------------------------------------
 ingress:
   enabled: false
-  domain: celine.local
-  host: "webapp.celine.local"
+  domain: celine.test
+  host: "webapp.celine.test"
   issuer: celine-tls
   auth:
     enabled: true
