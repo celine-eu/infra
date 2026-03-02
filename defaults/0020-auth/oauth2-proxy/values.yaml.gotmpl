@@ -73,3 +73,11 @@ ingress:
     - secretName: oauth2-proxy-tls
       hosts:
         - "sso.{{ .Environment.Values.domain }}"
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 32Mi
+  limits:
+    cpu: 100m
+    memory: 64Mi

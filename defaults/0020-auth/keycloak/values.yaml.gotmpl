@@ -98,3 +98,12 @@ extraVolumes: |
   - name: realm-import
     configMap:
       name: keycloak-realm-celine
+
+# JVM app using 722Mi actual — needs a ceiling to prevent unbounded growth
+resources:
+  requests:
+    cpu: 200m
+    memory: 768Mi
+  limits:
+    cpu: 500m
+    memory: 1Gi

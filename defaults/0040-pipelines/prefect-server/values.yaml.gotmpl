@@ -1,6 +1,13 @@
 server:
   uiConfig:
     prefectUiApiUrl: "https://prefect.{{ .Environment.Values.domain }}/api"
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 1
+      memory: 1Gi
 
 ## Database Migration Configuration
 migrations:

@@ -184,7 +184,17 @@ worker:
                         "args": "{{ `{{ command }}` }}",
                         "name": "prefect-job",
                         "image": "{{ `{{ image }}` }}",
-                        "imagePullPolicy": "{{ `{{ image_pull_policy }}` }}"
+                        "imagePullPolicy": "{{ `{{ image_pull_policy }}` }}",
+                        "resources": {
+                          "requests": {
+                            "cpu": "200m",
+                            "memory": "512Mi"
+                          },
+                          "limits": {
+                            "cpu": "2",
+                            "memory": "2Gi"
+                          }
+                        }
                       }
                     ],
                     "completions": 1,

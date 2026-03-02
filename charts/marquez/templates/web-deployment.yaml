@@ -28,3 +28,7 @@ spec:
               value: "5002"
           ports:
             - containerPort: 5002
+          {{- with .Values.resources.web }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}

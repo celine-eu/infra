@@ -37,3 +37,22 @@ ingress:
     nginx.ingress.kubernetes.io/auth-signin: "https://sso.{{ .Environment.Values.domain }}/oauth2/start?rd=$scheme://$host$request_uri"
     nginx.ingress.kubernetes.io/auth-response-headers: "Authorization, X-Auth-Request-Email, X-Auth-Request-User"
 
+resources:
+  api:
+    requests:
+      cpu: 100m
+      memory: 384Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  web:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+# Heap sized to fit within 512Mi container limit (leaves ~128Mi for off-heap/metaspace)
+javaOpts: "-Xms128m -Xmx384m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+ExitOnOutOfMemoryError"
+
