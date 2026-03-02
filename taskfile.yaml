@@ -43,6 +43,20 @@ tasks:
         fi
         helmfile -e {{ .DEPLOYMENT_ENV }} -l {{ .ARGS }} apply
 
+  helm:sync:*:
+    vars:
+      DEPLOYMENT_ENV: "{{ index .MATCH 0 }}"
+      ARGS: "{{ .CLI_ARGS }}"
+    env:
+      SOPS_AGE_KEY_FILE: "{{ .PWD }}/.sops/{{ .DEPLOYMENT_ENV }}/key.txt"
+    cmds:
+      - |
+        if [ -z "{{ .ARGS }}" ]; then
+          echo "Error: missing filter argument (e.g. name=chart1)"
+          exit 1
+        fi
+        helmfile -e {{ .DEPLOYMENT_ENV }} -l {{ .ARGS }} sync
+
   helm:destroy:*:
     vars:
       DEPLOYMENT_ENV: "{{ index .MATCH 0 }}"

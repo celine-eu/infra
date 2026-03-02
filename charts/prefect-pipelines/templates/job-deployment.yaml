@@ -67,16 +67,12 @@ spec:
 
                   # run once at time, assume idempotency
                   concurrency_limit: {{ .concurrencyLimit | default 1 }}
-                  collision_strategy: CANCEL_NEW
-
-                  # Never backfill missed runs — only ever run the next scheduled one.
-                  # schedules:
-                  #   - cron: {{ (.schedule).cron | default "0 * * * *" | quote }}
-                  #     active: true
-                  #     catchup: false
+                  collision_strategy: SKIP
 
                   schedule:
                     cron: {{ (.schedule).cron | default "0 * * * *" | quote }}
+                    # catchup: false
+                    # active: true
 
                   work_pool:
                     name: {{ $.Values.global.work_pool }}
