@@ -56,6 +56,6 @@ adminMfa:
   groupPath: "/admins"
 
 theme:
-  login: {{ .Environment.Values | dig "keycloak" "theme" "login" "" | quote }}
+  login: {{ .Environment.Values | dig "keycloak" "theme" "login" "rec" | quote }}
   account: {{ .Environment.Values | dig "keycloak" "theme" "account" "" | quote }}
   email: {{ .Environment.Values | dig "keycloak" "theme" "email" "" | quote }}
