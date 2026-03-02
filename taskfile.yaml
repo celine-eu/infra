@@ -323,16 +323,6 @@ tasks:
       - task helmfile:dev -- -l name={{.CLI_ARGS}} sync
       - task dev:build:{{.CLI_ARGS}}
 
-  dev:setup-dns:
-    desc: "Configure systemd-resolved to route *.test to minikube"
-    cmds:
-      - |
-        MINIKUBE_IP=$(minikube ip)
-        sudo mkdir -p /etc/systemd/resolved.conf.d/
-        printf '[Resolve]\nDNS=%s\nDomains=~test\n' "$MINIKUBE_IP" | sudo tee /etc/systemd/resolved.conf.d/minikube.conf
-        sudo systemctl restart systemd-resolved
-        echo "✅ DNS routing *.test → ${MINIKUBE_IP}"
-
   dev:setup-certs:
     desc: "Generate self-signed CA + wildcard cert for *.celine.test and load into minikube"
     cmds:
@@ -342,47 +332,51 @@ tasks:
         CERT_DIR=".certs"
         mkdir -p "$CERT_DIR"
 
-        echo "🔑 Generating CA key and certificate..."
+        echo "🔑 Generating CA key and certificate (with proper CA extensions)..."
         openssl genrsa -out "$CERT_DIR/ca.key" 4096
-        openssl req -new -x509 -days 3650 \
+        openssl req -new -x509 -sha256 -days 3650 \
           -key "$CERT_DIR/ca.key" \
           -out "$CERT_DIR/ca.crt" \
-          -subj "/CN=celine-local-ca/O=CELINE/C=EU"
+          -subj "/CN=celine-local-ca/O=CELINE/C=EU" \
+          -addext "basicConstraints=critical,CA:TRUE,pathlen:0" \
+          -addext "keyUsage=critical,keyCertSign,cRLSign" \
+          -addext "subjectKeyIdentifier=hash"
 
-        echo "🔑 Generating wildcard cert for *.${DOMAIN}..."
+        echo "🔑 Generating wildcard cert for *.${DOMAIN} (serverAuth, SAN, SKI/AKI)..."
         openssl genrsa -out "$CERT_DIR/tls.key" 2048
-        openssl req -new \
+        openssl req -new -sha256 \
           -key "$CERT_DIR/tls.key" \
           -out "$CERT_DIR/tls.csr" \
-          -subj "/CN=*.${DOMAIN}/O=CELINE"
-        openssl x509 -req -days 825 \
+          -subj "/CN=*.${DOMAIN}/O=CELINE/C=EU"
+
+        openssl x509 -req -sha256 -days 825 \
           -in "$CERT_DIR/tls.csr" \
           -CA "$CERT_DIR/ca.crt" \
           -CAkey "$CERT_DIR/ca.key" \
           -CAcreateserial \
           -out "$CERT_DIR/tls.crt" \
-          -extfile <(printf "subjectAltName=DNS:*.%s,DNS:%s\nbasicConstraints=CA:FALSE\nkeyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth" "$DOMAIN" "$DOMAIN")
+          -extfile <(printf "subjectAltName=DNS:*.%s,DNS:%s\nbasicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\nsubjectKeyIdentifier=hash\nauthorityKeyIdentifier=keyid,issuer\n" "$DOMAIN" "$DOMAIN")
 
         echo "📦 Loading secrets into minikube (namespace: celine-dev)..."
         kubectl create namespace celine-dev --dry-run=client -o yaml | kubectl apply -f -
 
-        # CA secret — mounted into pods as SSL_CERT_FILE
+        # CA secret — mounted into pods as SSL_CERT_FILE / provider CA
         kubectl create secret generic celine-ca \
           --from-file=ca.crt="$CERT_DIR/ca.crt" \
           --namespace celine-dev \
           --dry-run=client -o yaml | kubectl apply -f -
 
-        # Wildcard TLS secret — used by cert-manager CA issuer + ingress TLS
+        # Wildcard TLS secret — used by ingress TLS
         kubectl create secret tls celine-wildcard-tls \
           --cert="$CERT_DIR/tls.crt" \
           --key="$CERT_DIR/tls.key" \
           --namespace celine-dev \
           --dry-run=client -o yaml | kubectl apply -f -
 
-        # cert-manager CA issuer secret — needs tls.crt + tls.key of the CA itself
+        # cert-manager CA issuer secret — MUST be the CA keypair (ca.crt + ca.key)
         kubectl create secret tls celine-ca-issuer \
-          --cert=.certs/ca.crt \
-          --key=.certs/ca.key \
+          --cert="$CERT_DIR/ca.crt" \
+          --key="$CERT_DIR/ca.key" \
           -n celine-dev \
           --dry-run=client -o yaml | kubectl apply -f -
 

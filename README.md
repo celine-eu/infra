@@ -103,11 +103,7 @@ CELINE services rely on **Ingress host-based routing**.
 
 For local development, services are exposed under `*.celine.test` where `*.test` is resolved by minikube
 
-In linux, add an entry to `systemd-resolved` with this command:
-
-`task dev:setup-dns`
-
-**Alternatively**, add the following entry to `/etc/hosts`:
+Add the following entry to `/etc/hosts`:
 
 ```text
 192.168.49.2 api.celine.test webapp.celine.test assistant.celine.test dashboard.celine.test s3.celine.test keycloak.celine.test marquez.celine.test mqtt.celine.test sso.celine.test prefect.celine.test superset.celine.test
