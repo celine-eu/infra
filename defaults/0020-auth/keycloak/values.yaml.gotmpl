@@ -1,6 +1,13 @@
-# This is an example configuration, for production grade configuration see the Keycloak documentation.
 # See https://www.keycloak.org/server/configuration
 # See https://www.keycloak.org/server/all-config
+
+
+{{- if .Environment.Values | dig "keycloak" "theme" "login" "" }}
+image:
+  repository: ghcr.io/celine-eu/keycloak
+  tag: {{ .Environment.Values | dig "keycloak" "image_tag" "latest" | quote }}
+{{- end }}
+
 command:
   - "/opt/keycloak/bin/kc.sh"
   - "--verbose"
@@ -57,6 +64,12 @@ ingress:
         - "keycloak.{{ .Environment.Values.domain }}"
       secretName: keycloak-tls
 
+proxy:
+  enabled: true
+  mode: xforwarded   # sets KC_PROXY_HEADERS=xforwarded
+  http:
+    enabled: true   # TLS always on — nginx terminates SSL, Keycloak sees plain HTTP internally
+
 extraEnv: |
   - name: KEYCLOAK_ADMIN
     valueFrom:
@@ -72,10 +85,6 @@ extraEnv: |
     value: "keycloak.{{ .Environment.Values.domain }}"
   - name: KC_HOSTNAME_STRICT
     value: "false"
-  - name: KC_HTTP_ENABLED
-    value: "true"
-  - name: KC_PROXY_HEADERS
-    value: "xforwarded"
   - name: KEYCLOAK_IMPORT
     value: /opt/keycloak/data/import/celine-realm.json
   - name: KEYCLOAK_IMPORT_STRATEGY
@@ -89,3 +98,12 @@ extraVolumes: |
   - name: realm-import
     configMap:
       name: keycloak-realm-celine
+
+# JVM app using 722Mi actual — needs a ceiling to prevent unbounded growth
+resources:
+  requests:
+    cpu: 200m
+    memory: 768Mi
+  limits:
+    cpu: 500m
+    memory: 1Gi

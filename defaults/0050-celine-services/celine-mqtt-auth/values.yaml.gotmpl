@@ -1,0 +1,18 @@
+
+image:
+  tag: {{ .Values.mqtt_auth.image_tag | default "latest" | quote }}
+
+extraEnv:
+  - name: CELINE_MQTT_POLICY_PACKAGE
+    value: "celine.mqtt.acl"
+  - name: CELINE_MQTT_SUPERUSER_SCOPE
+    value: "mqtt.admin"
+
+oidc:
+  service:
+    clientSecret: {{ .Environment.Values | dig "mqtt_auth" "client_secret" "svc-mqtt-auth" | quote }}
+
+{{- with .Environment.Values | dig "mqtt_auth" "resources" nil }}
+resources:
+  {{- toYaml . | nindent 2 }}
+{{- end }}

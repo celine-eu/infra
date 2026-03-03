@@ -1,0 +1,8 @@
+{{- if .Values.configMap.enabled }}
+{{- $cmName := default (printf "%s-config" (include "celine-services.fullname" .)) .Values.configMap.name }}
+{{- $vol := dict "name" "config" "configMap" (dict "name" $cmName) }}
+{{- $mnt := dict "name" "config" "mountPath" (.Values.configMap.mountPath | default "/app/config") "readOnly" true }}
+{{- $_ := set .Values "volumes" (append .Values.volumes $vol) }}
+{{- $_ := set .Values "volumeMounts" (append .Values.volumeMounts $mnt) }}
+{{- end }}
+{{ include "celine-services.deployment" . }}

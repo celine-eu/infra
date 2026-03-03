@@ -1,0 +1,7 @@
+apiVersion: v2
+name: celine-services
+description: |
+  Library chart providing shared Helm templates for all CELINE services.
+  Produces no Kubernetes objects on its own — type: library.
+type: library
+version: 0.1.0

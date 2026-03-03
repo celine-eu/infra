@@ -1,0 +1,56 @@
+{{- $keycloakPublic := printf "https://keycloak.%s/auth/realms/%s" .Values.domain (.Values.keycloak.realm | default "celine") }}
+
+image:
+  pullPolicy: IfNotPresent
+
+oidc:
+  baseUrl: {{$keycloakPublic}}
+  jwksUri: {{$keycloakPublic}}/protocol/openid-connect/certs
+#   allowedAudiences: ""
+  includeClientIdAsAudience: true
+#   timeout: 10.0
+
+policies:
+  dir: "/app/policies"
+  dataDir: ""
+  cacheEnabled: true
+  cacheTtl: 300
+  cacheMaxsize: 10000
+
+s3:
+  endpointUrl: "{{ .Values.s3_accounts.endpoint }}"
+  region: "us-east-1"
+  existingSecret: ""
+
+# Inject custom CA cert into all pods when tls_setup.self_signed is true.
+# SSL_CERT_FILE and REQUESTS_CA_BUNDLE are set automatically — covers httpx
+# (OIDC, DT, nudging) and the ssl module (aiomqtt) with no SDK changes.
+caSecret: "{{ .Environment.Values.tls_setup.ca_secret | default "" }}"
+
+healthCheck:
+  enabled: true
+  path: /health
+  initialDelaySeconds: 10
+  periodSeconds: 30
+  failureThreshold: 3
+
+ingress:
+  enabled: false
+  domain: {{ .Values.domain }}
+  issuer: {{ .Values.tls_setup.issuer | default "celine-tls" }}
+  auth:
+    enabled: true
+  tls:
+    enabled: true
+    secretName: ""
+
+# Sensible default for Python/FastAPI services.
+# Override per-service via the per-service defaults file (dig pattern)
+# or via envs/*/values.yaml (e.g. rec_registry.resources.limits.memory: 1Gi).
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi

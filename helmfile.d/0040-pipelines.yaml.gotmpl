@@ -59,3 +59,15 @@ releases:
       - ../envs/{{ .Environment.Name }}/0040-pipelines/prefect-pipelines/values.yaml.gotmpl
     labels:
       group: pipelines
+    hooks:
+      - events: [presync]
+        showlogs: true
+        command: bash
+        args:
+          - -c
+          - |
+            echo "⏳ Waiting for prefect-worker service account..."
+            until kubectl get serviceaccount prefect-worker -n celine-{{ .Environment.Name }} &>/dev/null; do
+              sleep 3
+            done
+            echo "✅ prefect-worker SA ready"

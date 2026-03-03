@@ -1,0 +1,135 @@
+## charts/mosquitto-go-auth — values.yaml
+##
+## Updated: goAuth.jwt.host now points to the dedicated celine-mqtt-auth
+## release instead of the old celine-policies/celine-services embedding.
+## ----------------------------------------------------------------------------
+
+image:
+  repository: ghcr.io/lhns/mosquitto-go-auth
+  tag: "3.3.0-mosquitto_2.0.22"
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+# ------------------------------------------------------------------------------
+# Listeners
+# ------------------------------------------------------------------------------
+listeners:
+  mqtt:
+    port: 1883
+  websocket:
+    port: 1884
+
+# ------------------------------------------------------------------------------
+# General mosquitto settings
+# ------------------------------------------------------------------------------
+mosquitto:
+  allowAnonymous: false
+  logDest: stdout
+  logType: warning
+  maxInflightMessages: 20
+  maxQueuedMessages: 1000
+  persistence: true
+  persistenceLocation: /data/
+
+# ------------------------------------------------------------------------------
+# mosquitto-go-auth plugin
+# ------------------------------------------------------------------------------
+goAuth:
+  logLevel: info
+  logDest: stdout
+  disableSuperuser: false
+
+  # ----------------------------------------------------------------------------
+  # JWT backend — primary auth for new JWT clients
+  # Points to the dedicated celine-mqtt-auth ClusterIP Service.
+  # If you change the celine-mqtt-auth release name or fullnameOverride,
+  # update this host accordingly.
+  # ----------------------------------------------------------------------------
+  jwt:
+    host: "mqtt-auth"
+    port: 8009
+    httpTimeout: 1
+
+    # Paths match FastAPI routes in celine.mqtt_auth.routes
+    getUserUri: "/user"
+    aclUri: "/acl"
+    superuserUri: "/superuser"
+
+  # ----------------------------------------------------------------------------
+  # Files backend — legacy username/password auth for existing clients
+  # ----------------------------------------------------------------------------
+  files:
+    enabled: true
+
+  # ----------------------------------------------------------------------------
+  # Redis decision cache (disabled by default)
+  # ----------------------------------------------------------------------------
+  cache:
+    enabled: false
+    reset: true
+    refresh: true
+    type: redis
+    host: "redis-master"
+    port: 6379
+    db: 3
+    password: ""
+    authCacheSeconds: 30
+    aclCacheSeconds: 30
+    authJitterSeconds: 3
+    aclJitterSeconds: 3
+
+# ------------------------------------------------------------------------------
+# Password-file users
+# Compatible with the mosquitto: block in envs/dev/values.yaml.
+# Override per-env under the mosquitto-go-auth: key.
+# ------------------------------------------------------------------------------
+users:
+  - username: admin
+    # "admin" — generate with: task mqtt:passwd
+    password: "$7$101$T1RBXD5MGIImHq8g$hSCHVAyZtAif0qN9Fhuam9mVCd0xLomREHIwzdreGjjADCQewz9VpfhK6AumcZyVFHFpHd2EhZdqU+Lq7393Xw=="
+    acl:
+      - topic: "#"
+        access: readwrite
+  - username: readonly
+    # "readonly"
+    password: "$7$101$7BjHYB04irOjQSjW$4Wqgc1ZjUb14suJril94g8S5PzgoAXwSWRrI81etv4XHHryqzljiWFt59MFpCKnYRCaLzYulS80Tj0imGkA3cQ=="
+    acl:
+      - topic: "#"
+        access: read
+
+# ------------------------------------------------------------------------------
+# Service
+# ------------------------------------------------------------------------------
+service:
+  type: ClusterIP
+  annotations: {}
+
+# ------------------------------------------------------------------------------
+# Persistence
+# ------------------------------------------------------------------------------
+persistence:
+  data:
+    enabled: true
+    size: 1Gi
+    storageClass: ""
+
+# ------------------------------------------------------------------------------
+# Pod
+# ------------------------------------------------------------------------------
+podAnnotations: {}
+
+podSecurityContext:
+  fsGroup: 1883
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1883
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: [ALL]
+
+resources: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

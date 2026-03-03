@@ -1,4 +1,5 @@
-enabled: {{ .Environment.Values.tls_setup.enabled }}
+selfSigned: {{ .Environment.Values.tls_setup.self_signed | default false }}
+caSecret: {{ .Environment.Values.tls_setup.ca_secret | default "" | quote }}
 
 issuer: {{ .Environment.Values.tls_setup.issuer }}
 email: {{ .Environment.Values.tls_setup.email }}

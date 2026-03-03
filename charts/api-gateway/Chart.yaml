@@ -1,0 +1,5 @@
+apiVersion: v2
+name: api-gateway
+description: CELINE API Gateway — nginx ingress routing api.{domain}/{service}
+type: application
+version: 0.1.0

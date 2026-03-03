@@ -13,6 +13,26 @@ tasks:
       - minikube addons enable ingress
       - minikube addons enable ingress-dns
       - task: set-context
+      - task: dev:setup-certs
+      - task: dev:configure-coredns
+
+  dev:configure-coredns:
+    desc: "Patch CoreDNS to forward .test queries to minikube ingress-dns"
+    cmds:
+      - |
+        set -e
+        MINIKUBE_IP=$(minikube ip)
+        kubectl rollout status deployment/coredns -n kube-system --timeout=60s
+        kubectl get pod -n kube-system -l app=minikube-ingress-dns --no-headers | grep -q Running || \
+          kubectl wait pod -n kube-system -l app=minikube-ingress-dns --for=condition=Ready --timeout=60s
+        COREFILE=$(kubectl get cm coredns -n kube-system -o jsonpath='{.data.Corefile}')
+        if echo "$COREFILE" | grep -q "^test:53"; then
+          echo "CoreDNS already configured for .test — skipping"
+          exit 0
+        fi
+        kubectl patch cm coredns -n kube-system --type merge -p "{\"data\":{\"Corefile\":\"${COREFILE}\ntest:53 {\n    errors\n    forward . ${MINIKUBE_IP}\n    cache 30\n}\n\"}}"
+        kubectl rollout restart deployment/coredns -n kube-system
+        kubectl rollout status deployment/coredns -n kube-system --timeout=60s
 
   dev:stop:
     cmds:
@@ -70,6 +90,19 @@ tasks:
         fi
         helmfile -e {{ .DEPLOYMENT_ENV }} -l {{ .ARGS }} destroy
 
+  helmfile:*:
+    vars:
+      DEPLOYMENT_ENV: "{{ index .MATCH 0 }}"
+    env:
+      SOPS_AGE_KEY_FILE: "{{.PWD}}/.sops/{{.DEPLOYMENT_ENV}}/key.txt"
+    cmds:
+      - |
+        if [ ! -d "./envs/{{.DEPLOYMENT_ENV}}" ]; then \
+          echo "Environment ./envs/{{.DEPLOYMENT_ENV}} not found"
+          exit 1
+        fi
+      - helmfile -e {{.DEPLOYMENT_ENV}} {{.CLI_ARGS}}
+
   apply:
     env:
       SOPS_AGE_KEY_FILE: "{{.PWD}}/.sops/{{.CLI_ARGS}}/key.txt"
@@ -84,6 +117,7 @@ tasks:
       - helmfile -e {{.CLI_ARGS}} -l group=auth apply
       - helmfile -e {{.CLI_ARGS}} -l group=apps apply
       - helmfile -e {{.CLI_ARGS}} -l group=pipelines apply
+      - helmfile -e {{.CLI_ARGS}} -l group=celine-services apply
 
   apply:dev:
     deps:
@@ -103,6 +137,7 @@ tasks:
   postgres:forward:
     cmds:
       - kubectl port-forward svc/postgis1-rw 5432:5432
+
   sops:encrypt:
     desc: Encrypt secrets.yaml -> secrets.sops.yaml (per-env key)
     cmds:
@@ -218,6 +253,261 @@ tasks:
           cat "---" > ./envs/dev/secrets.yaml
         fi
 
-  dump-source:
+  dev:apply-local-image:*:
+    desc: "Apply local image tag to deployment"
+    vars:
+      SERVICE: "{{ index .MATCH 0 }}"
+    env:
+      SOPS_AGE_KEY_FILE: "{{.PWD}}/.sops/dev/key.txt"
     cmds:
-      - python3 scripts/dump_source.py
+      - |
+        helmfile -e dev -l name={{.SERVICE}} apply \
+          --set image.tag=local \
+          --set image.pullPolicy=Never
+        kubectl rollout restart deployment/{{.SERVICE}} -n celine-dev
+
+  dev:skaffold-build-image:*:
+    desc: "Build and deploy a service locally. Set SERVICES_BASEPATH to your repos root (default: ..)"
+    vars:
+      SERVICE: "{{ index .MATCH 0 }}"
+      BASEPATH: '{{ env "SERVICES_BASEPATH" | default "../celine-dev/repositories" }}'
+      REPO_PATH: '{{ env "REPO_PATH" | default "" }}'
+      IMAGE_NAME: '{{ env "IMAGE_NAME" | default "" }}'
+      DOCKERFILE: '{{ env "DOCKERFILE" | default "Dockerfile" }}'
+    env:
+      SOPS_AGE_KEY_FILE: "{{.PWD}}/.sops/dev/key.txt"
+    cmds:
+      - |
+
+        REPO_PATH={{ if .REPO_PATH }}{{ .REPO_PATH }}{{ else }}{{.BASEPATH}}/{{.SERVICE}}{{ end }}
+        IMAGE_NAME={{ if .IMAGE_NAME }}{{ .IMAGE_NAME }}{{ else }}{{.SERVICE}}{{ end }}
+        SERVICE_NAME={{ if .SERVICE_NAME }}{{ .SERVICE_NAME }}{{ else }}{{.SERVICE}}{{ end }}
+        DOCKERFILE={{ if .DOCKERFILE }}{{ .DOCKERFILE }}{{ else }}Dockerfile{{ end }}
+        eval $(minikube docker-env) && docker build -t ghcr.io/celine-eu/$IMAGE_NAME:local -f $REPO_PATH/$DOCKERFILE $REPO_PATH
+
+        task dev:apply-local-image:{{.SERVICE}}
+
+  dev:build:rec-registry:
+    cmds:
+      - task dev:skaffold-build-image:rec-registry
+
+  dev:build:nudging:
+    cmds:
+      - REPO_PATH="../celine-dev/repositories/nudging-tool" task dev:skaffold-build-image:nudging
+
+  dev:build:digital-twin:
+    cmds:
+      - REPO_PATH="../celine-dev/repositories/digital-twin" task dev:skaffold-build-image:digital-twin
+
+  dev:build:dataset-api:
+    cmds:
+      - REPO_PATH="../celine-dev/repositories/dataset-api" task dev:skaffold-build-image:dataset-api
+
+  dev:build:ai-assistant:
+    cmds:
+      - |
+        IMAGE_NAME=celine-ai-assistant \
+        REPO_PATH="../celine-dev/repositories/celine-ai-assistant" task dev:skaffold-build-image:ai-assistant
+
+  dev:build:webapp:
+    cmds:
+      - |
+        IMAGE_NAME=celine-webapp \
+        REPO_PATH="../celine-dev/repositories/celine-webapp" task dev:skaffold-build-image:webapp
+
+  dev:build:policies-shell:
+    env:
+      SOPS_AGE_KEY_FILE: "{{.PWD}}/.sops/dev/key.txt"
+    cmds:
+      - |
+        IMAGE_NAME=celine-policies \
+        SERVICE_NAME=policies-shell \
+        REPO_PATH="../celine-dev/repositories/celine-policies" \
+        task dev:skaffold-build-image:policies-shell
+      - |
+        helmfile -e dev -l name=mqtt-auth apply \
+          --set image.tag=local \
+          --set image.pullPolicy=Never
+        kubectl rollout restart deployment/mqtt-auth -n celine-dev
+
+  dev:build:frontend-webapp:
+    env:
+      SOPS_AGE_KEY_FILE: "{{.PWD}}/.sops/dev/key.txt"
+    cmds:
+      - |
+        IMAGE_NAME=celine-frontend-webapp \
+        REPO_PATH="../celine-dev/repositories/celine-frontend" \
+        DOCKERFILE="apps/webapp/Dockerfile" \
+        task dev:skaffold-build-image:frontend-webapp
+  dev:build:frontend-assistant:
+    env:
+      SOPS_AGE_KEY_FILE: "{{.PWD}}/.sops/dev/key.txt"
+    cmds:
+      - |
+        IMAGE_NAME=celine-frontend-assistant \
+        REPO_PATH="../celine-dev/repositories/celine-frontend" \
+        DOCKERFILE="apps/assistant/Dockerfile" \
+        task dev:skaffold-build-image:frontend-assistant
+
+  dev:build:all:
+    cmds:
+      - task: dev:build:rec-registry
+      - task: dev:build:nudging
+      - task: dev:build:digital-twin
+      - task: dev:build:dataset-api
+      - task: dev:build:ai-assistant
+      - task: dev:build:webapp
+      - task: dev:build:policies-shell
+      - task: dev:build:frontend-webapp
+      - task: dev:build:frontend-assistant
+
+  dev:deploy-service:
+    cmds:
+      - task helmfile:dev -- -l name={{.CLI_ARGS}} sync
+      - task dev:build:{{.CLI_ARGS}}
+
+  dev:setup-certs:
+    desc: "Generate self-signed CA + wildcard cert for *.celine.test and load into minikube"
+    cmds:
+      - |
+        set -e
+        DOMAIN="celine.test"
+        CERT_DIR=".certs"
+        mkdir -p "$CERT_DIR"
+
+        echo "🔑 Generating CA key and certificate (with proper CA extensions)..."
+        openssl genrsa -out "$CERT_DIR/ca.key" 4096
+        openssl req -new -x509 -sha256 -days 3650 \
+          -key "$CERT_DIR/ca.key" \
+          -out "$CERT_DIR/ca.crt" \
+          -subj "/CN=celine-local-ca/O=CELINE/C=EU" \
+          -addext "basicConstraints=critical,CA:TRUE,pathlen:0" \
+          -addext "keyUsage=critical,keyCertSign,cRLSign" \
+          -addext "subjectKeyIdentifier=hash"
+
+        echo "🔑 Generating wildcard cert for *.${DOMAIN} (serverAuth, SAN, SKI/AKI)..."
+        openssl genrsa -out "$CERT_DIR/tls.key" 2048
+        openssl req -new -sha256 \
+          -key "$CERT_DIR/tls.key" \
+          -out "$CERT_DIR/tls.csr" \
+          -subj "/CN=*.${DOMAIN}/O=CELINE/C=EU"
+
+        openssl x509 -req -sha256 -days 825 \
+          -in "$CERT_DIR/tls.csr" \
+          -CA "$CERT_DIR/ca.crt" \
+          -CAkey "$CERT_DIR/ca.key" \
+          -CAcreateserial \
+          -out "$CERT_DIR/tls.crt" \
+          -extfile <(printf "subjectAltName=DNS:*.%s,DNS:%s\nbasicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\nsubjectKeyIdentifier=hash\nauthorityKeyIdentifier=keyid,issuer\n" "$DOMAIN" "$DOMAIN")
+
+        echo "📦 Loading secrets into minikube (namespace: celine-dev)..."
+        kubectl create namespace celine-dev --dry-run=client -o yaml | kubectl apply -f -
+
+        # CA secret — mounted into pods as SSL_CERT_FILE / provider CA
+        kubectl create secret generic celine-ca \
+          --from-file=ca.crt="$CERT_DIR/ca.crt" \
+          --namespace celine-dev \
+          --dry-run=client -o yaml | kubectl apply -f -
+
+        # Wildcard TLS secret — used by ingress TLS
+        kubectl create secret tls celine-wildcard-tls \
+          --cert="$CERT_DIR/tls.crt" \
+          --key="$CERT_DIR/tls.key" \
+          --namespace celine-dev \
+          --dry-run=client -o yaml | kubectl apply -f -
+
+        # cert-manager CA issuer secret — MUST be the CA keypair (ca.crt + ca.key)
+        kubectl create secret tls celine-ca-issuer \
+          --cert="$CERT_DIR/ca.crt" \
+          --key="$CERT_DIR/ca.key" \
+          -n celine-dev \
+          --dry-run=client -o yaml | kubectl apply -f -
+
+        echo ""
+        echo "✅ Secrets created:"
+        echo "   celine-ca            → CA cert for pod SSL_CERT_FILE injection"
+        echo "   celine-wildcard-tls  → wildcard TLS cert for ingress + cert-manager CA issuer"
+        echo ""
+        echo "👉 To trust the CA in your browser/OS, add: $CERT_DIR/ca.crt"
+        echo "   macOS:   sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain $CERT_DIR/ca.crt"
+        echo "   Linux:   sudo cp $CERT_DIR/ca.crt /usr/local/share/ca-certificates/celine-ca.crt && sudo update-ca-certificates"
+        echo "   Firefox: Settings → Certificates → Import → $CERT_DIR/ca.crt"
+
+
+  # dev:sync-users:
+  #   desc: "Sync REC participants to Keycloak. Usage: task dev:sync-users -- recs/my-rec.yaml"
+  #   env:
+  #     CLI_DIR: "../celine-dev/repositories/celine-policies"
+  #   cmds:
+  #     - |
+  #       set -e
+  #       REC_YAML="{{ .CLI_ARGS }}"
+  #       test -n "$REC_YAML" || { echo "Usage: task dev:sync-users -- recs/my-rec.yaml"; exit 1; }
+  #       test -f "$REC_YAML" || { echo "File not found: $REC_YAML"; exit 1; }
+
+  #       REQUESTS_CA_BUNDLE=.certs/ca.crt \
+  #       SSL_CERT_FILE=.certs/ca.crt \
+  #       CELINE_KEYCLOAK_BASE_URL=https://keycloak.celine.test/auth \
+  #       CELINE_KEYCLOAK_REALM=celine \
+  #       CELINE_KEYCLOAK_ADMIN_USER={{ .KEYCLOAK_ADMIN_USER | default "admin" }} \
+  #       CELINE_KEYCLOAK_ADMIN_PASSWORD={{ .KEYCLOAK_ADMIN_PASSWORD | default "admin" }} \
+  #       CELINE_SYNC_USERS_GROUPS="/viewers" \
+  #       cd {{.CLI_DIR}} && uv run celine-policies keycloak sync-users "$REC_YAML"
+
+  dev:sync-clients:
+    desc: "Sync Keycloak clients from clients.yaml"
+    env:
+      CLI_DIR: "../celine-dev/repositories/celine-policies"
+    cmds:
+      - |
+        REQUESTS_CA_BUNDLE=.certs/ca.crt \
+        SSL_CERT_FILE=.certs/ca.crt \
+        CELINE_KEYCLOAK_BASE_URL=https://keycloak.celine.test/auth \
+        CELINE_KEYCLOAK_REALM=celine \
+        CELINE_KEYCLOAK_ADMIN_USER={{ .KEYCLOAK_ADMIN_USER | default "admin" }} \
+        CELINE_KEYCLOAK_ADMIN_PASSWORD={{ .KEYCLOAK_ADMIN_PASSWORD | default "admin" }} \
+        cd {{.CLI_DIR}} && uv run celine-policies keycloak sync clients.yaml
+
+  import:keycloak-users:*:
+    desc: "Import REC users into keycloak via the policies-shell pod. Usage: task import:keycloak-users:dev -- recs/my-rec.yaml"
+    vars:
+      DEPLOYMENT_ENV: "{{ index .MATCH 0 }}"
+      FILE: "{{ .CLI_ARGS }}"
+    cmds:
+      - |
+        set -e
+        FILE="{{ .FILE }}"
+        test -n "$FILE" || { echo "Usage: task import:rec-registry:{{ .DEPLOYMENT_ENV }} -- path/to/rec.yaml"; exit 1; }
+        test -f "$FILE" || { echo "File not found: $FILE"; exit 1; }
+
+
+        POD=$(kubectl get pod -n celine-{{ .DEPLOYMENT_ENV }} \
+          -l app.kubernetes.io/name=celine-policies-shell \
+          -o jsonpath='{.items[0].metadata.name}')
+        test -n "$POD" || { echo "No policies-shell pod found in celine-{{ .DEPLOYMENT_ENV }}"; exit 1; }
+
+        kubectl cp "$FILE" "$POD":/tmp/rec.yaml -n celine-{{ .DEPLOYMENT_ENV }}
+        kubectl exec -it "$POD" -n celine-{{ .DEPLOYMENT_ENV }} -- \
+          celine-policies keycloak sync-users /tmp/rec.yaml
+
+
+  import:rec-registry:*:
+    desc: "Import a REC YAML directly via the rec-registry pod. Usage: task import:rec-registry:dev -- recs/my-rec.yaml"
+    vars:
+      DEPLOYMENT_ENV: "{{ index .MATCH 0 }}"
+      FILE: "{{ .CLI_ARGS }}"
+    cmds:
+      - |
+        set -e
+        FILE="{{ .FILE }}"
+        test -n "$FILE" || { echo "Usage: task import:rec-registry:{{ .DEPLOYMENT_ENV }} -- path/to/rec.yaml"; exit 1; }
+        test -f "$FILE" || { echo "File not found: $FILE"; exit 1; }
+
+        POD=$(kubectl get pod -n celine-{{ .DEPLOYMENT_ENV }} \
+          -l app.kubernetes.io/name=celine-rec-registry-shell \
+          -o jsonpath='{.items[0].metadata.name}')
+        test -n "$POD" || { echo "No rec-registry-shell pod found in celine-{{ .DEPLOYMENT_ENV }}"; exit 1; }
+
+        kubectl cp "$FILE" "$POD":/tmp/rec.yaml -n celine-{{ .DEPLOYMENT_ENV }}
+        kubectl exec -it "$POD" -n celine-{{ .DEPLOYMENT_ENV }} -- bash -c "cd /app/src/celine/rec_registry/cli && python main.py import -f /tmp/rec.yaml"
+          

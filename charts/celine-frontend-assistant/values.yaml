@@ -1,0 +1,79 @@
+## ----------------------------------------------------------------------------
+## celine-frontend-assistant — values.yaml
+## ----------------------------------------------------------------------------
+
+fullnameOverride: frontend-assistant
+
+image:
+    repository: ghcr.io/celine-eu/celine-frontend-assistant
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+service:
+    type: ClusterIP
+    port: 3003
+
+ingress:
+    enabled: true
+    domain: celine.test
+    host: "assistant.celine.test"
+    issuer: celine-tls
+    apiBackend:
+        service: ai-assistant
+        port: 8012
+    auth:
+        enabled: true
+    tls:
+        enabled: true
+        secretName: ""
+    annotations: {}
+
+healthCheck:
+    enabled: true
+    path: /
+    initialDelaySeconds: 10
+    periodSeconds: 30
+    failureThreshold: 3
+
+# Not used but required by celine-services shared templates
+oidc:
+    baseUrl: ""
+    jwksUri: ""
+    allowedAudiences: ""
+    includeClientIdAsAudience: false
+    timeout: 10.0
+    service:
+        passthrough: true
+        clientId: ""
+        audience: ""
+        clientSecret: ""
+
+policies:
+    dir: "/app/policies"
+    dataDir: ""
+    cacheEnabled: false
+    cacheTtl: 300
+    cacheMaxsize: 10000
+
+extraEnv: []
+extraSecrets: {}
+podAnnotations: {}
+podSecurityContext:
+    runAsUser: 1000
+resources:
+  requests:
+    cpu: 10m
+    memory: 16Mi
+  limits:
+    cpu: 100m
+    memory: 32Mi
+nodeSelector: {}
+tolerations: []
+affinity: {}
+volumeMounts: []
+volumes: []
+logLevel: "INFO"
+migrate:
+    enabled: false

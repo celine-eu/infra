@@ -1,0 +1,13 @@
+apiVersion: v2
+name: celine-mqtt-auth
+description: >
+  Dedicated chart for the CELINE MQTT auth service (celine.mqtt_auth.main:create_app).
+  Extracted from celine-services so it can be deployed, scaled, and versioned independently.
+  mosquitto-go-auth reaches it via ClusterIP at port 8009.
+type: application
+version: 0.1.0
+appVersion: "latest"
+dependencies:
+  - name: celine-services
+    version: "0.1.0"
+    repository: file://../celine-services

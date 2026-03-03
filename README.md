@@ -97,16 +97,16 @@ kubectl config use-context minikube
 
 ---
 
-## Local DNS Configuration (`*.celine.local`)
+## Local DNS Configuration (`*.celine.test`)
 
 CELINE services rely on **Ingress host-based routing**.
 
-For local development, services are exposed under `*.celine.local`.
+For local development, services are exposed under `*.celine.test` where `*.test` is resolved by minikube
 
 Add the following entry to `/etc/hosts`:
 
 ```text
-192.168.49.2 dashboard.celine.local s3.celine.local keycloak.celine.local marquez.celine.local mqtt.celine.local sso.celine.local prefect.celine.local superset.celine.local
+192.168.49.2 api.celine.test webapp.celine.test assistant.celine.test dashboard.celine.test s3.celine.test keycloak.celine.test marquez.celine.test mqtt.celine.test sso.celine.test prefect.celine.test superset.celine.test
 ```
 
 Notes:
@@ -114,7 +114,7 @@ Notes:
 - Hostnames must match ingress definitions
 - OAuth redirect URIs depend on these domains
 
-Using `localhost` will not work.
+Plain `localhost` will not work due to OIDC issuer mismatch.
 
 ---
 

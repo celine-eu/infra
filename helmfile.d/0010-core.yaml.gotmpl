@@ -22,6 +22,8 @@ repositories:
     url: https://prometheus-community.github.io/helm-charts
   - name: seaweedfs
     url: https://seaweedfs.github.io/seaweedfs/helm
+  - name: cert-manager
+    url: https://charts.jetstack.io
 
 releases:
   - name: cnpg
@@ -92,9 +94,46 @@ releases:
     labels:
       group: core
 
+  - name: cert-manager
+    namespace: cert-manager
+    chart: cert-manager/cert-manager
+    version: v1.16.3
+    createNamespace: true
+    missingFileHandler: Warn
+    condition: tls_setup.cert_manager.enabled
+    values:
+      - crds:
+            enabled: true
+    labels:
+      group: core
+    hooks:
+      - events: [postsync]
+        showlogs: true
+        command: bash
+        args:
+          - -c
+          - |
+            echo "⏳ Waiting for cert-manager webhook..."
+            kubectl rollout status deployment/cert-manager-webhook \
+              -n cert-manager --timeout=120s
+
   - name: tls-setup
     namespace: celine-{{ .Environment.Name }}
     chart: ../charts/tls-setup
+    needs:
+      - cert-manager/cert-manager
+    hooks:
+      - events: [presync]
+        showlogs: true
+        command: bash
+        args:
+          - -c
+          - |
+            echo "⏳ Waiting for cert-manager CRDs..."
+            until kubectl get crd issuers.cert-manager.io &>/dev/null; do
+              sleep 2
+            done
+            echo "✅ CRDs ready"
     version: 0.1.0
     createNamespace: true
     missingFileHandler: Warn

@@ -4,9 +4,9 @@ metadata:
     name: prefect-deploy-cleanup
     namespace: "{{ $.Values.global.namespace }}"
     annotations:
-        "helm.sh/hook": pre-install,pre-upgrade
+        "helm.sh/hook": pre-upgrade
         "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
-        "helm.sh/hook-weight": "-1"
+        "helm.sh/hook-weight": "-5"
 spec:
     ttlSecondsAfterFinished: 10
     template:
@@ -25,3 +25,4 @@ spec:
                       - -l
                       - app=prefect-pipeline-deploy
                       - --ignore-not-found
+                      - --wait=false

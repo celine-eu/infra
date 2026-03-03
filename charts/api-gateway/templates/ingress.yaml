@@ -1,0 +1,42 @@
+{{- $root := . }}
+{{- $domain := .Values.domain }}
+{{- $authUrl := .Values.auth.url | default (printf "https://sso.%s/oauth2/auth" $domain) }}
+{{- $authSignin := .Values.auth.signin | default (printf "https://sso.%s/oauth2/start?rd=$scheme://$host$request_uri" $domain) }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-gateway
+  labels:
+    app.kubernetes.io/name: api-gateway
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  annotations:
+    cert-manager.io/issuer: {{ .Values.issuer | default "celine-tls" }}
+    {{- if .Values.auth.enabled }}
+    nginx.ingress.kubernetes.io/auth-url: {{ $authUrl | quote }}
+    nginx.ingress.kubernetes.io/auth-signin: {{ $authSignin | quote }}
+    nginx.ingress.kubernetes.io/auth-response-headers: "Authorization, X-Auth-Request-Email, X-Auth-Request-User"
+    {{- end }}
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/use-regex: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: api.{{ $domain }}
+      http:
+        paths:
+          {{- range .Values.services }}
+          - path: /{{ .name }}(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: {{ .service }}
+                port:
+                  number: {{ .port }}
+          {{- end }}
+
+  {{- if .Values.tls.enabled }}
+  tls:
+    - hosts:
+        - api.{{ $domain }}
+      secretName: {{ .Values.tls.secretName | default "api-gateway-tls" }}
+  {{- end }}

@@ -1,0 +1,63 @@
+{{- define "qdrant.name" -}}
+qdrant-{{ .Release.Name }}-{{ .Chart.Name }}
+{{- end -}}
+
+replicaCount: 1
+
+image:
+  repository: docker.io/qdrant/qdrant
+  pullPolicy: IfNotPresent
+  tag: ""
+  useUnprivilegedImage: false
+
+env: []
+  # - name: QDRANT_ALLOW_RECOVERY_MODE
+  #   value: true
+
+ingress:
+  enabled: false
+
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+
+persistence:
+  accessModes: ["ReadWriteOnce"]
+  size: 20Gi
+  annotations: {}
+  additionalLabels: {}
+  storageVolumeName: qdrant-storage
+  # storageSubPath: ""
+  # storageClassName: local-path
+  # volumeAttributesClassName: ""
+
+# If you use snapshots or the snapshot shard transfer mechanism, we recommend
+# creating a separate volume of the same size as your main volume so that your
+# cluster won't crash if the snapshot is too big.
+snapshotPersistence:
+  enabled: false
+  accessModes: ["ReadWriteOnce"]
+  size: 20Gi
+  annotations: {}
+  additionalLabels: {}
+  snapshotsVolumeName: qdrant-snapshots
+  # snapshotsSubPath: ""
+  # You can change the storageClassName to ensure snapshots are saved to cold storage.
+  # storageClassName: local-path
+  # volumeAttributesClassName: ""
+
+snapshotRestoration:
+  enabled: false
+  # Set pvcName if you want to restore from a separately-created PVC. Only supported for single-node clusters unless the PVC is ReadWriteMany.
+  # If you set snapshotPersistence.enabled and want to restore a snapshot from there, you can leave this blank to skip mounting an external volume.
+  pvcName: snapshots-pvc
+  # Must not conflict with /qdrant/snapshots or /qdrant/storage
+  mountPath: /qdrant/snapshot-restoration
+  snapshots:
+  #  - /qdrant/snapshot-restoration/test_collection/test_collection-2022-10-24-13-56-50.snapshot:test_collection

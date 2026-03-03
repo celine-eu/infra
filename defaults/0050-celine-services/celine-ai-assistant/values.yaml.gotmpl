@@ -1,0 +1,24 @@
+image:
+  tag: {{ .Environment.Values.ai_assistant.image_tag | default "latest" | quote }}
+
+oidc:
+  service:
+    # skip client ID / secrets
+    passthrough: true
+    clientId: ""
+    audience: "oauth2_proxy"
+    clientSecret: ""
+
+  includeClientIdAsAudience: false
+  allowedAudiences: ""
+
+extraEnv:
+  - name: QDRANT_URL
+    value: http://qdrant:6333
+  - name: OPENAI_API_KEY
+    value: {{ .Environment.Values.ai_assistant.openai_api_key | quote }}
+
+{{- with .Environment.Values | dig "ai_assistant" "resources" nil }}
+resources:
+  {{- toYaml . | nindent 2 }}
+{{- end }}

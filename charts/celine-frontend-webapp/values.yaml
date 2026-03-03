@@ -1,0 +1,58 @@
+## ----------------------------------------------------------------------------
+## celine-frontend-webapp — values.yaml
+## ----------------------------------------------------------------------------
+
+fullnameOverride: frontend-webapp
+
+image:
+  repository: ghcr.io/celine-eu/celine-frontend-webapp
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  port: 3005
+
+ingress:
+  enabled: true
+  domain: celine.test
+  host: "webapp.celine.test"
+  issuer: celine-tls
+
+  assistantBackend:
+    service: ai-assistant
+    port: 8012
+  apiBackend:
+    service: webapp
+    port: 8014
+
+  auth:
+    enabled: true
+  tls:
+    enabled: true
+    secretName: ""
+  annotations: {}
+
+healthCheck:
+  enabled: true
+  path: /
+  initialDelaySeconds: 10
+  periodSeconds: 30
+  failureThreshold: 3
+
+extraEnv: []
+podAnnotations: {}
+podSecurityContext:
+  runAsUser: 1000
+resources:
+  requests:
+    cpu: 10m
+    memory: 16Mi
+  limits:
+    cpu: 100m
+    memory: 32Mi
+nodeSelector: {}
+tolerations: []
+affinity: {}

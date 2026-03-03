@@ -1,0 +1,209 @@
+## ----------------------------------------------------------------------------
+## celine-digital-twin — values.yaml
+##
+## Defaults for all environments.
+## Per-environment overrides live in envs/<env>/celine-digital-twin.yaml
+## and are applied by helmfile.
+##
+## Secret values (marked [secret]) are passed via SOPS-encrypted files
+## in envs/<env>/secrets.yaml — never committed in plaintext.
+## ----------------------------------------------------------------------------
+
+fullnameOverride: digital-twin
+
+# ------------------------------------------------------------------------------
+# Image
+# ------------------------------------------------------------------------------
+image:
+  repository: ghcr.io/celine-eu/digital-twin
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+# ------------------------------------------------------------------------------
+# Service
+# ------------------------------------------------------------------------------
+service:
+  type: ClusterIP
+  port: 8002
+
+# ------------------------------------------------------------------------------
+# Ingress
+# ------------------------------------------------------------------------------
+ingress:
+  enabled: false
+  domain: celine.test # overridden per env
+  host: "dt.celine.test" # overridden per env
+  issuer: celine-tls
+  auth:
+    enabled: true # protected by oauth2-proxy
+  tls:
+    enabled: true
+    secretName: "" # defaults to <fullname>-tls
+  annotations: {}
+
+# ------------------------------------------------------------------------------
+# OIDC
+#
+# Global fields (baseUrl, jwksUri) are shared across all services and set
+# once per environment — override them in envs/<env>/celine-digital-twin.yaml.
+#
+# Per-service fields (service.*) default to svc-<release-name> which resolves
+# to "svc-celine-digital-twin" when released as "celine-digital-twin".
+# Override in envs/<env>/ if the Keycloak client id differs.
+# ------------------------------------------------------------------------------
+oidc:
+  # -- global (shared shape, override per env) --
+  baseUrl: "http://keycloak/realms/celine"
+  jwksUri: "http://keycloak/realms/celine/protocol/openid-connect/certs"
+  allowedAudiences: ""
+  includeClientIdAsAudience: true
+  timeout: 10.0
+
+  # -- per-service --
+  service:
+    clientId: "svc-digital-twin" # default: svc-<release-name>  e.g. svc-celine-digital-twin
+    audience: "svc-digital-twin" # default: svc-<release-name>
+    clientSecret: "svc-digital-twin" # [secret] — set via SOPS in envs/<env>/secrets.yaml
+
+# ------------------------------------------------------------------------------
+# Policies — celine-sdk PoliciesSettings (CELINE_POLICIES_*)
+#
+# Global defaults apply to all services.
+# Override locally only if this service needs different policy settings.
+# ------------------------------------------------------------------------------
+policies:
+  dir: "/app/policies"
+  dataDir: ""
+  cacheEnabled: true
+  cacheTtl: 300
+  cacheMaxsize: 10000
+
+# ------------------------------------------------------------------------------
+# Postgres — not used by DT currently
+# ------------------------------------------------------------------------------
+postgres:
+  existingSecret: ""
+  dsnEnvVar: "DATABASE_URL"
+  secretKey: "connection-string"
+
+# ------------------------------------------------------------------------------
+# S3 — not used by DT currently
+# ------------------------------------------------------------------------------
+s3:
+  endpointUrl: ""
+  region: "us-east-1"
+  existingSecret: ""
+
+# ------------------------------------------------------------------------------
+# Migrate — not used by DT
+# ------------------------------------------------------------------------------
+migrate:
+  enabled: false
+  command: ["alembic", "upgrade", "head"]
+  extraEnv: []
+
+# ------------------------------------------------------------------------------
+# Health check
+# ------------------------------------------------------------------------------
+healthCheck:
+  enabled: true
+  path: /health
+  initialDelaySeconds: 10
+  periodSeconds: 30
+  failureThreshold: 3
+
+# ------------------------------------------------------------------------------
+# Config volume
+# DT mounts a ConfigMap at /app/config (replaces ./config in docker-compose).
+# The ConfigMap name must match what is deployed in the cluster.
+# ------------------------------------------------------------------------------
+# defaults/0030-apps/celine-digital-twin/values.yaml.gotmpl
+
+configMap:
+  enabled: true
+  name: celine-digital-twin-config
+  data:
+    brokers.yaml: |
+      brokers:
+        celine_mqtt:
+          enabled: true
+          auth_with_token: true
+          config:
+            host: "${MQTT_HOST:-mqtt-mosquitto}"
+            port: "${MQTT_PORT:-1883}"
+            use_tls: "${MQTT_USE_TLS:-false}"
+            keepalive: 60
+            clean_session: true
+            token_refresh_margin: 30.0
+      default_broker: celine_mqtt
+
+    domains.yaml: |
+      domains:
+        - name: it-energy-community
+          import: celine.dt.domains.energy_community.domain:domain
+          enabled: true
+          overrides:
+            broker: "${MQTT_BROKER:-celine_mqtt}"
+        - name: it-participant
+          import: celine.dt.domains.participant.domain:domain
+          enabled: true
+          overrides:
+            broker: "${MQTT_BROKER:-celine_mqtt}"
+    clients.yaml: |
+      clients:
+        dataset_api:
+          class: celine.dt.core.clients.dataset_api:DatasetSqlApiClient
+          scope: dataset.query
+          config:
+            base_url: "http://datasets-api:8001"
+            timeout: 30.0
+        rec_registry_admin:
+          class: celine.sdk.rec_registry:RecRegistryAdminClient
+          scope: "rec-registry.lookup"
+          config:
+            base_url: "http://rec-registry:8004"
+            timeout: 5.0
+        nudging_admin_client:
+          class: celine.sdk.nudging.client:NudgingAdminClient
+          scope: "nudging.ingest"
+          config:
+            base_url: "http://nudging:8016"
+            timeout: 5.0
+
+# volumeMounts and volumes are populated by deployment.yaml using the
+# celine-services.configVolume* helpers — do not set manually here.
+volumeMounts: []
+volumes: []
+
+# ------------------------------------------------------------------------------
+# Application
+# ------------------------------------------------------------------------------
+logLevel: "INFO"
+
+# Extra env vars specific to this service — added verbatim to the container
+extraEnv: []
+# - name: SOME_VAR
+#   value: "some-value"
+
+# Extra keys added to the managed Secret (e.g. additional API keys)
+extraSecrets: {}
+# SOME_API_KEY: ""   # [secret]
+
+# ------------------------------------------------------------------------------
+# Pod
+# ------------------------------------------------------------------------------
+podAnnotations: {}
+podSecurityContext:
+  runAsUser: 1000
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+nodeSelector: {}
+tolerations: []
+affinity: {}

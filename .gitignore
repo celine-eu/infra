@@ -3,4 +3,8 @@ envs/*/secrets*.yaml
 envs/*/secrets*.yaml.*
 .sops.yaml
 /sources.txt
+*.tgz
+# Dumpster output
 .dumpster
+.certs
+.claude

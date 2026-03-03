@@ -1,4 +1,4 @@
-domain: celine.local
+domain: celine.test
 
 seaweedfs:
   enabled: true
@@ -10,9 +10,13 @@ seaweedfs:
     - name: celine-pipelines-copernicus
 
 tls_setup:
-  enabled: false
   issuer: celine-tls
-  email: issuer@celine.local
+  email: issuer@celine.test
+  self_signed: true
+  ca_secret: celine-ca
+  cert_manager:
+    # install cert-manager
+    enabled: true
 
 mqtt_ingestor:
   enabled: false
@@ -28,7 +32,6 @@ mqtt_ingestor:
     POSTGRES_TABLE: mqtt_messages
 
 postgres_db:
-  storage_size: "10Gi"
   datasets_owner: datasets_owner
   datasets_ro: datasets_ro
   meltano: meltano
@@ -37,11 +40,17 @@ postgres_db:
   keycloak: keycloak
   marquez: marquez
 
-registry_accounts:
-  registries: []
-    # - server: ghcr.io
-    #   username: "oauth2"
-    #   password: "YOUR_GITHUB_TOKEN"
+  # celine services
+  nudging: nudging
+  datasets_api: datasets_api
+  rec_registry: rec_registry
+  ai_assistant: ai_assistant
+  webapp: webapp
+
+registries: []
+  # - server: ghcr.io
+  #   username: "oauth2"
+  #   password: "YOUR_GITHUB_TOKEN"
 
 s3_accounts:
   endpoint: http://seaweedfs-s3:8333
@@ -67,10 +76,28 @@ auth_setup:
   clientSecret: oauth2_proxy
   clientCLISecret: celine-cli
   cookieSecret: 3d749938f5b65074ea3c7359a06ab108
+  realmAdminUser: admin
+  realmAdminPassword: admin
 
 keycloak:
+  realm: celine
   username: admin
   password: admin
+  # theme: "celine"
+  # image_tag: 26.04.0-1.0.0
+  admin_mfa: false
+  smtp:
+    enabled: false
+    host: ""
+    port: 587
+    from: "no-reply@celine.test"
+    fromDisplayName: "CELINE Platform"
+    replyTo: ""
+    ssl: false
+    starttls: true
+    auth: false
+    user: ""
+    password: ""
 
 # NOTE: mqtt_setup and mosquitto users should be aligned.
 mqtt_setup:
@@ -108,3 +135,45 @@ pipelines:
   CDSAPI_KEY: todo
   ADSAPI_KEY: todo
   OWM_APIKEY: todo
+
+mqtt_auth:
+  image_tag: latest
+  logLevel: DEBUG
+  oidc:
+    clientSecret: "svc-mqtt-auth"
+
+policies_shell:
+  image_tag: latest
+
+ai_assistant:
+  image_tag: latest
+  openai_api_key: your api key
+
+webapp:
+  image_tag: latest
+
+dataset_api:
+  image_tag: latest
+  oidc:
+    clientSecret: "svc-dataset-api"
+
+digital_twin:
+  image_tag: latest
+  oidc:
+    clientSecret: "svc-digital-twin"
+
+nudging:
+  image_tag: latest
+  oidc:
+    clientSecret: "svc-nudging"
+
+rec_registry:
+  image_tag: latest
+  oidc:
+    clientSecret: "svc-rec-registry"
+
+frontend_ai_assistant:
+  image_tag: "latest"
+
+frontend_webapp:
+  image_tag: "latest"

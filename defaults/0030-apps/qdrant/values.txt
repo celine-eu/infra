@@ -1,0 +1,1 @@
+https://github.com/qdrant/qdrant-helm/raw/refs/heads/main/charts/qdrant/values.yaml

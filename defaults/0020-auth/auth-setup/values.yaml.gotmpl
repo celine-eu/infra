@@ -1,8 +1,13 @@
-secure: false
+secure: true
 
 realm: celine
 domain: "{{ .Environment.Values.domain }}"
 issuer: {{ .Environment.Values.tls_setup.issuer }}
+
+realmAdmin:
+  username: {{ .Environment.Values | dig "auth_setup" "realmAdminUser" "celine-admin" }}
+  email: {{ .Environment.Values | dig "auth_setup" "realmAdminEmail" "admin@celine.test" }}
+  password: {{ .Environment.Values | dig "auth_setup" "realmAdminPassword" "celine-admin" }}
 
 oauth2Proxy:
   clientID: {{ .Environment.Values.auth_setup.clientID | default "oauth2_proxy"  }}
@@ -21,3 +26,37 @@ dashboard_items:
     host: prefect
   # - name: Monitoring (Prometheus)
   #   host: prometheus
+
+
+smtp:
+  enabled: {{ .Environment.Values | dig "keycloak" "smtp" "enabled" false }}
+  host: {{ .Environment.Values | dig "keycloak" "smtp" "host" "" | quote }}
+  port: {{ .Environment.Values | dig "keycloak" "smtp" "port" 587 }}
+  from: {{ .Environment.Values | dig "keycloak" "smtp" "from" "noreply@celine.test" | quote }}
+  fromDisplayName: {{ .Environment.Values | dig "keycloak" "smtp" "fromDisplayName" "CELINE Platform" | quote }}
+  replyTo: {{ .Environment.Values | dig "keycloak" "smtp" "replyTo" "" | quote }}
+  ssl: {{ .Environment.Values | dig "keycloak" "smtp" "ssl" false }}
+  starttls: {{ .Environment.Values | dig "keycloak" "smtp" "starttls" true }}
+  auth: {{ .Environment.Values | dig "keycloak" "smtp" "auth" false }}
+  user: {{ .Environment.Values | dig "keycloak" "smtp" "user" "" | quote }}
+  password: {{ .Environment.Values | dig "keycloak" "smtp" "password" "" | quote }}
+
+bruteForce:
+  enabled: {{ .Environment.Values | dig "keycloak" "brute_force" "enabled" false }}
+  maxLoginFailures: {{ .Environment.Values | dig "keycloak" "brute_force" "maxLoginFailures" 5 }}
+  waitIncrementSeconds: {{ .Environment.Values | dig "keycloak" "brute_force" "waitIncrementSeconds" 60 }}
+  quickLoginCheckMilliSeconds: {{ .Environment.Values | dig "keycloak" "brute_force" "quickLoginCheckMilliSeconds" 1000 }}
+  minimumQuickLoginWaitSeconds: {{ .Environment.Values | dig "keycloak" "brute_force" "minimumQuickLoginWaitSeconds" 60 }}
+  maxFailureWaitSeconds: {{ .Environment.Values | dig "keycloak" "brute_force" "maxFailureWaitSeconds" 900 }}
+  failureFactor: {{ .Environment.Values | dig "keycloak" "brute_force" "failureFactor" 50 }}
+  permanentLockout: {{ .Environment.Values | dig "keycloak" "brute_force" "permanentLockout" false }}  
+
+{{- $adminMfa := .Environment.Values | dig "keycloak" "admin_mfa" (dict) }}
+adminMfa:
+  enabled: {{ if kindIs "map" $adminMfa }}{{ $adminMfa | dig "enabled" false }}{{ else }}false{{ end }}
+  groupPath: "/admins"
+
+theme:
+  login: {{ .Environment.Values | dig "keycloak" "theme" "login" "rec" | quote }}
+  account: {{ .Environment.Values | dig "keycloak" "theme" "account" "" | quote }}
+  email: {{ .Environment.Values | dig "keycloak" "theme" "email" "" | quote }}

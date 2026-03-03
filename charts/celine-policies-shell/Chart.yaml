@@ -1,0 +1,10 @@
+apiVersion: v2
+name: celine-policies-shell
+description: >
+  Long-running shell pod for celine-policies maintenance tasks.
+  Runs the same ghcr.io/celine-eu/celine-policies image but with
+  `tail -f /dev/null` so operators can kubectl exec in to run
+  the celine-policies CLI (e.g. keycloak sync clients.yaml).
+type: application
+version: 0.1.0
+appVersion: "latest"
