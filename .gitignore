@@ -7,3 +7,4 @@ envs/*/secrets*.yaml.*
 # Dumpster output
 .dumpster
 .certs
+.claude
