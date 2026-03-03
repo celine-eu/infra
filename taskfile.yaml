@@ -14,6 +14,25 @@ tasks:
       - minikube addons enable ingress-dns
       - task: set-context
       - task: dev:setup-certs
+      - task: dev:configure-coredns
+
+  dev:configure-coredns:
+    desc: "Patch CoreDNS to forward .test queries to minikube ingress-dns"
+    cmds:
+      - |
+        set -e
+        MINIKUBE_IP=$(minikube ip)
+        kubectl rollout status deployment/coredns -n kube-system --timeout=60s
+        kubectl get pod -n kube-system -l app=minikube-ingress-dns --no-headers | grep -q Running || \
+          kubectl wait pod -n kube-system -l app=minikube-ingress-dns --for=condition=Ready --timeout=60s
+        COREFILE=$(kubectl get cm coredns -n kube-system -o jsonpath='{.data.Corefile}')
+        if echo "$COREFILE" | grep -q "^test:53"; then
+          echo "CoreDNS already configured for .test — skipping"
+          exit 0
+        fi
+        kubectl patch cm coredns -n kube-system --type merge -p "{\"data\":{\"Corefile\":\"${COREFILE}\ntest:53 {\n    errors\n    forward . ${MINIKUBE_IP}\n    cache 30\n}\n\"}}"
+        kubectl rollout restart deployment/coredns -n kube-system
+        kubectl rollout status deployment/coredns -n kube-system --timeout=60s
 
   dev:stop:
     cmds:
