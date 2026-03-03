@@ -1,14 +1,16 @@
+{{- if .Values.retention.enabled }}
 apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: marquez-lineage-retention
 spec:
-  schedule: "45 2 * * *"
+  schedule: {{ .Values.retention.schedule | quote }}
   concurrencyPolicy: Forbid
-  successfulJobsHistoryLimit: 0
+  successfulJobsHistoryLimit: 1
   failedJobsHistoryLimit: 1
   jobTemplate:
     spec:
+      activeDeadlineSeconds: 900
       backoffLimit: 1
       template:
         spec:
@@ -17,6 +19,13 @@ spec:
             - name: cleanup
               image: postgres:16
               imagePullPolicy: IfNotPresent
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+                limits:
+                  cpu: 500m
+                  memory: 256Mi
               env:
                 - name: PGHOST
                   value: "{{ .Values.postgres.host }}"
@@ -32,85 +41,134 @@ spec:
                       name: "{{ .Values.postgres.existingSecret }}"
                       key: "{{ .Values.postgres.existingSecretKey }}"
               command:
-                - /bin/sh
+                - /bin/bash
                 - -c
                 - |
                   set -euo pipefail
 
-                  psql -v ON_ERROR_STOP=1 <<'SQL'
-                  SET lock_timeout = '5s';
-                  SET statement_timeout = '5min';
+                  BATCH={{ .Values.retention.batchSize }}
+                  MAX_ITER={{ .Values.retention.maxIterations }}
+                  KEEP={{ .Values.retention.keepVersions }}
+                  MAX_AGE={{ .Values.retention.runMaxAgeDays }}
 
-                  -- DATASET VERSIONS: keep last 5, delete max 10k
-                  WITH ranked AS (
-                    SELECT
-                      dv.uuid,
-                      d.current_version_uuid,
-                      ROW_NUMBER() OVER (
-                        PARTITION BY dv.dataset_uuid
-                        ORDER BY dv.created_at DESC, dv.uuid DESC
-                      ) AS rn
-                    FROM public.dataset_versions dv
-                    JOIN public.datasets d ON d.uuid = dv.dataset_uuid
-                  ),
-                  to_delete AS (
-                    SELECT uuid
-                    FROM ranked
-                    WHERE rn > 5
-                      AND uuid IS DISTINCT FROM current_version_uuid
-                    ORDER BY uuid
-                    LIMIT 10000
-                  )
-                  DELETE FROM public.dataset_versions dv
-                  USING to_delete t
-                  WHERE dv.uuid = t.uuid;
+                  echo "=== Marquez Retention Start: $(date -Iseconds) ==="
 
-                  -- JOB VERSIONS: keep last 5, delete max 10k
-                  WITH ranked AS (
-                    SELECT
-                      jv.uuid,
-                      j.current_version_uuid,
-                      ROW_NUMBER() OVER (
-                        PARTITION BY jv.job_uuid
-                        ORDER BY jv.created_at DESC, jv.uuid DESC
-                      ) AS rn
-                    FROM public.job_versions jv
-                    JOIN public.jobs j ON j.uuid = jv.job_uuid
-                  ),
-                  to_delete AS (
-                    SELECT uuid
-                    FROM ranked
-                    WHERE rn > 5
-                      AND uuid IS DISTINCT FROM current_version_uuid
-                    ORDER BY uuid
-                    LIMIT 10000
-                  )
-                  DELETE FROM public.job_versions jv
-                  USING to_delete t
-                  WHERE jv.uuid = t.uuid;
-
-                  -- OPTIONAL: RUN AGE CAP (30 days, max 10k)
-                  WITH to_delete AS (
-                    SELECT r.uuid
-                    FROM public.runs r
-                    LEFT JOIN public.jobs j ON j.current_run_uuid = r.uuid
-                    LEFT JOIN public.job_versions jv ON jv.latest_run_uuid = r.uuid
-                    WHERE r.created_at < now() - interval '30 days'
-                      AND j.uuid IS NULL
-                      AND jv.uuid IS NULL
-                    ORDER BY r.created_at
-                    LIMIT 10000
-                  )
-                  DELETE FROM public.runs r
-                  USING to_delete t
-                  WHERE r.uuid = t.uuid;
-
-                  VACUUM (ANALYZE) public.dataset_versions;
-                  VACUUM (ANALYZE) public.dataset_facets;
-                  VACUUM (ANALYZE) public.dataset_versions_field_mapping;
-                  VACUUM (ANALYZE) public.job_versions;
-                  VACUUM (ANALYZE) public.runs;
-                  VACUUM (ANALYZE) public.run_facets;
-                  VACUUM (ANALYZE) public.run_states;
-
+                  # --- dataset_versions: keep last N per dataset ---
+                  iteration=0
+                  while [ $iteration -lt $MAX_ITER ]; do
+                    deleted=$(psql -tA -v ON_ERROR_STOP=1 <<SQL
+                      SET lock_timeout = '{{ .Values.retention.lockTimeout }}';
+                      SET statement_timeout = '{{ .Values.retention.statementTimeout }}';
+                      WITH ranked AS (
+                        SELECT dv.uuid, d.current_version_uuid,
+                               ROW_NUMBER() OVER (
+                                 PARTITION BY dv.dataset_uuid
+                                 ORDER BY dv.created_at DESC, dv.uuid DESC
+                               ) AS rn
+                        FROM public.dataset_versions dv
+                        JOIN public.datasets d ON d.uuid = dv.dataset_uuid
+                      ),
+                      to_delete AS (
+                        SELECT uuid FROM ranked
+                        WHERE rn > $KEEP
+                          AND uuid IS DISTINCT FROM current_version_uuid
+                        ORDER BY uuid
+                        LIMIT $BATCH
+                      ),
+                      deleted AS (
+                        DELETE FROM public.dataset_versions dv
+                        USING to_delete t WHERE dv.uuid = t.uuid
+                        RETURNING 1
+                      )
+                      SELECT count(*) FROM deleted;
                   SQL
+                    )
+                    echo "[dataset_versions iter $iteration] deleted: $deleted"
+                    if [ "$deleted" -eq 0 ]; then break; fi
+                    iteration=$((iteration + 1))
+                  done
+
+                  # --- job_versions: keep last N per job ---
+                  iteration=0
+                  while [ $iteration -lt $MAX_ITER ]; do
+                    deleted=$(psql -tA -v ON_ERROR_STOP=1 <<SQL
+                      SET lock_timeout = '{{ .Values.retention.lockTimeout }}';
+                      SET statement_timeout = '{{ .Values.retention.statementTimeout }}';
+                      WITH ranked AS (
+                        SELECT jv.uuid, j.current_version_uuid,
+                               ROW_NUMBER() OVER (
+                                 PARTITION BY jv.job_uuid
+                                 ORDER BY jv.created_at DESC, jv.uuid DESC
+                               ) AS rn
+                        FROM public.job_versions jv
+                        JOIN public.jobs j ON j.uuid = jv.job_uuid
+                      ),
+                      to_delete AS (
+                        SELECT uuid FROM ranked
+                        WHERE rn > $KEEP
+                          AND uuid IS DISTINCT FROM current_version_uuid
+                        ORDER BY uuid
+                        LIMIT $BATCH
+                      ),
+                      deleted AS (
+                        DELETE FROM public.job_versions jv
+                        USING to_delete t WHERE jv.uuid = t.uuid
+                        RETURNING 1
+                      )
+                      SELECT count(*) FROM deleted;
+                  SQL
+                    )
+                    echo "[job_versions iter $iteration] deleted: $deleted"
+                    if [ "$deleted" -eq 0 ]; then break; fi
+                    iteration=$((iteration + 1))
+                  done
+
+                  # --- runs: older than N days, not referenced by current job/version ---
+                  iteration=0
+                  while [ $iteration -lt $MAX_ITER ]; do
+                    deleted=$(psql -tA -v ON_ERROR_STOP=1 <<SQL
+                      SET lock_timeout = '{{ .Values.retention.lockTimeout }}';
+                      SET statement_timeout = '{{ .Values.retention.statementTimeout }}';
+                      WITH to_delete AS (
+                        SELECT r.uuid
+                        FROM public.runs r
+                        LEFT JOIN public.jobs j ON j.current_run_uuid = r.uuid
+                        LEFT JOIN public.job_versions jv ON jv.latest_run_uuid = r.uuid
+                        WHERE r.created_at < now() - interval '${MAX_AGE} days'
+                          AND j.uuid IS NULL
+                          AND jv.uuid IS NULL
+                        ORDER BY r.created_at
+                        LIMIT $BATCH
+                      ),
+                      deleted AS (
+                        DELETE FROM public.runs r
+                        USING to_delete t WHERE r.uuid = t.uuid
+                        RETURNING 1
+                      )
+                      SELECT count(*) FROM deleted;
+                  SQL
+                    )
+                    echo "[runs iter $iteration] deleted: $deleted"
+                    if [ "$deleted" -eq 0 ]; then break; fi
+                    iteration=$((iteration + 1))
+                  done
+
+                  # --- VACUUM ANALYZE (separate session, no statement_timeout) ---
+                  # Bug fix: VACUUM inherits SET statement_timeout from the same
+                  # psql session as DELETEs and times out on large tables.
+                  # Fix: dedicated psql session with quoted heredoc (no variable expansion).
+                  echo "Running VACUUM ANALYZE..."
+                  psql -v ON_ERROR_STOP=1 <<'SQL'
+                    VACUUM (ANALYZE) public.dataset_versions;
+                    VACUUM (ANALYZE) public.dataset_facets;
+                    VACUUM (ANALYZE) public.dataset_versions_field_mapping;
+                    VACUUM (ANALYZE) public.job_versions;
+                    VACUUM (ANALYZE) public.runs;
+                    VACUUM (ANALYZE) public.run_facets;
+                    VACUUM (ANALYZE) public.run_states;
+                    VACUUM (ANALYZE) public.lineage_events;
+                  SQL
+                  echo "VACUUM ANALYZE completed"
+
+                  echo "=== Marquez Retention Done: $(date -Iseconds) ==="
+{{- end }}
