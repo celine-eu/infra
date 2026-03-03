@@ -1,0 +1,27 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+    name: prefect-deploy-cleanup
+    namespace: "{{ $.Values.global.namespace }}"
+    annotations:
+        "helm.sh/hook": pre-install,pre-upgrade
+        "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+        "helm.sh/hook-weight": "-1"
+spec:
+    ttlSecondsAfterFinished: 10
+    template:
+        spec:
+            restartPolicy: Never
+            serviceAccountName: prefect-worker
+            containers:
+                - name: cleanup
+                  image: bitnami/kubectl:latest
+                  command:
+                      - kubectl
+                      - delete
+                      - jobs
+                      - -n
+                      - "{{ $.Values.global.namespace }}"
+                      - -l
+                      - app=prefect-pipeline-deploy
+                      - --ignore-not-found

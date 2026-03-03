@@ -45,6 +45,10 @@ spec:
               value: {{ .Values.search.host | quote }}
             - name: SEARCH_PORT
               value: {{ .Values.search.port | quote }}
+           # JVM tuning: explicit heap + G1GC to avoid GC pauses causing slow responses
+            - name: JAVA_OPTS
+              value: {{ .Values.javaOpts | default "-Xms512m -Xmx1536m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+ExitOnOutOfMemoryError" | quote }}
+
           ports:
             - containerPort: 5000
             - containerPort: 5001
@@ -54,6 +58,39 @@ spec:
             - name: marquez-config
               mountPath: /usr/src/app/marquez.yaml
               subPath: marquez.yaml
+
+          # Dropwizard JVM startup is slow — give it time before probing.
+          # /healthcheck on the admin port returns 200 only when fully ready.
+          readinessProbe:
+            httpGet:
+              path: /healthcheck
+              port: 5001
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+            successThreshold: 1
+
+          livenessProbe:
+            httpGet:
+              path: /healthcheck
+              port: 5001
+            initialDelaySeconds: 60   # longer: liveness failure triggers a restart
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 5
+
+          startupProbe:
+            # Blocks liveness/readiness until the JVM has fully started.
+            # Gives up to 60 * 5s = 5 minutes before killing the pod.
+            httpGet:
+              path: /healthcheck
+              port: 5001
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            failureThreshold: 60
+
+
       volumes:
         - name: marquez-data
           {{- if .Values.persistence.enabled }}

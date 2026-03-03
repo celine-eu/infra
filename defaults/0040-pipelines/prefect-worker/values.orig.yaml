@@ -117,8 +117,10 @@ worker:
     name: null
     # -- maximum number of flow runs to start simultaneously (default: unlimited)
     limit: null
-    # -- the namespace where the jobs would spawn. If unset, spawns in the same namespace as the worker controller. Requires role.namespace to be set with the same value.
+    # -- the namespace(s) that the Kubernetes observer will watch for pod events and job crash detection. Accepts a comma-separated list (e.g., "default,namespace-2"). If unset, defaults to watching only the namespace where the worker is deployed. This does NOT control where worker jobs are deployed - job deployment namespace is configured via the work pool's base job template.
     jobNamespace: null
+    # -- if true, the Kubernetes observer will watch for pod events and job crash detection across the entire cluster. If true, PREFECT_INTEGRATIONS_KUBERNETES_OBSERVER_NAMESPACES will not be set.
+    observerClusterWide: false
 
     ##  If unspecified, Prefect will use the default base job template for the given worker type. If the work pool already exists, this will be ignored.
     ## e.g.:
@@ -139,19 +141,12 @@ worker:
       # -- the name of an existing ConfigMap containing a base job template. NOTE - the key must be 'baseJobTemplate.json'
       existingConfigMapName: ""
       # -- JSON formatted base job template. If data is provided here, the chart will generate a configmap and mount it to the worker pod
-      # configuration: |
-      #   {
-      #     "variables": {},
-      #     "job_configuration": {
-
-      #       "ttlSecondsAfterFinished": 60
-      #     }
-      #   }
+      configuration: null
       # -- optionally override the default name of the generated configmap
       # name: ""
 
   ## connection settings
-  # -- one of 'cloud', 'selfManagedCloud', or 'selfHostedServer'
+  # -- one of 'cloud', 'customerManagedCloud', or 'selfHostedServer'
   apiConfig: cloud
 
   cloudApiConfig:
@@ -166,10 +161,16 @@ worker:
       # -- prefect API secret key
       key: key
 
+    # -- controls how the Prefect API key is propagated to spawned flow run pods.
+    # 'secretRef' (default): reference the existing apiKeySecret in job pod specs via valueFrom.secretKeyRef (most secure)
+    # 'autoSecret': worker creates and manages a temporary K8s Secret per job, referencing it via valueFrom.secretKeyRef (RBAC for secrets is granted automatically when this value is set)
+    # 'envVar': inject the API key as a plain PREFECT_API_KEY environment variable in job pod specs (least secure)
+    jobApiKeyPropagation: secretRef
+
     # -- prefect cloud API url; the full URL is constructed as https://cloudUrl/accounts/accountId/workspaces/workspaceId
     cloudUrl: https://api.prefect.cloud/api
 
-  selfManagedCloudApiConfig:
+  customerManagedCloudApiConfig:
     # -- prefect API url (PREFECT_API_URL)
     apiUrl: ""
     # -- prefect account ID
@@ -182,6 +183,12 @@ worker:
       name: prefect-api-key
       # -- prefect API secret key
       key: key
+
+    # -- controls how the Prefect API key is propagated to spawned flow run pods.
+    # 'secretRef' (default): reference the existing apiKeySecret in job pod specs via valueFrom.secretKeyRef (most secure)
+    # 'autoSecret': worker creates and manages a temporary K8s Secret per job, referencing it via valueFrom.secretKeyRef (RBAC for secrets is granted automatically when this value is set)
+    # 'envVar': inject the API key as a plain PREFECT_API_KEY environment variable in job pod specs (least secure)
+    jobApiKeyPropagation: secretRef
 
     # -- Cloud API url for PREFECT_CLOUD_API_URL
     # -- This is used in self managed cloud instances to congfigure events and logs over websockets
@@ -205,7 +212,7 @@ worker:
   # -- the number of old ReplicaSets to retain to allow rollback
   revisionHistoryLimit: 10
 
-  # -- number of worker replicas to deploy
+  # -- number of worker replicas to deploy, ignored if autoscaling is enabled
   replicaCount: 1
 
   resources:

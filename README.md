@@ -55,16 +55,20 @@ Local setup is **mandatory**. Install the following tools:
   https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/
 
 - `helm`  
-  https://helm.sh/docs/intro/install/
+  ```bash
+  curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-4 | bash
+  ```
 
 - `helm-diff` (required by Helmfile)  
   ```bash
-  helm plugin install https://github.com/databus23/helm-diff
+  helm plugin install https://github.com/databus23/helm-diff --verify=false
   ```
 
 - `helm-secrets` (required by Helmfile)  
   ```bash
-  helm plugin install https://github.com/jkroepke/helm-secrets --version v4.7.4
+    helm plugin install https://github.com/jkroepke/helm-secrets/releases/download/v4.7.5/secrets-4.7.5.tgz  --verify=false
+    helm plugin install https://github.com/jkroepke/helm-secrets/releases/download/v4.7.5/secrets-getter-4.7.5.tgz  --verify=false
+    helm plugin install https://github.com/jkroepke/helm-secrets/releases/download/v4.7.5/secrets-post-renderer-4.7.5.tgz  --verify=false
   ```
 
 - `helmfile`  
@@ -102,7 +106,7 @@ For local development, services are exposed under `*.celine.local`.
 Add the following entry to `/etc/hosts`:
 
 ```text
-192.168.49.2 dashboard.celine.local s3.celine.local keycloak.celine.local mqtt.celine.local sso.celine.local prefect.celine.local superset.celine.local s3.celine.local
+192.168.49.2 dashboard.celine.local s3.celine.local keycloak.celine.local marquez.celine.local mqtt.celine.local sso.celine.local prefect.celine.local superset.celine.local
 ```
 
 Notes:

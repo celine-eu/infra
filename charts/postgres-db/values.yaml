@@ -6,6 +6,15 @@ cluster:
     size: 10Gi
   parameters:
     log_statement: ddl
+    shared_buffers: "2GB"
+    work_mem: "64MB"
+    effective_cache_size: "6GB"
+    maintenance_work_mem: "512MB"
+    effective_io_concurrency: 200
+    random_page_cost: 200
+    max_parallel_workers_per_gather: 2
+    max_wal_size: "2GB"
+    wal_buffers: 64MB
 
 roles: []
   # - name: datasets_owner

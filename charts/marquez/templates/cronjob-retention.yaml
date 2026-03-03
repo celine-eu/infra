@@ -3,10 +3,10 @@ kind: CronJob
 metadata:
   name: marquez-lineage-retention
 spec:
-  schedule: "0 * * * *"
+  schedule: "45 2 * * *"
   concurrencyPolicy: Forbid
-  successfulJobsHistoryLimit: 2
-  failedJobsHistoryLimit: 2
+  successfulJobsHistoryLimit: 0
+  failedJobsHistoryLimit: 1
   jobTemplate:
     spec:
       backoffLimit: 1
@@ -29,8 +29,8 @@ spec:
                 - name: PGPASSWORD
                   valueFrom:
                     secretKeyRef:
-                      name: {{ .Values.postgres.existingSecret }}
-                      key: {{ .Values.postgres.existingSecretKey }}
+                      name: "{{ .Values.postgres.existingSecret }}"
+                      key: "{{ .Values.postgres.existingSecretKey }}"
               command:
                 - /bin/sh
                 - -c
@@ -39,7 +39,7 @@ spec:
 
                   psql -v ON_ERROR_STOP=1 <<'SQL'
                   SET lock_timeout = '5s';
-                  SET statement_timeout = '20min';
+                  SET statement_timeout = '5min';
 
                   -- DATASET VERSIONS: keep last 5, delete max 10k
                   WITH ranked AS (

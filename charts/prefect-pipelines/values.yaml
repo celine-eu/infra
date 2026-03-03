@@ -71,3 +71,11 @@ flows:
         value: celine_pipelines_owm
       - name: TAP_OPENWEATHERMAP_API_KEY
         value: "TODO"
+
+  - name: om
+    path: /pipelines/apps/om/flows/pipeline.py
+    callback: om_flow
+    image: ghcr.io/celine-eu/pipeline-om:latest
+    schedule:
+      cron: "0 0,6,12,18 * * *"
+    env: []

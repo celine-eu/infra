@@ -4,14 +4,10 @@ server:
 
 ## Database Migration Configuration
 migrations:
-  # -- enable automatic database migrations during chart upgrades
   enabled: true
-  # -- commands to run for database migrations (default: prefect server database upgrade -y)
   command: |
     prefect server database upgrade -y
-  # -- custom container entrypoint for the migration job
   entrypoint: ["/bin/sh", "-c"]
-  # -- job resources configuration
   resources:
     requests:
       cpu: 100m
@@ -19,39 +15,24 @@ migrations:
     limits:
       cpu: 500m
       memory: 256Mi
-  # -- job security context configuration
   securityContext:
     runAsUser: 1001
     runAsNonRoot: true
     readOnlyRootFilesystem: true
     allowPrivilegeEscalation: false
     capabilities: {}
-  # -- job timeout in seconds (default: 300 seconds / 5 minutes)
   timeoutSeconds: 300
-  # -- job backoff limit (number of retries)
   backoffLimit: 5
-  # -- job restart policy
   restartPolicy: Never
-  # -- additional environment variables for the migration job
   env: []
-  # -- additional volume mounts for the migration job
   extraVolumeMounts: []
-  # -- additional volumes for the migration job
   extraVolumes: []
-
-  # ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
-  # -- affinity for migration job pods assignment
   affinity: {}
-
-  # ref: https://kubernetes.io/docs/user-guide/node-selection/
-  # -- node labels for migration job pods assignment
   nodeSelector: {}
-
-  # ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
-  # -- tolerations for migration job pods assignment
   tolerations: []
 
 ## Background Services Deployment Configuration
+# messaging moved under backgroundServices in the new chart
 backgroundServices:
   messaging:
     broker: prefect_redis.messaging
@@ -74,7 +55,7 @@ ingress:
     path: /
     pathType: ImplementationSpecific
   annotations:
-    cert-manager.io/issuer: {{ .Environment.Values.tls_setup.issuer | default "celine-tls" }}
+    cert-manager.io/issuer: {{ .Environment.Values | dig "tls_setup" "issuer" "celine-tls" }}
     nginx.ingress.kubernetes.io/rewrite-target: /
     nginx.ingress.kubernetes.io/auth-url: "https://sso.{{ .Environment.Values.domain }}/oauth2/auth"
     nginx.ingress.kubernetes.io/auth-signin: "https://sso.{{ .Environment.Values.domain }}/oauth2/start?rd=$scheme://$host$request_uri"
@@ -82,21 +63,10 @@ ingress:
   tls: true
   selfSigned: false
 
+# Reference existing external secret — do not create
 secret:
-  # # TODO set secret name if created outside. Example
-  # # data:
-  # #   connection-string: 'postgresql+asyncpg://prefect:prefect@postgis1-rw:5432/prefect'
-  # # https://github.com/PrefectHQ/prefect-helm/blob/main/charts/prefect-server/templates/secret.yaml
-
   create: false
   name: "postgis1-prefect-connection-string"
-
-  # create: true
-  # username: prefect
-  # password: prefect
-  # host: postgis1-rw
-  # port: 5432
-  # database: prefect
 
 postgresql:
   enabled: false
