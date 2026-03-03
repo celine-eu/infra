@@ -1,6 +1,19 @@
 image:
   tag: {{ .Environment.Values.rec_registry.image_tag | default "latest" | quote }}
 
+{{- $resources := .Environment.Values | dig "rec_registry_shell" "resources" nil }}
+resources:
+{{- if $resources }}
+  {{- toYaml $resources | nindent 2 }}
+{{- else }}
+  requests:
+    cpu: 10m
+    memory: 64Mi
+  limits:
+    cpu: 100m
+    memory: 128Mi
+{{- end }}
+
 oidc:
   existingSecret: "rec-registry-secrets"
   clientSecretKey: "CELINE_OIDC_CLIENT_SECRET"

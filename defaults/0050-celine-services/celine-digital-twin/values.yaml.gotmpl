@@ -6,3 +6,8 @@ logLevel: "DEBUG"
 oidc:
   service:
     clientSecret: {{ .Environment.Values | dig "digital_twin" "client_secret" "svc-digital-twin" | quote }}
+
+{{- with .Environment.Values | dig "digital_twin" "resources" nil }}
+resources:
+  {{- toYaml . | nindent 2 }}
+{{- end }}

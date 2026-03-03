@@ -125,7 +125,13 @@ securityContext:
   allowPrivilegeEscalation: false
   readOnlyRootFilesystem: false # OPA/regorus may write temp files
 
-resources: {}
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
 nodeSelector: {}
 tolerations: []
 affinity: {}

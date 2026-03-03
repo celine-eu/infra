@@ -88,7 +88,13 @@ podSecurityContext:
   runAsNonRoot: true
   runAsUser: 1000
 
-resources: {}
+resources:
+  requests:
+    cpu: 10m
+    memory: 64Mi
+  limits:
+    cpu: 100m
+    memory: 128Mi
 
 nodeSelector: {}
 tolerations: []

@@ -17,3 +17,8 @@ extraEnv:
     value: http://qdrant:6333
   - name: OPENAI_API_KEY
     value: {{ .Environment.Values.ai_assistant.openai_api_key | quote }}
+
+{{- with .Environment.Values | dig "ai_assistant" "resources" nil }}
+resources:
+  {{- toYaml . | nindent 2 }}
+{{- end }}

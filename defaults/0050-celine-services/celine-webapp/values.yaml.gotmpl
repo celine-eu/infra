@@ -19,3 +19,8 @@ extraEnv:
     value: "http://nudging:8016"
   - name: CORS_ORIGINS
     value: '["https://webapp.{{ .Values.domain }}"]'
+
+{{- with .Environment.Values | dig "webapp" "resources" nil }}
+resources:
+  {{- toYaml . | nindent 2 }}
+{{- end }}

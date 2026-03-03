@@ -43,3 +43,14 @@ ingress:
   tls:
     enabled: true
     secretName: ""
+
+# Sensible default for Python/FastAPI services.
+# Override per-service via the per-service defaults file (dig pattern)
+# or via envs/*/values.yaml (e.g. rec_registry.resources.limits.memory: 1Gi).
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi

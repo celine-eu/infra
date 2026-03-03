@@ -1,6 +1,19 @@
 image:
   tag: {{ .Values.policies_shell.image_tag | default "latest" | quote }}
 
+{{- $resources := .Environment.Values | dig "policies_shell" "resources" nil }}
+resources:
+{{- if $resources }}
+  {{- toYaml $resources | nindent 2 }}
+{{- else }}
+  requests:
+    cpu: 10m
+    memory: 64Mi
+  limits:
+    cpu: 100m
+    memory: 128Mi
+{{- end }}
+
 keycloak:
   # Base URL of the Keycloak instance reachable from within the cluster.
   baseUrl: "https://keycloak.{{ .Values.domain }}/auth"

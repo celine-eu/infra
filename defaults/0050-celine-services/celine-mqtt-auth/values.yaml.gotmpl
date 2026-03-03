@@ -11,3 +11,8 @@ extraEnv:
 oidc:
   service:
     clientSecret: {{ .Environment.Values | dig "mqtt_auth" "client_secret" "svc-mqtt-auth" | quote }}
+
+{{- with .Environment.Values | dig "mqtt_auth" "resources" nil }}
+resources:
+  {{- toYaml . | nindent 2 }}
+{{- end }}

@@ -62,7 +62,13 @@ extraSecrets: {}
 podAnnotations: {}
 podSecurityContext:
     runAsUser: 1000
-resources: {}
+resources:
+  requests:
+    cpu: 10m
+    memory: 16Mi
+  limits:
+    cpu: 100m
+    memory: 32Mi
 nodeSelector: {}
 tolerations: []
 affinity: {}
