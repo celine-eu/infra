@@ -36,13 +36,13 @@ spec:
               tail -f /dev/null
           env:
             # ----------------------------------------------------------------
-            # OIDC credentials (CELINE_OIDC_* → OIDCSettings)
+            # rec-registry CLI auth (envvar= names from main.py / CLISettings)
             # ----------------------------------------------------------------
-            - name: CELINE_OIDC_BASE_URL
+            - name: REGISTRY_AUTH_URL
               value: {{ .Values.oidc.baseUrl | quote }}
-            - name: CELINE_OIDC_CLIENT_ID
+            - name: REGISTRY_CLIENT_ID
               value: {{ .Values.oidc.clientId | quote }}
-            - name: CELINE_OIDC_CLIENT_SECRET
+            - name: REGISTRY_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.oidc.existingSecret }}

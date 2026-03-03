@@ -19,7 +19,7 @@ oidc:
   clientSecretKey: "CELINE_OIDC_CLIENT_SECRET"
 
 extraEnv:
-  - name: REC_REGISTRY_URL
+  - name: CLI_BASE_URL
     value: "http://celine-rec-registry:8004"
 
 {{- if .Values.tls_setup.self_signed }}
