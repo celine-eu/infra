@@ -21,6 +21,13 @@ spec:
     - host: {{ .Values.ingress.host }}
       http:
         paths:
+          - path: /api/assistant
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.ingress.assistantBackend.service }}
+                port:
+                  number: {{ .Values.ingress.assistantBackend.port }}
           - path: /api
             pathType: Prefix
             backend:
