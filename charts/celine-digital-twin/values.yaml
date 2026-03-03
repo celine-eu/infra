@@ -183,7 +183,13 @@ volumes: []
 logLevel: "INFO"
 
 # Extra env vars specific to this service — added verbatim to the container
-extraEnv: []
+extraEnv:
+  # ParticipantDomainSettings (env_prefix=PARTICIPANT_) — the domain creates its
+  # own RecRegistryUserClient directly; it does NOT use the clients.yaml configmap.
+  # Without this the default "http://api.celine.localhost/rec-registry" is used
+  # and DNS resolution fails inside the cluster.
+  - name: PARTICIPANT_REGISTRY_BASE_URL
+    value: "http://rec-registry:8004"
 # - name: SOME_VAR
 #   value: "some-value"
 

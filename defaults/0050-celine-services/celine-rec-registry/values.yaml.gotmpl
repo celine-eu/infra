@@ -6,7 +6,7 @@ oidc:
     clientSecret: {{ .Environment.Values | dig "rec_registry" "client_secret" "svc-rec-registry" | quote }}
 
 migrate:
-  enabled: false
+  enabled: true
 
 {{- with .Environment.Values | dig "rec_registry" "resources" nil }}
 resources:

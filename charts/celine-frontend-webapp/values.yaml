@@ -49,10 +49,10 @@ podSecurityContext:
 resources:
   requests:
     cpu: 10m
-    memory: 16Mi
+    memory: 256Mi
   limits:
     cpu: 100m
-    memory: 32Mi
+    memory: 512Mi
 nodeSelector: {}
 tolerations: []
 affinity: {}

@@ -1,18 +1,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "celine-rec-registry-shell.fullname" . }}
+  name: {{ include "celine-dataset-api-shell.fullname" . }}
   labels:
-    {{- include "celine-rec-registry-shell.labels" . | nindent 4 }}
+    {{- include "celine-dataset-api-shell.labels" . | nindent 4 }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      {{- include "celine-rec-registry-shell.selectorLabels" . | nindent 6 }}
+      {{- include "celine-dataset-api-shell.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "celine-rec-registry-shell.selectorLabels" . | nindent 8 }}
+        {{- include "celine-dataset-api-shell.selectorLabels" . | nindent 8 }}
       {{- with .Values.podAnnotations }}
       annotations:
         {{- toYaml . | nindent 8 }}
@@ -32,26 +32,27 @@ spec:
             - /bin/sh
             - -c
             - |
-              echo "rec-registry shell ready"
+              echo "dataset-api shell ready"
               tail -f /dev/null
           env:
             # ----------------------------------------------------------------
-            # rec-registry CLI auth (envvar= names from main.py / CLISettings)
+            # PostgreSQL connection (used by `dataset-cli export postgres`)
             # ----------------------------------------------------------------
-            - name: REGISTRY_AUTH_URL
-              value: {{ .Values.oidc.baseUrl | quote }}
-            - name: REGISTRY_CLIENT_ID
-              value: {{ .Values.oidc.clientId | quote }}
-            {{- if .Values.oidc.existingSecret }}
-            - name: REGISTRY_CLIENT_SECRET
+            - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.oidc.existingSecret }}
-                  key: {{ .Values.oidc.clientSecretKey }}
-            {{- else if .Values.oidc.clientSecretValue }}
-            - name: REGISTRY_CLIENT_SECRET
-              value: {{ .Values.oidc.clientSecretValue | quote }}
-            {{- end }}
+                  name: {{ .Values.postgres.existingSecret }}
+                  key: {{ .Values.postgres.secretKey }}
+            # ----------------------------------------------------------------
+            # Marquez URL (used by `dataset-cli export openlineage`)
+            # ----------------------------------------------------------------
+            - name: MARQUEZ_URL
+              value: {{ .Values.marquez.url | quote }}
+            # ----------------------------------------------------------------
+            # Dataset API URL (convenience for `dataset-cli import catalogue`)
+            # ----------------------------------------------------------------
+            - name: DATASET_API_URL
+              value: {{ .Values.datasetApi.url | quote }}
             # ----------------------------------------------------------------
             # Extra env vars (for ad-hoc use)
             # ----------------------------------------------------------------

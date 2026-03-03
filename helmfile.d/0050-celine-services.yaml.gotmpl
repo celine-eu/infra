@@ -44,6 +44,18 @@ releases:
     labels:
       group: celine-services
 
+  - name: dataset-api-shell
+    namespace: celine-{{ .Environment.Name }}
+    chart: ../charts/celine-dataset-api-shell
+    createNamespace: true
+    missingFileHandler: Warn
+    values:
+      - ../defaults/0050-celine-services/values.yaml.gotmpl
+      - ../defaults/0050-celine-services/celine-dataset-api-shell/values.yaml.gotmpl
+      - ../envs/{{ .Environment.Name }}/0050-celine-services/celine-dataset-api-shell/values.yaml.gotmpl
+    labels:
+      group: celine-services
+
   - name: ai-assistant
     namespace: celine-{{ .Environment.Name }}
     chart: ../charts/celine-ai-assistant

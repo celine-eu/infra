@@ -46,7 +46,7 @@ policies:
   cacheMaxsize: 10000
 
 postgres:
-  existingSecret: "postgis1-datasets-readonly-connection-string"
+  existingSecret: "postgis1-dataset-api-connection-string"
   dsnEnvVar: "DATABASE_URL"
   secretKey: "connection-string"
 
@@ -57,7 +57,9 @@ s3:
 
 migrate:
   enabled: false
-  command: ["alembic", "upgrade", "head"]
+  # command: ["alembic", "upgrade", "head"]
+  # tmp fix
+  command: ["/bin/sh", "-c", "/app/.venv/bin/alembic upgrade head"]
   extraEnv: []
 
 healthCheck:

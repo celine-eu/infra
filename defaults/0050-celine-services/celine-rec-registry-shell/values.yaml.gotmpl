@@ -8,19 +8,26 @@ resources:
 {{- else }}
   requests:
     cpu: 10m
-    memory: 64Mi
+    memory: 256Mi
   limits:
     cpu: 100m
-    memory: 128Mi
+    memory: 512Mi
 {{- end }}
 
+# Use the admin CLI client so the token carries aud=svc-rec-registry.
+# The service account (svc-rec-registry) cannot call the service itself —
+# Keycloak won't add its own client_id to the audience of a self-issued token.
 oidc:
-  existingSecret: "rec-registry-secrets"
-  clientSecretKey: "CELINE_OIDC_CLIENT_SECRET"
+  clientId: "celine-cli"
+  existingSecret: ""
+  clientSecretKey: ""
+  clientSecretValue: {{ .Environment.Values | dig "auth_setup" "clientCLISecret" "celine-cli" | quote }}
 
 extraEnv:
+  # CLI_BASE_URL → sets settings.base_url (CLISettings env_prefix=CLI_),
+  # used as default for --api in every rec-registry CLI command.
   - name: CLI_BASE_URL
-    value: "http://celine-rec-registry:8004"
+    value: "http://rec-registry:8004"
 
 {{- if .Values.tls_setup.self_signed }}
   - name: SSL_CERT_FILE

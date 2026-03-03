@@ -34,13 +34,18 @@ oidc:
   # Overridden by defaults/0050-celine-services/values.yaml.gotmpl.
   baseUrl: "http://keycloak/realms/celine"
 
-  # Client ID — plain value, same client as the running rec-registry service.
-  clientId: "svc-rec-registry"
+  # Client ID for CLI operations.
+  # Use the admin CLI client (celine-cli) rather than the service account
+  # (svc-rec-registry) — the service account's token lacks aud=svc-rec-registry.
+  clientId: "celine-cli"
 
-  # Secret created by the celine-rec-registry chart (celine-services helper).
-  # Contains a single key: CELINE_OIDC_CLIENT_SECRET.
-  existingSecret: "rec-registry-secrets"
-  clientSecretKey: "CELINE_OIDC_CLIENT_SECRET"
+  # Option A: read secret from an existing Kubernetes secret.
+  existingSecret: ""
+  clientSecretKey: ""
+
+  # Option B: plain value — used when the secret comes from sops env values
+  # (e.g. .Environment.Values.auth_setup.clientCLISecret). Set in gotmpl.
+  clientSecretValue: ""
 
 # --------------------------------------------------------------------------
 # Extra environment variables (plain value or secretKeyRef)

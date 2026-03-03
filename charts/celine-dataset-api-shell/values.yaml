@@ -1,0 +1,106 @@
+## ----------------------------------------------------------------------------
+## celine-dataset-api-shell — values.yaml
+##
+## Long-running shell pod for maintenance tasks against celine-dataset-api.
+## Primary use cases:
+##   - Import catalogue YAML into the API
+##   - Export PostgreSQL schemas to catalogue YAML
+##   - Export OpenLineage datasets from Marquez
+##
+## Usage after deploy:
+##   # Import a catalogue file
+##   kubectl exec -it <pod> -- \
+##     dataset-cli import catalogue \
+##       -i /tmp/catalogue.yaml \
+##       --api-url http://dataset-api:8001
+##
+##   # Export PostgreSQL schema
+##   kubectl exec -it <pod> -- \
+##     dataset-cli export postgres \
+##       --database-url "$DATABASE_URL" \
+##       -o /tmp/export
+##
+##   # Export from Marquez
+##   kubectl exec -it <pod> -- \
+##     dataset-cli export openlineage \
+##       --marquez-url "$MARQUEZ_URL" \
+##       --ns '*' \
+##       -o /tmp/export
+## ----------------------------------------------------------------------------
+
+image:
+  repository: ghcr.io/celine-eu/dataset-api
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+
+fullnameOverride: "dataset-api-shell"
+
+# --------------------------------------------------------------------------
+# PostgreSQL connection — injected as DATABASE_URL for `export postgres`
+# --------------------------------------------------------------------------
+postgres:
+  existingSecret: "postgis1-datasets-readonly-connection-string"
+  secretKey: "connection-string"
+
+# --------------------------------------------------------------------------
+# Marquez — URL injected as MARQUEZ_URL for `export openlineage`
+# --------------------------------------------------------------------------
+marquez:
+  url: "http://marquez:5000"
+
+# --------------------------------------------------------------------------
+# Dataset API internal URL — convenience env var for `import catalogue`
+# --------------------------------------------------------------------------
+datasetApi:
+  url: "http://dataset-api:8001"
+
+# --------------------------------------------------------------------------
+# Extra environment variables (plain value or secretKeyRef)
+# --------------------------------------------------------------------------
+extraEnv: []
+# Example secretKeyRef:
+#   - name: SOME_SECRET
+#     secret: my-secret
+#     key: my-key
+
+# --------------------------------------------------------------------------
+# Extra volume mounts — useful for mounting a ConfigMap with catalogue YAML
+# --------------------------------------------------------------------------
+volumeMounts: []
+volumes: []
+
+# Example — mount catalogue YAML from a ConfigMap:
+#
+# volumeMounts:
+#   - name: catalogue-config
+#     mountPath: /etc/dataset-api
+#     readOnly: true
+#
+# volumes:
+#   - name: catalogue-config
+#     configMap:
+#       name: dataset-api-catalogue
+
+# --------------------------------------------------------------------------
+# Pod
+# --------------------------------------------------------------------------
+podAnnotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 64Mi
+  limits:
+    cpu: 100m
+    memory: 256Mi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

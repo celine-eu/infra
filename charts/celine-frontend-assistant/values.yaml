@@ -63,12 +63,12 @@ podAnnotations: {}
 podSecurityContext:
     runAsUser: 1000
 resources:
-  requests:
-    cpu: 10m
-    memory: 16Mi
-  limits:
-    cpu: 100m
-    memory: 32Mi
+    requests:
+        cpu: 50m
+        memory: 256Mi
+    limits:
+        cpu: 100m
+        memory: 512Mi
 nodeSelector: {}
 tolerations: []
 affinity: {}

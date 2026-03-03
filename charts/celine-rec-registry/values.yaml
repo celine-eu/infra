@@ -56,7 +56,7 @@ s3:
   existingSecret: ""
 
 migrate:
-  enabled: false
+  enabled: true
   command: ["alembic", "upgrade", "head"]
   extraEnv: []
 

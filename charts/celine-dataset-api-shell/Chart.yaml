@@ -1,0 +1,10 @@
+apiVersion: v2
+name: celine-dataset-api-shell
+description: >
+  Long-running shell pod for celine-dataset-api maintenance tasks.
+  Runs the same ghcr.io/celine-eu/dataset-api image but with
+  `tail -f /dev/null` so operators can kubectl exec in to run
+  the dataset-cli (e.g. import catalogue, export postgres/openlineage).
+type: application
+version: 0.1.0
+appVersion: "latest"
