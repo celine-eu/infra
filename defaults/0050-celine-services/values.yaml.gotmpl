@@ -1,4 +1,4 @@
-{{- $keycloakPublic := printf "https://keycloak.%s/auth/realms/%s" .Values.domain (.Values.keycloak.realm | default "celine") }}
+{{- $keycloakPublic := printf "https://keycloak.%s/realms/%s" .Values.domain (.Values.keycloak.realm | default "celine") }}
 
 image:
   pullPolicy: IfNotPresent
@@ -25,7 +25,7 @@ s3:
 # Inject custom CA cert into all pods when tls_setup.self_signed is true.
 # SSL_CERT_FILE and REQUESTS_CA_BUNDLE are set automatically — covers httpx
 # (OIDC, DT, nudging) and the ssl module (aiomqtt) with no SDK changes.
-caSecret: "{{ .Environment.Values.tls_setup.ca_secret | default "" }}"
+caSecret: "{{ if .Environment.Values.tls_setup.self_signed }}{{ .Environment.Values.tls_setup.ca_secret | default "celine-ca" }}{{ end }}"
 
 healthCheck:
   enabled: true

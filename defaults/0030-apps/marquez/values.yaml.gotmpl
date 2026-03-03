@@ -41,18 +41,18 @@ resources:
   api:
     requests:
       cpu: 100m
-      memory: 384Mi
+      memory: 1Gi
     limits:
       cpu: 500m
-      memory: 512Mi
+      memory: 2Gi
   web:
     requests:
       cpu: 50m
-      memory: 64Mi
+      memory: 128Mi
     limits:
       cpu: 200m
-      memory: 128Mi
+      memory: 256Mi
 
-# Heap sized to fit within 512Mi container limit (leaves ~128Mi for off-heap/metaspace)
-javaOpts: "-Xms128m -Xmx384m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+ExitOnOutOfMemoryError"
+# Heap sized to fit within 768Mi container limit (leaves ~256Mi for off-heap/metaspace/Netty)
+javaOpts: "-Xms128m -Xmx512m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+ExitOnOutOfMemoryError"
 

@@ -52,8 +52,7 @@ ingress:
   labels: {}
     # List of rules for the Ingress
   rules:
-    - # Ingress host
-      host: "keycloak.{{ .Environment.Values.domain }}"
+    - host: "keycloak.{{ .Environment.Values.domain }}"
       # Paths for the host
       paths:
         - path: /
@@ -70,6 +69,9 @@ proxy:
   http:
     enabled: true   # TLS always on — nginx terminates SSL, Keycloak sees plain HTTP internally
 
+http:
+  relativePath: "/"   # Keycloak 17+ serves at /realms/… by default; override chart default of /auth
+
 extraEnv: |
   - name: KEYCLOAK_ADMIN
     valueFrom:
@@ -82,7 +84,7 @@ extraEnv: |
         name: keycloak-keycloakx-keycloak-admin-secret
         key: password
   - name: KC_HOSTNAME
-    value: "keycloak.{{ .Environment.Values.domain }}"
+    value: "https://keycloak.{{ .Environment.Values.domain }}"
   - name: KC_HOSTNAME_STRICT
     value: "false"
   - name: KEYCLOAK_IMPORT

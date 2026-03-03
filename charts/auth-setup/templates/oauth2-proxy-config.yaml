@@ -8,7 +8,7 @@ data:
   oauth2_proxy.cfg: |
     provider = "keycloak-oidc"
     upstreams = [ "file:///dev/null" ]
-    oidc_issuer_url = "https://keycloak.{{ .Values.domain }}/auth/realms/{{ .Values.realm | default "celine" }}"
+    oidc_issuer_url = "https://keycloak.{{ .Values.domain }}/realms/{{ .Values.realm | default "celine" }}"
     redirect_url = "https://sso.{{ .Values.domain }}/oauth2/callback"
     email_domains = [ "*" ]
     cookie_domains = [ ".{{ .Values.domain }}" ]

@@ -52,13 +52,26 @@ keycloak:
 # --------------------------------------------------------------------------
 # Extra environment variables (plain value or secretKeyRef)
 # --------------------------------------------------------------------------
-extraEnv: []
-# Example:
-#   - name: SOME_VAR
-#     value: "some-value"
-#   - name: SECRET_VAR
-#     secret: my-secret
-#     key: secret-key
+# Client secrets — substituted into clients.yaml during keycloak sync.
+# Values here match the ${VAR:-default} fallbacks defined in clients.yaml.
+# Override via secretKeyRef in production (e.g. from the SOPS-decrypted secret).
+extraEnv:
+  - name: SVC_DT_SECRET
+    value: "svc-digital-twin"
+  - name: SVC_PIPELINES_SECRET
+    value: "svc-pipelines"
+  - name: SVC_DATASET_SECRET
+    value: "svc-dataset-api"
+  - name: SVC_NUDGING_SECRET
+    value: "svc-nudging"
+  - name: SVC_REC_REGISTRY_SECRET
+    value: "svc-rec-registry"
+  - name: CELINE_ADMIN_CLI_SECRET
+    value: "celine-cli"
+# Example secretKeyRef override:
+#   - name: SVC_DT_SECRET
+#     secret: celine-client-secrets
+#     key: svc-dt-secret
 
 # --------------------------------------------------------------------------
 # Extra volume mounts — useful for mounting a ConfigMap with clients.yaml

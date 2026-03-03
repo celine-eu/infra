@@ -16,7 +16,7 @@ resources:
 
 keycloak:
   # Base URL of the Keycloak instance reachable from within the cluster.
-  baseUrl: "https://keycloak.{{ .Values.domain }}/auth"
+  baseUrl: "https://keycloak.{{ .Values.domain }}"
   realm: {{ .Values.keycloak.realm | default "celine" | quote }}
 
   adminUser: {{ .Values.keycloak.username | default "admin" | quote }}
@@ -26,17 +26,16 @@ keycloak:
 
 
 extraEnv:
-
   - name: SVC_DT_SECRET
-    value: {{ .Environment.Values | dig "digital_twin" "oidc" "clientSecret" "svc-digital-twin" | quote }}
+    value: {{ .Environment.Values | dig "digital_twin" "client_secret" "svc-digital-twin" | quote }}
   - name: SVC_PIPELINES_SECRET
-    value: {{ .Environment.Values | dig "pipelines" "oidc" "clientSecret" "svc-pipelines" | quote }}
+    value: {{ .Environment.Values | dig "pipelines" "client_secret" "svc-pipelines" | quote }}
   - name: SVC_DATASET_SECRET
-    value: {{ .Environment.Values | dig "dataset_api" "oidc" "clientSecret" "svc-dataset-api" | quote }}
+    value: {{ .Environment.Values | dig "dataset_api" "client_secret" "svc-dataset-api" | quote }}
   - name: SVC_NUDGING_SECRET
-    value: {{ .Environment.Values | dig "nudging" "oidc" "clientSecret" "svc-nudging" | quote }}
+    value: {{ .Environment.Values | dig "nudging" "client_secret" "svc-nudging" | quote }}
   - name: SVC_REC_REGISTRY_SECRET
-    value: {{ .Environment.Values | dig "rec_registry" "oidc" "clientSecret" "svc-rec-registry" | quote }}
+    value: {{ .Environment.Values | dig "rec_registry" "client_secret" "svc-rec-registry" | quote }}
   - name: CELINE_ADMIN_CLI_SECRET
     value: {{ .Environment.Values | dig "auth_setup" "clientCLISecret" "celine-cli" | quote }}
 

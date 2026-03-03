@@ -433,7 +433,6 @@ tasks:
         echo "   Linux:   sudo cp $CERT_DIR/ca.crt /usr/local/share/ca-certificates/celine-ca.crt && sudo update-ca-certificates"
         echo "   Firefox: Settings → Certificates → Import → $CERT_DIR/ca.crt"
 
-
   # dev:sync-users:
   #   desc: "Sync REC participants to Keycloak. Usage: task dev:sync-users -- recs/my-rec.yaml"
   #   env:
@@ -447,26 +446,26 @@ tasks:
 
   #       REQUESTS_CA_BUNDLE=.certs/ca.crt \
   #       SSL_CERT_FILE=.certs/ca.crt \
-  #       CELINE_KEYCLOAK_BASE_URL=https://keycloak.celine.test/auth \
+  #       CELINE_KEYCLOAK_BASE_URL=https://keycloak.celine.test \
   #       CELINE_KEYCLOAK_REALM=celine \
   #       CELINE_KEYCLOAK_ADMIN_USER={{ .KEYCLOAK_ADMIN_USER | default "admin" }} \
   #       CELINE_KEYCLOAK_ADMIN_PASSWORD={{ .KEYCLOAK_ADMIN_PASSWORD | default "admin" }} \
   #       CELINE_SYNC_USERS_GROUPS="/viewers" \
   #       cd {{.CLI_DIR}} && uv run celine-policies keycloak sync-users "$REC_YAML"
 
-  dev:sync-clients:
-    desc: "Sync Keycloak clients from clients.yaml"
-    env:
-      CLI_DIR: "../celine-dev/repositories/celine-policies"
-    cmds:
-      - |
-        REQUESTS_CA_BUNDLE=.certs/ca.crt \
-        SSL_CERT_FILE=.certs/ca.crt \
-        CELINE_KEYCLOAK_BASE_URL=https://keycloak.celine.test/auth \
-        CELINE_KEYCLOAK_REALM=celine \
-        CELINE_KEYCLOAK_ADMIN_USER={{ .KEYCLOAK_ADMIN_USER | default "admin" }} \
-        CELINE_KEYCLOAK_ADMIN_PASSWORD={{ .KEYCLOAK_ADMIN_PASSWORD | default "admin" }} \
-        cd {{.CLI_DIR}} && uv run celine-policies keycloak sync clients.yaml
+  # dev:sync-clients:
+  #   desc: "Sync Keycloak clients from clients.yaml"
+  #   env:
+  #     CLI_DIR: "../celine-dev/repositories/celine-policies"
+  #   cmds:
+  #     - |
+  #       REQUESTS_CA_BUNDLE=.certs/ca.crt \
+  #       SSL_CERT_FILE=.certs/ca.crt \
+  #       CELINE_KEYCLOAK_BASE_URL=https://keycloak.celine.test \
+  #       CELINE_KEYCLOAK_REALM=celine \
+  #       CELINE_KEYCLOAK_ADMIN_USER={{ .KEYCLOAK_ADMIN_USER | default "admin" }} \
+  #       CELINE_KEYCLOAK_ADMIN_PASSWORD={{ .KEYCLOAK_ADMIN_PASSWORD | default "admin" }} \
+  #       cd {{.CLI_DIR}} && uv run celine-policies keycloak sync clients.yaml
 
   import:keycloak-users:*:
     desc: "Import REC users into keycloak via the policies-shell pod. Usage: task import:keycloak-users:dev -- recs/my-rec.yaml"
@@ -490,7 +489,6 @@ tasks:
         kubectl exec -it "$POD" -n celine-{{ .DEPLOYMENT_ENV }} -- \
           celine-policies keycloak sync-users /tmp/rec.yaml
 
-
   import:rec-registry:*:
     desc: "Import a REC YAML directly via the rec-registry pod. Usage: task import:rec-registry:dev -- recs/my-rec.yaml"
     vars:
@@ -510,4 +508,3 @@ tasks:
 
         kubectl cp "$FILE" "$POD":/tmp/rec.yaml -n celine-{{ .DEPLOYMENT_ENV }}
         kubectl exec -it "$POD" -n celine-{{ .DEPLOYMENT_ENV }} -- bash -c "cd /app/src/celine/rec_registry/cli && python main.py import -f /tmp/rec.yaml"
-          
