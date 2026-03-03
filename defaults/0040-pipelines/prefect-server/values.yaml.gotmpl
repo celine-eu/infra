@@ -1,4 +1,7 @@
 server:
+  env:
+    - name: PREFECT_EVENTS_RETENTION_PERIOD
+      value: "7d"
   uiConfig:
     prefectUiApiUrl: "https://prefect.{{ .Environment.Values.domain }}/api"
   resources:

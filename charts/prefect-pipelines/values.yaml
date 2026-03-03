@@ -79,3 +79,13 @@ flows:
     schedule:
       cron: "0 0,6,12,18 * * *"
     env: []
+
+retention:
+  enabled: true
+  schedule: "15 4 * * *"
+  flowRunMaxAgeDays: 14
+  eventsMaxAgeDays: 7
+  batchSize: 2000
+  maxIterations: 20
+  lockTimeout: "5s"
+  statementTimeout: "10min"

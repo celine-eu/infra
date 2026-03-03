@@ -63,3 +63,13 @@ resources:
 # G1GC is better than default ParallelGC for latency-sensitive workloads.
 # MaxGCPauseMillis=200 targets <200ms GC pauses.
 javaOpts: "-Xms512m -Xmx1536m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+ExitOnOutOfMemoryError"
+
+retention:
+  enabled: true
+  schedule: "45 */6 * * *"
+  keepVersions: 5
+  runMaxAgeDays: 30
+  batchSize: 10000
+  maxIterations: 10
+  lockTimeout: "5s"
+  statementTimeout: "5min"
