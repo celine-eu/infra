@@ -63,7 +63,7 @@ s3:
   existingSecret: "s3-account-user-rw"
 
 migrate:
-  enabled: false
+  enabled: true
   command: ["alembic", "upgrade", "head"]
   extraEnv: []
 

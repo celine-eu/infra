@@ -234,6 +234,19 @@ tasks:
           cat "---" > ./envs/dev/secrets.yaml
         fi
 
+  dev:apply-local-image:*:
+    desc: "Apply local image tag to deployment"
+    vars:
+      SERVICE: "{{ index .MATCH 0 }}"
+    env:
+      SOPS_AGE_KEY_FILE: "{{.PWD}}/.sops/dev/key.txt"
+    cmds:
+      - |
+        helmfile -e dev -l name={{.SERVICE}} apply \
+          --set image.tag=local \
+          --set image.pullPolicy=Never
+        kubectl rollout restart deployment/{{.SERVICE}} -n celine-dev
+
   dev:skaffold-build-image:*:
     desc: "Build and deploy a service locally. Set SERVICES_BASEPATH to your repos root (default: ..)"
     vars:
@@ -253,10 +266,7 @@ tasks:
         DOCKERFILE={{ if .DOCKERFILE }}{{ .DOCKERFILE }}{{ else }}Dockerfile{{ end }}
         eval $(minikube docker-env) && docker build -t ghcr.io/celine-eu/$IMAGE_NAME:local -f $REPO_PATH/$DOCKERFILE $REPO_PATH
 
-        helmfile -e dev -l name={{.SERVICE}} apply \
-          --set image.tag=local \
-          --set image.pullPolicy=Never
-        kubectl rollout restart deployment/{{.SERVICE}} -n celine-dev
+        task dev:apply-local-image:{{.SERVICE}}
 
   dev:build:rec-registry:
     cmds:
