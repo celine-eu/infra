@@ -1,0 +1,75 @@
+## ----------------------------------------------------------------------------
+## celine-rec-registry-shell — values.yaml
+##
+## Long-running shell pod for maintenance tasks against celine-rec-registry.
+## Primary use case: running the rec-registry CLI to import REC YAML files.
+##
+## Usage after deploy:
+##   # Copy a REC YAML into the pod
+##   kubectl cp recs/my-rec.yaml <pod>:/tmp/rec.yaml
+##
+##   # Run the import
+##   kubectl exec -it <pod> -- \
+##     bash -c "cd /app/src/celine/rec_registry/cli && python main.py import -f /tmp/rec.yaml"
+##
+##   # Or use: task import:rec-registry:dev -- recs/my-rec.yaml
+## ----------------------------------------------------------------------------
+
+image:
+  repository: ghcr.io/celine-eu/rec-registry
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+
+fullnameOverride: "rec-registry-shell"
+
+# --------------------------------------------------------------------------
+# OIDC credentials — admin-level client from the auth-setup chart.
+# Maps to CELINE_OIDC_* environment variables.
+# --------------------------------------------------------------------------
+oidc:
+  # Base URL of the Keycloak realm reachable from within the cluster.
+  # Overridden by defaults/0050-celine-services/values.yaml.gotmpl.
+  baseUrl: "http://keycloak/realms/celine"
+
+  # Client ID — plain value, same client as the running rec-registry service.
+  clientId: "svc-rec-registry"
+
+  # Secret created by the celine-rec-registry chart (celine-services helper).
+  # Contains a single key: CELINE_OIDC_CLIENT_SECRET.
+  existingSecret: "rec-registry-secrets"
+  clientSecretKey: "CELINE_OIDC_CLIENT_SECRET"
+
+# --------------------------------------------------------------------------
+# Extra environment variables (plain value or secretKeyRef)
+# --------------------------------------------------------------------------
+extraEnv: []
+# Example:
+#   - name: SOME_VAR
+#     value: "some-value"
+#   - name: SECRET_VAR
+#     secret: my-secret
+#     key: secret-key
+
+# --------------------------------------------------------------------------
+# Extra volume mounts
+# --------------------------------------------------------------------------
+volumeMounts: []
+volumes: []
+
+# --------------------------------------------------------------------------
+# Pod
+# --------------------------------------------------------------------------
+podAnnotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+
+resources: {}
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

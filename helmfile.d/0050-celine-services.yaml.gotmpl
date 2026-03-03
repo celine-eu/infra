@@ -92,6 +92,17 @@ releases:
     labels:
       group: celine-services
 
+  - name: rec-registry-shell
+    namespace: celine-{{ .Environment.Name }}
+    chart: ../charts/celine-rec-registry-shell
+    missingFileHandler: Warn
+    labels:
+      group: celine-services
+    values:
+      - ../defaults/0050-celine-services/values.yaml.gotmpl
+      - ../defaults/0050-celine-services/celine-rec-registry-shell/values.yaml.gotmpl
+      - ../envs/{{ .Environment.Name }}/0050-celine-services/celine-rec-registry-shell/values.yaml.gotmpl
+
   - name: mqtt-auth
     namespace: celine-{{ .Environment.Name }}
     chart: ../charts/celine-mqtt-auth

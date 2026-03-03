@@ -438,3 +438,47 @@ tasks:
         CELINE_KEYCLOAK_ADMIN_USER={{ .KEYCLOAK_ADMIN_USER | default "admin" }} \
         CELINE_KEYCLOAK_ADMIN_PASSWORD={{ .KEYCLOAK_ADMIN_PASSWORD | default "admin" }} \
         cd {{.CLI_DIR}} && uv run celine-policies keycloak sync clients.yaml
+
+  import:keycloak-users:*:
+    desc: "Import REC users into keycloak via the policies-shell pod. Usage: task import:keycloak-users:dev -- recs/my-rec.yaml"
+    vars:
+      DEPLOYMENT_ENV: "{{ index .MATCH 0 }}"
+      FILE: "{{ .CLI_ARGS }}"
+    cmds:
+      - |
+        set -e
+        FILE="{{ .FILE }}"
+        test -n "$FILE" || { echo "Usage: task import:rec-registry:{{ .DEPLOYMENT_ENV }} -- path/to/rec.yaml"; exit 1; }
+        test -f "$FILE" || { echo "File not found: $FILE"; exit 1; }
+
+
+        POD=$(kubectl get pod -n celine-{{ .DEPLOYMENT_ENV }} \
+          -l app.kubernetes.io/name=celine-policies-shell \
+          -o jsonpath='{.items[0].metadata.name}')
+        test -n "$POD" || { echo "No policies-shell pod found in celine-{{ .DEPLOYMENT_ENV }}"; exit 1; }
+
+        kubectl cp "$FILE" "$POD":/tmp/rec.yaml -n celine-{{ .DEPLOYMENT_ENV }}
+        kubectl exec -it "$POD" -n celine-{{ .DEPLOYMENT_ENV }} -- \
+          celine-policies keycloak sync-users /tmp/rec.yaml
+
+
+  import:rec-registry:*:
+    desc: "Import a REC YAML directly via the rec-registry pod. Usage: task import:rec-registry:dev -- recs/my-rec.yaml"
+    vars:
+      DEPLOYMENT_ENV: "{{ index .MATCH 0 }}"
+      FILE: "{{ .CLI_ARGS }}"
+    cmds:
+      - |
+        set -e
+        FILE="{{ .FILE }}"
+        test -n "$FILE" || { echo "Usage: task import:rec-registry:{{ .DEPLOYMENT_ENV }} -- path/to/rec.yaml"; exit 1; }
+        test -f "$FILE" || { echo "File not found: $FILE"; exit 1; }
+
+        POD=$(kubectl get pod -n celine-{{ .DEPLOYMENT_ENV }} \
+          -l app.kubernetes.io/name=celine-rec-registry-shell \
+          -o jsonpath='{.items[0].metadata.name}')
+        test -n "$POD" || { echo "No rec-registry-shell pod found in celine-{{ .DEPLOYMENT_ENV }}"; exit 1; }
+
+        kubectl cp "$FILE" "$POD":/tmp/rec.yaml -n celine-{{ .DEPLOYMENT_ENV }}
+        kubectl exec -it "$POD" -n celine-{{ .DEPLOYMENT_ENV }} -- bash -c "cd /app/src/celine/rec_registry/cli && python main.py import -f /tmp/rec.yaml"
+          

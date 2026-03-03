@@ -1,0 +1,10 @@
+apiVersion: v2
+name: celine-rec-registry-shell
+description: >
+  Long-running shell pod for celine-rec-registry maintenance tasks.
+  Runs the same ghcr.io/celine-eu/rec-registry image but with
+  `tail -f /dev/null` so operators can kubectl exec in to run
+  the rec-registry CLI (e.g. python main.py import -f /tmp/rec.yaml).
+type: application
+version: 0.1.0
+appVersion: "latest"
