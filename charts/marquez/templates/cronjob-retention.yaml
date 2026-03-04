@@ -56,7 +56,7 @@ spec:
                   # --- dataset_versions: keep last N per dataset ---
                   iteration=0
                   while [ $iteration -lt $MAX_ITER ]; do
-                    deleted=$(psql -tA -v ON_ERROR_STOP=1 <<SQL
+                    deleted=$(psql -tA -v ON_ERROR_STOP=1 <<SQL | tail -1
                       SET lock_timeout = '{{ .Values.retention.lockTimeout }}';
                       SET statement_timeout = '{{ .Values.retention.statementTimeout }}';
                       WITH ranked AS (
@@ -91,7 +91,7 @@ spec:
                   # --- job_versions: keep last N per job ---
                   iteration=0
                   while [ $iteration -lt $MAX_ITER ]; do
-                    deleted=$(psql -tA -v ON_ERROR_STOP=1 <<SQL
+                    deleted=$(psql -tA -v ON_ERROR_STOP=1 <<SQL | tail -1
                       SET lock_timeout = '{{ .Values.retention.lockTimeout }}';
                       SET statement_timeout = '{{ .Values.retention.statementTimeout }}';
                       WITH ranked AS (
@@ -126,7 +126,7 @@ spec:
                   # --- runs: older than N days, not referenced by current job/version ---
                   iteration=0
                   while [ $iteration -lt $MAX_ITER ]; do
-                    deleted=$(psql -tA -v ON_ERROR_STOP=1 <<SQL
+                    deleted=$(psql -tA -v ON_ERROR_STOP=1 <<SQL | tail -1
                       SET lock_timeout = '{{ .Values.retention.lockTimeout }}';
                       SET statement_timeout = '{{ .Values.retention.statementTimeout }}';
                       WITH to_delete AS (
