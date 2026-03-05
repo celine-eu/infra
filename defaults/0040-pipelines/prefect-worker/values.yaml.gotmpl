@@ -204,6 +204,7 @@ worker:
                     "serviceAccountName": "{{ `{{ service_account_name }}` }}"
                   }
                 },
+                "activeDeadlineSeconds": 7200,
                 "backoffLimit": "{{ `{{ backoff_limit }}` }}",
                 "ttlSecondsAfterFinished": "{{ `{{ finished_job_ttl }}` }}"
               },
