@@ -8,6 +8,7 @@ oidc:
 migrate:
   enabled: true
 
+
 {{- with .Environment.Values | dig "dataset_api" "resources" nil }}
 resources:
   {{- toYaml . | nindent 2 }}

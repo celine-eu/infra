@@ -22,11 +22,15 @@ spec:
               {{- if and .grants (hasKey .grants "readonly") }}
               {{- if .grants.readonly }}
               echo " - {{ .name }}"
-              psql "postgresql://app:${PGPASSWORD}@{{ $.Values.cluster.name }}-rw:5432/{{ .name }}" -v ON_ERROR_STOP=1 -c "
-                GRANT USAGE ON SCHEMA public TO {{ .username }};
-                GRANT SELECT ON ALL TABLES IN SCHEMA public TO {{ .username }};
-                ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO {{ .username }};
+              {{- $username := .username }}
+              {{- $dbname := .name }}
+              {{- range (.grants.schemas | default (list "public")) }}
+              psql "postgresql://app:${PGPASSWORD}@{{ $.Values.cluster.name }}-rw:5432/{{ $dbname }}" -v ON_ERROR_STOP=1 -c "
+                GRANT USAGE ON SCHEMA {{ . }} TO {{ $username }};
+                GRANT SELECT ON ALL TABLES IN SCHEMA {{ . }} TO {{ $username }};
+                ALTER DEFAULT PRIVILEGES IN SCHEMA {{ . }} GRANT SELECT ON TABLES TO {{ $username }};
               "
+              {{- end }}
               {{- end }}
               {{- end }}
               {{- end }}

@@ -5,6 +5,14 @@ oidc:
   service:
     clientSecret: {{ .Environment.Values | dig "nudging" "client_secret" "svc-nudging" | quote }}
 
+extraEnv:
+  - name: VAPID_PUBLIC_KEY
+    value: {{ .Environment.Values | dig "nudging" "vapid_public_key" "" | quote }}
+  - name: VAPID_PRIVATE_KEY
+    value: {{ .Environment.Values | dig "nudging" "vapid_private_key" "" | quote }}
+  - name: VAPID_SUBJECT
+    value: {{ .Environment.Values | dig "nudging" "vapid_subject" "" | quote }}
+
 {{- with .Environment.Values | dig "nudging" "resources" nil }}
 resources:
   {{- toYaml . | nindent 2 }}

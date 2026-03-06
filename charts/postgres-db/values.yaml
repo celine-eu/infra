@@ -67,6 +67,12 @@ connection_strings: []
 
 grants:
   enabled: false
+  schemas:
+    - ds_dev_gold
+    - ds_dev_raw
+    - ds_dev_silver
+    - ds_dev_staging
+    - raw
   job:
     image: ghcr.io/cloudnative-pg/postgis:17
     superuserSecret: datasets-owner-db-secret

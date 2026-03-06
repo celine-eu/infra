@@ -82,6 +82,11 @@ connection_strings:
     name: datasets-readonly
     dialect: postgresql+asyncpg
 
+  - database: datasets
+    user: datasets_owner
+    name: datasets-async
+    dialect: postgresql+asyncpg
+
   - database: dataset_api
     dialect: postgresql+asyncpg
 
@@ -105,6 +110,12 @@ connection_strings:
 
 grants:
   enabled: true
+  schemas:
+    - ds_dev_gold
+    - ds_dev_raw
+    - ds_dev_silver
+    - ds_dev_staging
+    - raw
   job:
     image: ghcr.io/cloudnative-pg/postgis:17
     superuserSecret: datasets-owner-db-secret
