@@ -66,7 +66,7 @@ spec:
                   # 1. Flow runs terminati (CASCADE su flow_run_state, task_run, task_run_state)
                   iteration=0
                   while [ $iteration -lt $MAX_ITER ]; do
-                    deleted=$(psql -tA -v ON_ERROR_STOP=1 <<SQL
+                    deleted=$(psql -tA -v ON_ERROR_STOP=1 <<SQL | tail -1
                       SET lock_timeout = '{{ .Values.retention.lockTimeout }}';
                       SET statement_timeout = '{{ .Values.retention.statementTimeout }}';
                       WITH to_delete AS (
@@ -92,7 +92,7 @@ spec:
                   # 2. Log orfani (nessuna FK)
                   iteration=0
                   while [ $iteration -lt $MAX_ITER ]; do
-                    deleted=$(psql -tA -v ON_ERROR_STOP=1 <<SQL
+                    deleted=$(psql -tA -v ON_ERROR_STOP=1 <<SQL | tail -1
                       SET lock_timeout = '{{ .Values.retention.lockTimeout }}';
                       SET statement_timeout = '{{ .Values.retention.statementTimeout }}';
                       WITH to_delete AS (
@@ -119,7 +119,7 @@ spec:
                   # 3. Artifact orfani (nessuna FK)
                   iteration=0
                   while [ $iteration -lt $MAX_ITER ]; do
-                    deleted=$(psql -tA -v ON_ERROR_STOP=1 <<SQL
+                    deleted=$(psql -tA -v ON_ERROR_STOP=1 <<SQL | tail -1
                       SET lock_timeout = '{{ .Values.retention.lockTimeout }}';
                       SET statement_timeout = '{{ .Values.retention.statementTimeout }}';
                       WITH to_delete AS (
@@ -146,7 +146,7 @@ spec:
                   # 4. Eventi vecchi
                   iteration=0
                   while [ $iteration -lt $MAX_ITER ]; do
-                    deleted=$(psql -tA -v ON_ERROR_STOP=1 <<SQL
+                    deleted=$(psql -tA -v ON_ERROR_STOP=1 <<SQL | tail -1
                       SET lock_timeout = '{{ .Values.retention.lockTimeout }}';
                       SET statement_timeout = '{{ .Values.retention.statementTimeout }}';
                       WITH to_delete AS (
@@ -171,7 +171,7 @@ spec:
                   # 5. Event resources orfani (nessuna FK)
                   iteration=0
                   while [ $iteration -lt $MAX_ITER ]; do
-                    deleted=$(psql -tA -v ON_ERROR_STOP=1 <<SQL
+                    deleted=$(psql -tA -v ON_ERROR_STOP=1 <<SQL | tail -1
                       SET lock_timeout = '{{ .Values.retention.lockTimeout }}';
                       SET statement_timeout = '{{ .Values.retention.statementTimeout }}';
                       WITH to_delete AS (
