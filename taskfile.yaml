@@ -508,3 +508,22 @@ tasks:
 
         kubectl cp "$FILE" "$POD":/tmp/rec.yaml -n celine-{{ .DEPLOYMENT_ENV }}
         kubectl exec -it "$POD" -n celine-{{ .DEPLOYMENT_ENV }} -- bash -c "cd /app/src/celine/rec_registry/cli && python main.py import -f /tmp/rec.yaml"
+
+  import:dataset-sync:*:
+    vars:
+      DEPLOYMENT_ENV: "{{ index .MATCH 0 }}"
+    cmds:
+      - |
+        POD=$(kubectl get pods -n celine-{{.DEPLOYMENT_ENV}} --no-headers -o custom-columns=':metadata.name' | grep dataset-api-shell | head -1)
+        kubectl exec -n celine-{{.DEPLOYMENT_ENV}} -it "$POD" -- sh -c '
+          mkdir -p /tmp/export &&
+          dataset-cli export openlineage --ns ds_dev_gold -o /tmp/export --expose --ns '*' &&
+          dataset-cli row-filter add "/tmp/export/*.yaml" datasets.ds_dev_gold.meters_data_15m --handler rec_registry --args column=device_id &&
+          dataset-cli row-filter add "/tmp/export/*.yaml" datasets.ds_dev_gold.meters_data_15m_missing_intervals --handler rec_registry --args column=device_id &&
+          dataset-cli row-filter add "/tmp/export/*.yaml" datasets.ds_dev_gold.meters_data_1h --handler rec_registry --args column=device_id &&
+          dataset-cli row-filter add "/tmp/export/*.yaml" datasets.ds_dev_gold.meters_energy_forecast --handler rec_registry --args column=device_id &&
+          dataset-cli import catalogue \
+            --input "/tmp/export/*.yaml" \
+            --ns ds_dev_gold \
+            --api-url http://dataset-api:8001
+        '
