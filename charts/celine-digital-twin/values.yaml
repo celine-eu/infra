@@ -157,7 +157,7 @@ configMap:
           class: celine.dt.core.clients.dataset_api:DatasetSqlApiClient
           scope: dataset.query
           config:
-            base_url: "http://datasets-api:8001"
+            base_url: "http://dataset-api:8001"
             timeout: 30.0
         rec_registry_admin:
           class: celine.sdk.rec_registry:RecRegistryAdminClient

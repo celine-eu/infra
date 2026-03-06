@@ -79,7 +79,12 @@ volumeMounts: []
 volumes: []
 
 logLevel: "INFO"
-extraEnv: []
+extraEnv:
+  - name: DATASETS_DATABASE_URL
+    valueFrom:
+      secretKeyRef:
+        name: postgis1-datasets-readonly-connection-string
+        key: connection-string
 extraSecrets: {}
 
 podAnnotations: {}
