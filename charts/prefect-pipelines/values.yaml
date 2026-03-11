@@ -85,7 +85,10 @@ retention:
   schedule: "15 4 * * *"
   flowRunMaxAgeDays: 14
   eventsMaxAgeDays: 7
-  batchSize: 2000
-  maxIterations: 20
-  lockTimeout: "5s"
-  statementTimeout: "10min"
+  batchSize: 500          # smaller batches = shorter lock hold time
+  maxIterations: 200      # compensates for smaller batch
+  sleepMs: 200            # ms to sleep between batches
+  lockTimeout: "3s"
+  statementTimeout: "60s"
+  activeDeadlineSeconds: 3600  # 1h — old value of 900 caused DeadlineExceeded
+  backoffLimit: 0              # no retry: a failed cleanup shouldn't hammer again
