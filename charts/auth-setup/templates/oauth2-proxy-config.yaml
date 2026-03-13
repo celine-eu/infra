@@ -12,7 +12,7 @@ data:
     redirect_url = "https://sso.{{ .Values.domain }}/oauth2/callback"
     email_domains = [ "*" ]
     cookie_domains = [ ".{{ .Values.domain }}" ]
-    whitelist_domains = [ "*.{{ .Values.domain }}" ]
+    whitelist_domains = [ ".{{ .Values.domain }}" ]
     skip_provider_button = true
     set_xauthrequest = true
     set_authorization_header = true
