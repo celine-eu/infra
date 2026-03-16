@@ -63,7 +63,7 @@ spec:
                   SLEEP_MS={{ .Values.retention.sleepMs }}
 
                   sleep_between() {
-                    sleep $(echo "scale=3; $SLEEP_MS/1000" | bc)
+                    sleep $(awk "BEGIN{printf \"%.3f\", $SLEEP_MS/1000}")
                   }
 
                   run_batch() {
