@@ -239,7 +239,9 @@
       "secret": "{{ .Values.oauth2Proxy.clientSecret }}",
       "redirectUris": [
         "https://sso.{{ .Values.domain }}/oauth2/callback",
-        "https://superset.{{ .Values.domain }}/*/"
+        "https://superset.{{ .Values.domain }}/*/",                                                                                                  │
+        "https://webapp.{{ .Values.domain }}/*",                                                                                                     │
+        "https://assistant.{{ .Values.domain }}/*"                                                                                                   │
       ],
       "webOrigins": [
         "https://*.{{ .Values.domain }}"
