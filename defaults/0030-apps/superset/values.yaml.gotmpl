@@ -17,6 +17,13 @@ extraSecretEnv:
   MAPBOX_API_KEY: {{ .Environment.Values.superset.mapboxApiKey }}
   SUPERSET_FEATURE_ENABLE_JAVASCRIPT_CONTROLS: "true"
   SUPERSET_LOG_LEVEL: DEBUG
+  SMTP_HOST: {{ .Environment.Values.superset.smtp.host }}
+  SMTP_PORT: "{{ .Environment.Values.superset.smtp.port }}"
+  SMTP_USER: {{ .Environment.Values.superset.smtp.user }}
+  SMTP_PASSWORD: {{ .Environment.Values.superset.smtp.password }}
+  SMTP_MAIL_FROM: {{ .Environment.Values.superset.smtp.mailFrom }}
+  WEBDRIVER_BASEURL: "http://superset:8088"
+  WEBDRIVER_BASEURL_USER_FRIENDLY: "https://superset.{{ .Environment.Values.domain }}"
 
 secretEnv:
   create: true
