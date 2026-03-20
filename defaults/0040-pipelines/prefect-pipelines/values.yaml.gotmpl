@@ -51,19 +51,7 @@ global:
 
 # Individual flows
 flows:
-  # - name: copernicus  # PAUSED — replaced by om-wind for wind data
-  #   path: /pipelines/apps/copernicus/flows/pipeline.py
-  #   callback: copernicus_flow
-  #   image: ghcr.io/celine-eu/pipeline-copernicus:latest
-  #   schedule:
-  #     cron: "0 0,6,12,18 * * *"
-  #   env:
-  #     - name: CDSAPI_KEY
-  #       value: {{ .Environment.Values.pipelines.CDSAPI_KEY | quote }}
-  #     - name: ADSAPI_KEY
-  #       value: {{ .Environment.Values.pipelines.ADSAPI_KEY | quote }}
-  #     - name: AWS_BUCKET
-  #       value: celine-pipelines-copernicus
+  # copernicus — PAUSED, replaced by om-wind for wind data
 
   - name: osm
     path: /pipelines/apps/osm/flows/pipeline.py
