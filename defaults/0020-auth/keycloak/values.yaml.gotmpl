@@ -2,7 +2,7 @@
 # See https://www.keycloak.org/server/all-config
 
 
-{{- if .Environment.Values | dig "keycloak" "theme" "login" "" }}
+{{- if .Environment.Values | dig "keycloak" "theme" "" }}
 image:
   repository: ghcr.io/celine-eu/keycloak
   tag: {{ .Environment.Values | dig "keycloak" "image_tag" "latest" | quote }}
