@@ -1,41 +1,5 @@
 {{- if .Values.ingress.enabled }}
 ---
-# Sign-out intercept: redirect browser to Keycloak end_session first to clear
-# the Keycloak browser session. Without this, oauth2-proxy only clears the
-# Redis session; Keycloak's SSO cookie survives and silently re-authenticates.
-# Chain: this ingress → Keycloak logout → sso/oauth2/sign_out (clears Redis
-# session) → user must log in again.
-# No auth annotation — sign_out must be reachable with an expired/no token.
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: {{ include "celine-services.fullname" . }}-signout
-  labels:
-    {{- include "celine-services.labels" . | nindent 4 }}
-  annotations:
-    cert-manager.io/issuer: {{ .Values.ingress.issuer | default "celine-tls" }}
-    nginx.ingress.kubernetes.io/permanent-redirect: "https://keycloak.{{ .Values.ingress.domain }}/realms/celine/protocol/openid-connect/logout?client_id=oauth2_proxy&post_logout_redirect_uri=https%3A%2F%2Fsso.{{ .Values.ingress.domain }}%2Foauth2%2Fsign_out"
-    nginx.ingress.kubernetes.io/permanent-redirect-code: "302"
-spec:
-  ingressClassName: nginx
-  rules:
-    - host: {{ .Values.ingress.host }}
-      http:
-        paths:
-          - path: /oauth2/sign_out
-            pathType: Exact
-            backend:
-              service:
-                name: oauth2-proxy
-                port:
-                  number: 80
-  {{- if .Values.ingress.tls.enabled }}
-  tls:
-    - hosts:
-        - {{ .Values.ingress.host }}
-      secretName: {{ .Values.ingress.tls.secretName | default (printf "%s-tls" (include "celine-services.fullname" .)) }}
-  {{- end }}
----
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
