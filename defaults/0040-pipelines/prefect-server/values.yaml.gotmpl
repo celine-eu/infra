@@ -3,7 +3,7 @@ server:
     - name: PREFECT_EVENTS_RETENTION_PERIOD
       value: "7d"
     - name: PREFECT_SERVER_CONCURRENCY_INITIAL_DEPLOYMENT_LEASE_DURATION
-      value: "1800"
+      value: "3600"
   uiConfig:
     prefectUiApiUrl: "https://prefect.{{ .Environment.Values.domain }}/api"
   resources:
