@@ -1,0 +1,29 @@
+# Separate ingress to route superset.domain/oauth2/* → oauth2-proxy.
+# Cannot be merged into the superset ingress because that ingress has
+# rewrite-target: / (needed for the React SPA), which would corrupt the
+# /oauth2/sign_out path before proxying it.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: superset-oauth2
+  labels:
+    app: superset-oauth2
+  annotations:
+    cert-manager.io/issuer: {{ .Values.issuer | default "celine-tls" }}
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: superset.{{ .Values.domain }}
+      http:
+        paths:
+          - path: /oauth2
+            pathType: Prefix
+            backend:
+              service:
+                name: oauth2-proxy
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - superset.{{ .Values.domain }}
+      secretName: superset-tls

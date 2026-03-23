@@ -17,6 +17,7 @@ extraSecretEnv:
   MAPBOX_API_KEY: {{ .Environment.Values.superset.mapboxApiKey }}
   SUPERSET_FEATURE_ENABLE_JAVASCRIPT_CONTROLS: "true"
   SUPERSET_LOG_LEVEL: DEBUG
+  SERVER_WORKER_AMOUNT: "2"
   SMTP_HOST: {{ .Environment.Values.superset.smtp.host }}
   SMTP_PORT: "{{ .Environment.Values.superset.smtp.port }}"
   SMTP_USER: {{ .Environment.Values.superset.smtp.user }}
@@ -67,10 +68,10 @@ supersetNode:
   forceReload: true
   resources:
     requests:
-      cpu: 100m
+      cpu: 200m
       memory: 512Mi
     limits:
-      cpu: 500m
+      cpu: 1000m
       memory: 1Gi
   connections:
     db_type: postgresql
