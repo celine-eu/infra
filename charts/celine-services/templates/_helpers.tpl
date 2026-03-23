@@ -398,6 +398,7 @@ spec:
               port: http
             initialDelaySeconds: {{ .Values.healthCheck.initialDelaySeconds | default 10 }}
             periodSeconds: {{ .Values.healthCheck.periodSeconds | default 30 }}
+            timeoutSeconds: {{ .Values.healthCheck.timeoutSeconds | default 5 }}
             failureThreshold: {{ .Values.healthCheck.failureThreshold | default 3 }}
           readinessProbe:
             httpGet:
@@ -405,6 +406,7 @@ spec:
               port: http
             initialDelaySeconds: {{ .Values.healthCheck.initialDelaySeconds | default 5 }}
             periodSeconds: {{ .Values.healthCheck.periodSeconds | default 10 }}
+            timeoutSeconds: {{ .Values.healthCheck.timeoutSeconds | default 5 }}
             failureThreshold: {{ .Values.healthCheck.failureThreshold | default 3 }}
           {{- end }}
           volumeMounts:
