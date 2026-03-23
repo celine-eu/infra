@@ -176,15 +176,18 @@ spec:
                   "
 
                   # 6. VACUUM ANALYZE — separate psql calls, no statement_timeout
+                  # vacuum_cost_delay set via PGOPTIONS (not SET) because VACUUM cannot run inside a transaction block
                   echo "Running VACUUM ANALYZE..."
-                  psql -v ON_ERROR_STOP=1 -c "SET vacuum_cost_delay = '20ms'; VACUUM ANALYZE flow_run;"
-                  psql -v ON_ERROR_STOP=1 -c "SET vacuum_cost_delay = '20ms'; VACUUM ANALYZE flow_run_state;"
-                  psql -v ON_ERROR_STOP=1 -c "SET vacuum_cost_delay = '20ms'; VACUUM ANALYZE task_run;"
-                  psql -v ON_ERROR_STOP=1 -c "SET vacuum_cost_delay = '20ms'; VACUUM ANALYZE task_run_state;"
-                  psql -v ON_ERROR_STOP=1 -c "SET vacuum_cost_delay = '20ms'; VACUUM ANALYZE log;"
-                  psql -v ON_ERROR_STOP=1 -c "SET vacuum_cost_delay = '20ms'; VACUUM ANALYZE artifact;"
-                  psql -v ON_ERROR_STOP=1 -c "SET vacuum_cost_delay = '20ms'; VACUUM ANALYZE events;"
-                  psql -v ON_ERROR_STOP=1 -c "SET vacuum_cost_delay = '20ms'; VACUUM ANALYZE event_resources;"
+                  export PGOPTIONS="-c vacuum_cost_delay=20ms"
+                  psql -v ON_ERROR_STOP=1 -c "VACUUM ANALYZE flow_run;"
+                  psql -v ON_ERROR_STOP=1 -c "VACUUM ANALYZE flow_run_state;"
+                  psql -v ON_ERROR_STOP=1 -c "VACUUM ANALYZE task_run;"
+                  psql -v ON_ERROR_STOP=1 -c "VACUUM ANALYZE task_run_state;"
+                  psql -v ON_ERROR_STOP=1 -c "VACUUM ANALYZE log;"
+                  psql -v ON_ERROR_STOP=1 -c "VACUUM ANALYZE artifact;"
+                  psql -v ON_ERROR_STOP=1 -c "VACUUM ANALYZE events;"
+                  psql -v ON_ERROR_STOP=1 -c "VACUUM ANALYZE event_resources;"
+                  unset PGOPTIONS
                   echo "VACUUM ANALYZE completed"
 
                   echo "=== Prefect Retention Done: $(date -Iseconds) ==="
