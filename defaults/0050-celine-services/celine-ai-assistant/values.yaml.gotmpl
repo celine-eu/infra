@@ -19,6 +19,10 @@ extraEnv:
     value: {{ .Environment.Values.ai_assistant.openai_api_key | quote }}
   - name: TRAINING_MATERIALS_REPO_URL
     value: {{ .Environment.Values.ai_assistant.training_material_url | quote }}
+  - name: TRAINING_MATERIALS_PATH
+    value: "/tmp/training-material"
+  - name: MANIFEST_PATH
+    value: "/tmp/manifest.json"
 
 {{- with .Environment.Values | dig "ai_assistant" "resources" nil }}
 resources:
