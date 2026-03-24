@@ -13,6 +13,7 @@ env:
   MQTT_TOPICS: "#"
   STORAGE_BACKEND: postgres
   POSTGRES_TABLE: mqtt_messages
+  WATCHDOG_TIMEOUT: 300
 
 db:
   # Name of an existing Secret containing the DSN
