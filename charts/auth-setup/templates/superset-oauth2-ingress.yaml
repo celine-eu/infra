@@ -1,23 +1,26 @@
-# Separate ingress to route superset.domain/oauth2/* → oauth2-proxy.
-# Cannot be merged into the superset ingress because that ingress has
-# rewrite-target: / (needed for the React SPA), which would corrupt the
-# /oauth2/sign_out path before proxying it.
+# Client-side redirect superset.domain/oauth2/sign_out → sso.domain/oauth2/sign_out.
+# Proxying to oauth2-proxy does not work: oauth2-proxy sees Host: superset.domain
+# via X-Forwarded-Host and mis-handles the cookie domain / redirect chain.
+# By redirecting to sso.domain, oauth2-proxy handles sign_out natively, clears
+# the Redis session, and the logout_url chain to Keycloak works correctly.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: superset-oauth2
+  name: superset-oauth2-signout
   labels:
-    app: superset-oauth2
+    app: superset-oauth2-signout
   annotations:
     cert-manager.io/issuer: {{ .Values.issuer | default "celine-tls" }}
+    nginx.ingress.kubernetes.io/permanent-redirect: "https://sso.{{ .Values.domain }}/oauth2/sign_out"
+    nginx.ingress.kubernetes.io/permanent-redirect-code: "302"
 spec:
   ingressClassName: nginx
   rules:
     - host: superset.{{ .Values.domain }}
       http:
         paths:
-          - path: /oauth2
-            pathType: Prefix
+          - path: /oauth2/sign_out
+            pathType: Exact
             backend:
               service:
                 name: oauth2-proxy
