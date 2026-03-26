@@ -18,6 +18,8 @@ extraSecretEnv:
   SUPERSET_FEATURE_ENABLE_JAVASCRIPT_CONTROLS: "true"
   SUPERSET_LOG_LEVEL: DEBUG
   SERVER_WORKER_AMOUNT: "2"
+  SQLALCHEMY_POOL_SIZE: "5"
+  SQLALCHEMY_MAX_OVERFLOW: "5"
   SMTP_HOST: {{ .Environment.Values.superset.smtp.host }}
   SMTP_PORT: "{{ .Environment.Values.superset.smtp.port }}"
   SMTP_USER: {{ .Environment.Values.superset.smtp.user }}

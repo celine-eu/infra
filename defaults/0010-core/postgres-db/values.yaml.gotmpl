@@ -6,6 +6,7 @@ cluster:
     size: {{ .Environment.Values | dig "postgres_db" "storage_size" "10Gi" }}
   parameters:
     log_statement: ddl
+    max_connections: "200"
 
 roles:
   - name: datasets_owner
