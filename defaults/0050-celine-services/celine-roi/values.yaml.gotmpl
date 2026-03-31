@@ -1,0 +1,13 @@
+image:
+  tag: {{ .Environment.Values.roi.image_tag | default "latest" | quote }}
+
+extraEnv:
+  - name: CELINE_CONFIG_DIR
+    value: "/app/config"
+  - name: CORS_ORIGINS
+    value: '["https://roi.{{ .Values.domain }}"]'
+
+{{- with .Environment.Values | dig "roi" "resources" nil }}
+resources:
+  {{- toYaml . | nindent 2 }}
+{{- end }}

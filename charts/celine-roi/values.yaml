@@ -1,0 +1,98 @@
+## ----------------------------------------------------------------------------
+## celine-roi — values.yaml
+##
+## FastAPI stateless calculation engine for PV/CER financial analysis.
+## No database. Auth delegated to oauth2-proxy at ingress level.
+## ----------------------------------------------------------------------------
+
+fullnameOverride: roi
+
+image:
+  repository: ghcr.io/celine-eu/celine-roi
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  port: 8000
+
+# --------------------------------------------------------------------------
+# Ingress — disabled, accessed via celine-frontend-roi ingress proxy
+# --------------------------------------------------------------------------
+ingress:
+  enabled: false
+  domain: celine.test
+  host: "roi.celine.test"
+  issuer: celine-tls
+  auth:
+    enabled: true
+  tls:
+    enabled: true
+    secretName: ""
+  annotations: {}
+
+# --------------------------------------------------------------------------
+# OIDC — not used by the app itself, auth handled by oauth2-proxy upstream
+# --------------------------------------------------------------------------
+oidc:
+  baseUrl: "http://keycloak/realms/celine"
+  jwksUri: "http://keycloak/realms/celine/protocol/openid-connect/certs"
+  allowedAudiences: ""
+  includeClientIdAsAudience: false
+  timeout: 10.0
+  service:
+    passthrough: true
+    clientId: ""
+    audience: "oauth2_proxy"
+    clientSecret: ""
+
+# --------------------------------------------------------------------------
+# Health check
+# --------------------------------------------------------------------------
+healthCheck:
+  enabled: true
+  path: /docs
+  initialDelaySeconds: 10
+  periodSeconds: 30
+  failureThreshold: 3
+
+# --------------------------------------------------------------------------
+# Policies — required by celine-services helpers
+# --------------------------------------------------------------------------
+policies:
+  dir: "/app/policies"
+  dataDir: ""
+  cacheEnabled: false
+  cacheTtl: 300
+  cacheMaxsize: 10000
+
+# --------------------------------------------------------------------------
+# App config — YAML configs baked into the image under /app/config
+# --------------------------------------------------------------------------
+extraEnv:
+  - name: CELINE_CONFIG_DIR
+    value: "/app/config"
+
+extraSecrets: {}
+
+podAnnotations: {}
+podSecurityContext:
+  runAsUser: 1000
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+volumeMounts: []
+volumes: []
+
+logLevel: "INFO"

@@ -1,0 +1,8 @@
+# defaults/0050-celine-services/celine-frontend-roi/values.yaml.gotmpl
+
+image:
+  tag: {{ .Environment.Values.frontend_roi.image_tag | default "latest" | quote }}
+
+ingress:
+  host: roi.{{ .Environment.Values.domain }}
+  domain: {{ .Environment.Values.domain }}
