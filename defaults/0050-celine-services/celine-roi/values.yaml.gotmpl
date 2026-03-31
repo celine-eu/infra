@@ -1,6 +1,9 @@
 image:
   tag: {{ .Environment.Values.roi.image_tag | default "latest" | quote }}
 
+healthCheck:
+  path: /docs
+
 extraEnv:
   - name: CELINE_CONFIG_DIR
     value: "/app/config"
