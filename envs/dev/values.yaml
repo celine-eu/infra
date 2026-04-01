@@ -177,3 +177,9 @@ frontend_ai_assistant:
 
 frontend_webapp:
   image_tag: "latest"
+
+roi:
+  image_tag: "latest"
+
+frontend_roi:
+  image_tag: "latest"

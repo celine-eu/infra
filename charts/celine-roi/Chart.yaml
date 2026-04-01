@@ -1,0 +1,13 @@
+apiVersion: v2
+name: celine-roi
+description: >
+  CELINE ROI API (FastAPI).
+  Stateless calculation engine for PV/CER financial analysis.
+  Deployed behind oauth2-proxy; JWT forwarded via X-Auth-Request-Access-Token.
+type: application
+version: 0.1.0
+appVersion: "latest"
+dependencies:
+  - name: celine-services
+    version: "0.1.0"
+    repository: file://../celine-services

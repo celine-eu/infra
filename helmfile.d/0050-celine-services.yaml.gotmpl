@@ -148,6 +148,18 @@ releases:
     labels:
       group: celine-services
 
+  - name: roi
+    namespace: celine-{{ .Environment.Name }}
+    chart: ../charts/celine-roi
+    createNamespace: true
+    missingFileHandler: Warn
+    values:
+      - ../defaults/0050-celine-services/values.yaml.gotmpl
+      - ../defaults/0050-celine-services/celine-roi/values.yaml.gotmpl
+      - ../envs/{{ .Environment.Name }}/0050-celine-services/celine-roi/values.yaml.gotmpl
+    labels:
+      group: celine-services
+
   - name: frontend-assistant
     namespace: celine-{{ .Environment.Name }}
     chart: ../charts/celine-frontend-assistant
@@ -167,5 +179,16 @@ releases:
     values:
       - ../defaults/0050-celine-services/celine-frontend-webapp/values.yaml.gotmpl
       - ../envs/{{ .Environment.Name }}/0050-frontends/celine-frontend-webapp/values.yaml.gotmpl
+    labels:
+      group: celine-services
+
+  - name: frontend-roi
+    namespace: celine-{{ .Environment.Name }}
+    chart: ../charts/celine-frontend-roi
+    createNamespace: true
+    missingFileHandler: Warn
+    values:
+      - ../defaults/0050-celine-services/celine-frontend-roi/values.yaml.gotmpl
+      - ../envs/{{ .Environment.Name }}/0050-frontends/celine-frontend-roi/values.yaml.gotmpl
     labels:
       group: celine-services
