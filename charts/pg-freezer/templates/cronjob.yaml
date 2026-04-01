@@ -10,10 +10,11 @@ spec:
   timeZone: {{ .Values.timeZone | quote }}
   {{- end }}
   concurrencyPolicy: {{ .Values.concurrencyPolicy }}
-  successfulJobsHistoryLimit: 3
+  successfulJobsHistoryLimit: 0
   failedJobsHistoryLimit: 3
   jobTemplate:
     spec:
+      backoffLimit: 1
       template:
         metadata:
           labels:
