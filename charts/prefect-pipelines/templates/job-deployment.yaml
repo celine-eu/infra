@@ -9,6 +9,7 @@ metadata:
 
 spec:
   ttlSecondsAfterFinished: 30
+  backoffLimit: 0
   template:
     spec:
       restartPolicy: Never
@@ -50,6 +51,19 @@ spec:
             {{- end }}
             {{- end }}
 
+          resources:
+            {{- if .resources }}
+            {{- toYaml .resources | nindent 12 }}
+            {{- else }}
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+              ephemeral-storage: "1Gi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+              ephemeral-storage: "4Gi"
+            {{- end }}
           command:
             - "bash"
             - "-c"
