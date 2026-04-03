@@ -131,6 +131,7 @@ superset:
   mapboxApiKey: ""
 
 pipelines:
+  client_secret: svc-pipelines
   s3_secret: s3-account-user-rw
   CDSAPI_KEY: todo
   ADSAPI_KEY: todo
