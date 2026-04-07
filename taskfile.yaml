@@ -510,20 +510,36 @@ tasks:
         kubectl exec -it "$POD" -n celine-{{ .DEPLOYMENT_ENV }} -- bash -c "cd /app/src/celine/rec_registry/cli && python main.py import -f /tmp/rec.yaml"
 
   import:dataset-sync:*:
+    desc: "Export governance.yaml files from pipeline repos and import into the dataset-api catalogue. Usage: task import:dataset-sync:staging"
     vars:
       DEPLOYMENT_ENV: "{{ index .MATCH 0 }}"
     cmds:
       - |
-        POD=$(kubectl get pods -n celine-{{.DEPLOYMENT_ENV}} --no-headers -o custom-columns=':metadata.name' | grep dataset-api-shell | head -1)
-        kubectl exec -n celine-{{.DEPLOYMENT_ENV}} -it "$POD" -- sh -c '
+        set -e
+
+        POD=$(kubectl get pod -n celine-{{ .DEPLOYMENT_ENV }} \
+          -l app.kubernetes.io/name=dataset-api-shell \
+          -o jsonpath='{.items[0].metadata.name}')
+        test -n "$POD" || { echo "No dataset-api-shell pod found in celine-{{ .DEPLOYMENT_ENV }}"; exit 1; }
+
+        TMPDIR=$(mktemp -d)
+        trap "rm -rf $TMPDIR" EXIT
+        mkdir -p "$TMPDIR/gov"
+
+        find "{{ .TASKFILE_DIR }}/../../celine-pipelines/apps" \
+             "{{ .TASKFILE_DIR }}/../../demo3/pipelines/apps" \
+             -name "governance.yaml" | while read -r f; do
+          app=$(basename "$(dirname "$f")")
+          cp "$f" "$TMPDIR/gov/${app}-governance.yaml"
+        done
+
+        kubectl cp "$TMPDIR/gov" "$POD":/tmp/governance_src -n celine-{{ .DEPLOYMENT_ENV }}
+
+        kubectl exec -n celine-{{ .DEPLOYMENT_ENV }} -it "$POD" -- sh -c '
           mkdir -p /tmp/export &&
-          dataset-cli export openlineage --ns "*" -o /tmp/export --expose &&
-          dataset-cli row-filter add "/tmp/export/*.yaml" datasets.ds_dev_gold.meters_data_15m --handler rec_registry --args column=device_id &&
-          dataset-cli row-filter add "/tmp/export/*.yaml" datasets.ds_dev_gold.meters_data_15m_missing_intervals --handler rec_registry --args column=device_id &&
-          dataset-cli row-filter add "/tmp/export/*.yaml" datasets.ds_dev_gold.meters_data_1h --handler rec_registry --args column=device_id &&
+          dataset-cli export governance "/tmp/governance_src/*.yaml" -o /tmp/export --verbose &&
           dataset-cli import catalogue \
             --input "/tmp/export/*.yaml" \
-            --ns "*" \
-            --ns ds_dev_gold \
-            --api-url http://dataset-api:8001
+            --api-url http://dataset-api:8001 \
+            --verbose
         '

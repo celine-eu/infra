@@ -1,0 +1,11 @@
+image:
+  tag: {{ .Environment.Values | dig "flexibility_api" "image_tag" "latest" | quote }}
+
+oidc:
+  service:
+    clientSecret: {{ .Environment.Values | dig "flexibility_api" "client_secret" "svc-flexibility" | quote }}
+
+{{- with .Environment.Values | dig "flexibility_api" "resources" nil }}
+resources:
+  {{- toYaml . | nindent 2 }}
+{{- end }}

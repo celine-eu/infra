@@ -36,8 +36,6 @@ extraEnv:
     value: {{ .Environment.Values | dig "nudging" "client_secret" "svc-nudging" | quote }}
   - name: SVC_REC_REGISTRY_SECRET
     value: {{ .Environment.Values | dig "rec_registry" "client_secret" "svc-rec-registry" | quote }}
-  - name: SVC_PIPELINES_SECRET
-    value: {{ .Environment.Values | dig "pipelines" "client_secret" "svc-pipelines" | quote }}
   - name: CELINE_ADMIN_CLI_SECRET
     value: {{ .Environment.Values | dig "auth_setup" "clientCLISecret" "celine-cli" | quote }}
 
