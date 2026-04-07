@@ -119,6 +119,13 @@ volumes: []
 # ------------------------------------------------------------------------------
 logLevel: "INFO"
 extraEnv:
+  - name: NUDGING_API_URL
+    value: http://nudging:8016
+  - name: DIGITAL_TWIN_API_URL
+    value: http://digital-twin:8002
+  - name: REC_REGISTRY_URL
+    value: http://rec-registry:8004
+
   - name: CELINE_MQTT_HOST
     valueFrom:
       secretKeyRef:

@@ -241,10 +241,15 @@
         "https://sso.{{ .Values.domain }}/oauth2/callback",
         "https://superset.{{ .Values.domain }}/*/",
         "https://webapp.{{ .Values.domain }}/*",
-        "https://assistant.{{ .Values.domain }}/*"
+        "https://assistant.{{ .Values.domain }}/*",
+        "https://roi.{{ .Values.domain }}/*"
       ],
       "postLogoutRedirectUris": [
-        "https://sso.{{ .Values.domain }}/*"
+        "https://sso.{{ .Values.domain }}/*",
+        "https://webapp.{{ .Values.domain }}/*",
+        "https://superset.{{ .Values.domain }}/*",
+        "https://roi.{{ .Values.domain }}/*",
+        "https://assistant.{{ .Values.domain }}/*"
       ],
       "webOrigins": [
         "https://*.{{ .Values.domain }}"

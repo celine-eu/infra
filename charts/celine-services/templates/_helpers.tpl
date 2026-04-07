@@ -335,6 +335,42 @@ spec:
         - {{ .Values.ingress.host }}
       secretName: {{ .Values.ingress.tls.secretName | default (printf "%s-tls" (include "celine-services.fullname" .)) }}
   {{- end }}
+{{- if .Values.ingress.auth.enabled }}
+---
+# Redirect {host}/oauth2/sign_out → sso.{domain}/oauth2/sign_out?rd=https://{host}/
+# so that oauth2-proxy (at sso.*) clears the proxy session and performs native
+# OIDC RP-initiated logout (end_session_endpoint with id_token_hint), using rd
+# as post_logout_redirect_uri so Keycloak returns to the originating service.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "celine-services.fullname" . }}-signout
+  labels:
+    {{- include "celine-services.labels" . | nindent 4 }}
+  annotations:
+    cert-manager.io/issuer: {{ .Values.ingress.issuer | default "celine-tls" }}
+    nginx.ingress.kubernetes.io/permanent-redirect: "https://sso.{{ .Values.ingress.domain }}/oauth2/sign_out?rd=https://keycloak.{{ .Values.ingress.domain }}/realms/celine/protocol/openid-connect/logout"
+    nginx.ingress.kubernetes.io/permanent-redirect-code: "302"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          - path: /oauth2/sign_out
+            pathType: Exact
+            backend:
+              service:
+                name: {{ include "celine-services.fullname" . }}
+                port:
+                  number: {{ .Values.service.port }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host }}
+      secretName: {{ .Values.ingress.tls.secretName | default (printf "%s-tls" (include "celine-services.fullname" .)) }}
+  {{- end }}
+{{- end }}
 {{- end }}
 {{- end }}
 

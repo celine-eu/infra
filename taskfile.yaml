@@ -530,14 +530,16 @@ tasks:
              "{{ .TASKFILE_DIR }}/../../demo3/pipelines/apps" \
              -name "governance.yaml" | while read -r f; do
           app=$(basename "$(dirname "$f")")
-          cp "$f" "$TMPDIR/gov/${app}-governance.yaml"
+          mkdir -p "$TMPDIR/gov/$app"
+          cp "$f" "$TMPDIR/gov/$app/governance.yaml"
+          echo "Copied $f"
         done
 
         kubectl cp "$TMPDIR/gov" "$POD":/tmp/governance_src -n celine-{{ .DEPLOYMENT_ENV }}
 
         kubectl exec -n celine-{{ .DEPLOYMENT_ENV }} -it "$POD" -- sh -c '
-          mkdir -p /tmp/export &&
-          dataset-cli export governance "/tmp/governance_src/*.yaml" -o /tmp/export --verbose &&
+          rm -rf /tmp/export && mkdir -p /tmp/export &&
+          dataset-cli export governance "/tmp/governance_src/**/governance.yaml" -o /tmp/export --verbose &&
           dataset-cli import catalogue \
             --input "/tmp/export/*.yaml" \
             --api-url http://dataset-api:8001 \

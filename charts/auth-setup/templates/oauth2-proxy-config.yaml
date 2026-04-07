@@ -37,7 +37,8 @@ data:
     cookie_samesite = "lax"
     session_store_type = "redis"
     redis_connection_url = "redis://redis:6379"
-    # Redirect to Keycloak end_session after clearing the proxy session so the
-    # Keycloak browser cookie (KEYCLOAK_SESSION) is also cleared. Without this,
-    # Keycloak's SSO session survives and silently re-authenticates on next visit.
-    logout_url = "https://keycloak.{{ .Values.domain }}/realms/{{ .Values.realm | default "celine" }}/protocol/openid-connect/logout?client_id=oauth2_proxy&post_logout_redirect_uri=https%3A%2F%2Fsso.{{ .Values.domain }}%2Foauth2%2Fsign_in"
+    # oauth2-proxy (keycloak-oidc provider) performs native OIDC RP-initiated
+    # logout: it discovers end_session_endpoint, calls it with id_token_hint and
+    # post_logout_redirect_uri taken from the ?rd= param on /oauth2/sign_out.
+    # Each service's signout ingress passes rd=https://{service-host}/ so
+    # Keycloak returns the user to the originating service after clearing its session.
