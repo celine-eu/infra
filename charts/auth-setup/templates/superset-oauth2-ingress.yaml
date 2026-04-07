@@ -2,7 +2,7 @@
 # Proxying to oauth2-proxy does not work: oauth2-proxy sees Host: superset.domain
 # via X-Forwarded-Host and mis-handles the cookie domain / redirect chain.
 # By redirecting to sso.domain, oauth2-proxy handles sign_out natively, clears
-# the Redis session, and the logout_url chain to Keycloak works correctly.
+# the Redis session, then follows ?rd to trigger Keycloak RP-initiated logout.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -11,7 +11,7 @@ metadata:
     app: superset-oauth2-signout
   annotations:
     cert-manager.io/issuer: {{ .Values.issuer | default "celine-tls" }}
-    nginx.ingress.kubernetes.io/permanent-redirect: "https://sso.{{ .Values.domain }}/oauth2/sign_out"
+    nginx.ingress.kubernetes.io/permanent-redirect: "https://sso.{{ .Values.domain }}/oauth2/sign_out?rd=https://keycloak.{{ .Values.domain }}/realms/celine/protocol/openid-connect/logout"
     nginx.ingress.kubernetes.io/permanent-redirect-code: "302"
 spec:
   ingressClassName: nginx
