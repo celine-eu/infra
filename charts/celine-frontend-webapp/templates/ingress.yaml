@@ -52,8 +52,6 @@ spec:
 {{- end }}
 {{- if and .Values.ingress.enabled .Values.ingress.auth.enabled }}
 ---
-# Redirect {host}/oauth2/sign_out → sso.{domain}/oauth2/sign_out
-# oauth2-proxy clears the proxy session then redirects to rd (Keycloak logout endpoint).
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -62,7 +60,7 @@ metadata:
     {{- include "celine-services.labels" . | nindent 4 }}
   annotations:
     cert-manager.io/issuer: {{ .Values.ingress.issuer | default "celine-tls" }}
-    nginx.ingress.kubernetes.io/permanent-redirect: "https://sso.{{ .Values.ingress.domain }}/oauth2/sign_out?rd=https://keycloak.{{ .Values.ingress.domain }}/realms/celine/protocol/openid-connect/logout"
+    nginx.ingress.kubernetes.io/permanent-redirect: "https://sso.{{ .Values.ingress.domain }}/oauth2/sign_out?rd=https://{{ .Values.ingress.host }}/keycloak-logout"
     nginx.ingress.kubernetes.io/permanent-redirect-code: "302"
 spec:
   ingressClassName: nginx
@@ -71,6 +69,36 @@ spec:
       http:
         paths:
           - path: /oauth2/sign_out
+            pathType: Exact
+            backend:
+              service:
+                name: {{ include "celine-services.fullname" . }}
+                port:
+                  number: {{ .Values.service.port }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host }}
+      secretName: {{ .Values.ingress.tls.secretName | default (printf "%s-tls" (include "celine-services.fullname" .)) }}
+  {{- end }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "celine-services.fullname" . }}-keycloak-logout
+  labels:
+    {{- include "celine-services.labels" . | nindent 4 }}
+  annotations:
+    cert-manager.io/issuer: {{ .Values.ingress.issuer | default "celine-tls" }}
+    nginx.ingress.kubernetes.io/permanent-redirect: "https://keycloak.{{ .Values.ingress.domain }}/realms/celine/protocol/openid-connect/logout?client_id=oauth2_proxy&post_logout_redirect_uri=https://{{ .Values.ingress.host }}/"
+    nginx.ingress.kubernetes.io/permanent-redirect-code: "302"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          - path: /keycloak-logout
             pathType: Exact
             backend:
               service:
