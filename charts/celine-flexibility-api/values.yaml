@@ -118,7 +118,12 @@ volumes: []
 # Application
 # ------------------------------------------------------------------------------
 logLevel: "INFO"
-extraEnv: []
+extraEnv:
+  - name: CELINE_MQTT_HOST
+    valueFrom:
+      secretKeyRef:
+        name: mqtt-account-admin
+        key: MQTT_BROKER
 extraSecrets: {}
 
 # ------------------------------------------------------------------------------
