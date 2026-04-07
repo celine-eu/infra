@@ -518,7 +518,7 @@ tasks:
         set -e
 
         POD=$(kubectl get pod -n celine-{{ .DEPLOYMENT_ENV }} \
-          -l app.kubernetes.io/name=dataset-api-shell \
+          -l app.kubernetes.io/name=celine-dataset-api-shell \
           -o jsonpath='{.items[0].metadata.name}')
         test -n "$POD" || { echo "No dataset-api-shell pod found in celine-{{ .DEPLOYMENT_ENV }}"; exit 1; }
 

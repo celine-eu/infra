@@ -26,7 +26,7 @@ replicaCount: 1
 # ------------------------------------------------------------------------------
 service:
   type: ClusterIP
-  port: 8080
+  port: 8017
 
 # ------------------------------------------------------------------------------
 # Ingress
@@ -72,7 +72,7 @@ policies:
 # Postgres
 # ------------------------------------------------------------------------------
 postgres:
-  existingSecret: ""
+  existingSecret: "postgis1-flexibility-api-connection-string"
   dsnEnvVar: "DATABASE_URL"
   secretKey: "connection-string"
 
@@ -88,7 +88,7 @@ s3:
 # Migrate
 # ------------------------------------------------------------------------------
 migrate:
-  enabled: false
+  enabled: true
   command: ["alembic", "upgrade", "head"]
   extraEnv: []
 
