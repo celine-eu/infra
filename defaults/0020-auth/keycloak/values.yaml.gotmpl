@@ -6,7 +6,15 @@
 image:
   repository: ghcr.io/celine-eu/keycloak
   tag: {{ .Environment.Values | dig "keycloak" "image_tag" "latest" | quote }}
+
+theme:
+  login: {{ .Environment.Values | dig "keycloak" "theme" "login" "" }}
+  account: ""
+  email: ""
+
 {{- end }}
+
+
 
 command:
   - "/opt/keycloak/bin/kc.sh"
