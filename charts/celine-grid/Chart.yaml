@@ -1,0 +1,13 @@
+apiVersion: v2
+name: celine-grid
+description: >
+  CELINE Grid API (FastAPI).
+  Grid resilience service with OIDC, Postgres and MQTT listener.
+  Deployed behind oauth2-proxy; JWT forwarded via X-Auth-Request-Access-Token.
+type: application
+version: 0.1.0
+appVersion: "latest"
+dependencies:
+  - name: celine-services
+    version: "0.1.0"
+    repository: file://../celine-services

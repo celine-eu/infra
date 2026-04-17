@@ -1,0 +1,8 @@
+# defaults/0050-celine-services/celine-frontend-grid/values.yaml.gotmpl
+
+image:
+  tag: {{ .Environment.Values.frontend_grid.image_tag | default "latest" | quote }}
+
+ingress:
+  host: grid.{{ .Environment.Values.domain }}
+  domain: {{ .Environment.Values.domain }}

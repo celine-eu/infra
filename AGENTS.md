@@ -30,9 +30,11 @@ Development setup is managed with `minikube` with local build support via `skaff
 - `celine-ai-assistant` AI Assistant API
 - `celine-roi` ROI API
 - `celine-webapp` Participant webapp API
+- `celine-grid` Grid resilience API
 - `celine-frontend-assistant` AI Assistant webapp 
 - `celine-frontend-roi` ROI webapp 
 - `celine-frontend-webapp` Participant webapp 
+- `celine-frontend-grid` Grid webapp 
 
 - `auth-setup` configure secrets and configmaps for `oauth2-proxy` and `keycloak`
 - `mqtt-setup` Configure MQTT access for services

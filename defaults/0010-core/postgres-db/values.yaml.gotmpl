@@ -40,6 +40,8 @@ roles:
     password: {{ .Environment.Values.postgres_db.webapp | quote }}
   - name: flexibility_api
     password: {{ .Environment.Values.postgres_db.flexibility_api | quote }}
+  - name: grid
+    password: {{ .Environment.Values.postgres_db.grid | quote }}
 
 databases:
   - name: datasets
@@ -77,6 +79,8 @@ databases:
     owner: dataset_api
   - name: flexibility_api
     owner: flexibility_api
+  - name: grid
+    owner: grid
 
 connection_strings:
   - database: datasets
@@ -113,6 +117,9 @@ connection_strings:
     dialect: postgresql+asyncpg
 
   - database: flexibility_api
+    dialect: postgresql+asyncpg
+
+  - database: grid
     dialect: postgresql+asyncpg
 
 

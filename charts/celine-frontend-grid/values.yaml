@@ -1,0 +1,55 @@
+## ----------------------------------------------------------------------------
+## celine-frontend-grid — values.yaml
+## ----------------------------------------------------------------------------
+
+fullnameOverride: frontend-grid
+
+image:
+  repository: ghcr.io/celine-eu/celine-frontend-grid
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  port: 3006
+
+ingress:
+  enabled: true
+  domain: celine.test
+  host: "grid.celine.test"
+  issuer: celine-tls
+
+  gridBackend:
+    service: grid
+    port: 8015
+
+  auth:
+    enabled: true
+  tls:
+    enabled: true
+    secretName: ""
+  annotations: {}
+
+healthCheck:
+  enabled: true
+  path: /
+  initialDelaySeconds: 10
+  periodSeconds: 30
+  failureThreshold: 3
+
+extraEnv: []
+podAnnotations: {}
+podSecurityContext:
+  runAsUser: 1000
+resources:
+  requests:
+    cpu: 10m
+    memory: 256Mi
+  limits:
+    cpu: 100m
+    memory: 512Mi
+nodeSelector: {}
+tolerations: []
+affinity: {}

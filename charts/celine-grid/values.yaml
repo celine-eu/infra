@@ -1,0 +1,116 @@
+## ----------------------------------------------------------------------------
+## celine-grid — values.yaml
+##
+## FastAPI Grid resilience API.
+## Deployed behind oauth2-proxy; JWT arrives via X-Auth-Request-Access-Token.
+## ----------------------------------------------------------------------------
+
+fullnameOverride: grid
+
+image:
+  repository: ghcr.io/celine-eu/celine-grid
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  port: 8015
+
+# --------------------------------------------------------------------------
+# Ingress — disabled, accessed via celine-frontend-grid ingress proxy
+# --------------------------------------------------------------------------
+ingress:
+  enabled: false
+  domain: celine.test
+  host: "grid.celine.test"
+  issuer: celine-tls
+  auth:
+    enabled: true
+  tls:
+    enabled: true
+    secretName: ""
+  annotations: {}
+
+# --------------------------------------------------------------------------
+# OIDC — grid verifies tokens and uses a service client for outbound calls
+# --------------------------------------------------------------------------
+oidc:
+  baseUrl: "http://keycloak/realms/celine"
+  jwksUri: "http://keycloak/realms/celine/protocol/openid-connect/certs"
+  allowedAudiences: ""
+  includeClientIdAsAudience: true
+  timeout: 10.0
+  service:
+    clientId: "svc-grid"
+    audience: "svc-grid"
+    clientSecret: "svc-grid" # [secret]
+
+# --------------------------------------------------------------------------
+# Postgres — DSN injected from the connection-string Secret produced by
+# the postgres-db chart. Maps to DATABASE_URL env var.
+# --------------------------------------------------------------------------
+postgres:
+  existingSecret: "postgis1-grid-connection-string"
+  dsnEnvVar: "DATABASE_URL"
+  secretKey: "connection-string"
+
+# --------------------------------------------------------------------------
+# Alembic migration init-container
+# --------------------------------------------------------------------------
+migrate:
+  enabled: true
+  command: ["alembic", "upgrade", "head"]
+  extraEnv: []
+
+# --------------------------------------------------------------------------
+# Health check
+# --------------------------------------------------------------------------
+healthCheck:
+  enabled: true
+  path: /health
+  initialDelaySeconds: 10
+  periodSeconds: 30
+  failureThreshold: 3
+
+# --------------------------------------------------------------------------
+# Policies — required by celine-services helpers
+# --------------------------------------------------------------------------
+policies:
+  dir: "/app/policies"
+  dataDir: ""
+  cacheEnabled: true
+  cacheTtl: 300
+  cacheMaxsize: 10000
+
+# --------------------------------------------------------------------------
+# Application-specific env vars
+# --------------------------------------------------------------------------
+extraEnv:
+  - name: DIGITAL_TWIN_API_URL
+    value: "http://digital-twin:8002"
+  - name: NUDGING_API_URL
+    value: "http://nudging:8016"
+
+extraSecrets: {}
+
+podAnnotations: {}
+podSecurityContext:
+  runAsUser: 1000
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+volumeMounts: []
+volumes: []
+
+logLevel: "INFO"

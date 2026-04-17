@@ -1,0 +1,19 @@
+image:
+  tag: {{ .Environment.Values.grid.image_tag | default "latest" | quote }}
+
+oidc:
+  service:
+    clientSecret: {{ .Environment.Values | dig "grid" "client_secret" "svc-grid" | quote }}
+
+extraEnv:
+  - name: DIGITAL_TWIN_API_URL
+    value: "http://digital-twin:8002"
+  - name: NUDGING_API_URL
+    value: "http://nudging:8016"
+  - name: CORS_ORIGINS
+    value: '["https://grid.{{ .Values.domain }}"]'
+
+{{- with .Environment.Values | dig "grid" "resources" nil }}
+resources:
+  {{- toYaml . | nindent 2 }}
+{{- end }}

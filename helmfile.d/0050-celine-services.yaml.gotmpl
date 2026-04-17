@@ -204,3 +204,26 @@ releases:
       - ../envs/{{ .Environment.Name }}/0050-frontends/celine-frontend-roi/values.yaml.gotmpl
     labels:
       group: celine-services
+
+  - name: grid
+    namespace: celine-{{ .Environment.Name }}
+    chart: ../charts/celine-grid
+    createNamespace: true
+    missingFileHandler: Warn
+    values:
+      - ../defaults/0050-celine-services/values.yaml.gotmpl
+      - ../defaults/0050-celine-services/celine-grid/values.yaml.gotmpl
+      - ../envs/{{ .Environment.Name }}/0050-celine-services/celine-grid/values.yaml.gotmpl
+    labels:
+      group: celine-services
+
+  - name: frontend-grid
+    namespace: celine-{{ .Environment.Name }}
+    chart: ../charts/celine-frontend-grid
+    createNamespace: true
+    missingFileHandler: Warn
+    values:
+      - ../defaults/0050-celine-services/celine-frontend-grid/values.yaml.gotmpl
+      - ../envs/{{ .Environment.Name }}/0050-frontends/celine-frontend-grid/values.yaml.gotmpl
+    labels:
+      group: celine-services

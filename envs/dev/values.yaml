@@ -46,6 +46,7 @@ postgres_db:
   rec_registry: rec_registry
   ai_assistant: ai_assistant
   webapp: webapp
+  grid: grid
 
 registries: []
   # - server: ghcr.io
@@ -183,4 +184,10 @@ roi:
   image_tag: "latest"
 
 frontend_roi:
+  image_tag: "latest"
+
+grid:
+  image_tag: "latest"
+
+frontend_grid:
   image_tag: "latest"
