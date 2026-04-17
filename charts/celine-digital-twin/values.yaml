@@ -101,7 +101,7 @@ s3:
 # ------------------------------------------------------------------------------
 migrate:
   enabled: false
-  command: ["alembic", "upgrade", "head"]
+  command: [ "alembic", "upgrade", "head" ]
   extraEnv: []
 
 # ------------------------------------------------------------------------------
@@ -151,6 +151,10 @@ configMap:
           enabled: true
           overrides:
             broker: "${MQTT_BROKER:-celine_mqtt}"
+        - name: it-grid
+          import: celine.dt.domains.grid.domain:domain
+          enabled: true
+
     clients.yaml: |
       clients:
         dataset_api:
