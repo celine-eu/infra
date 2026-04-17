@@ -1,9 +1,18 @@
 server:
+  image:
+    tag: "3.6.26-python3.11"
   env:
     - name: PREFECT_EVENTS_RETENTION_PERIOD
       value: "7d"
     - name: PREFECT_SERVER_CONCURRENCY_INITIAL_DEPLOYMENT_LEASE_DURATION
       value: "3600"
+    # Increase asyncpg command timeout (default 30s) to reduce spurious
+    # TimeoutErrors during commit that cause task_run_recorder retries,
+    # which then hit the uq_task_run__flow_run_id_task_key_dynamic_key constraint
+    - name: PREFECT_SERVER_DATABASE_COMMAND_TIMEOUT
+      value: "120"
+    - name: PREFECT_SERVER_DATABASE_CONNECTION_TIMEOUT
+      value: "30"
   uiConfig:
     prefectUiApiUrl: "https://prefect.{{ .Environment.Values.domain }}/api"
   resources:
