@@ -66,6 +66,8 @@ extraEnv:
     value: "svc-nudging"
   - name: SVC_REC_REGISTRY_SECRET
     value: "svc-rec-registry"
+  - name: SVC_GRID_SECRET
+    value: "svc-grid"
   - name: CELINE_ADMIN_CLI_SECRET
     value: "celine-cli"
 # Example secretKeyRef override:

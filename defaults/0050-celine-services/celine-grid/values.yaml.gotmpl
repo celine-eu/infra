@@ -12,6 +12,11 @@ extraEnv:
     value: "http://nudging:8016"
   - name: CORS_ORIGINS
     value: '["https://grid.{{ .Values.domain }}"]'
+  - name: CELINE_MQTT_HOST
+    valueFrom:
+      secretKeyRef:
+        name: mqtt-account-admin
+        key: MQTT_BROKER
 
 {{- with .Environment.Values | dig "grid" "resources" nil }}
 resources:
