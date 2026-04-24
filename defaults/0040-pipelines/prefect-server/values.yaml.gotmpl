@@ -3,7 +3,13 @@ server:
     tag: "3.6.26-python3.11"
   env:
     - name: PREFECT_EVENTS_RETENTION_PERIOD
-      value: "7d"
+      value: "30d"
+    - name: PREFECT_SERVER_SERVICES_DB_VACUUM_ENABLED
+      value: "events,flow_runs"
+    - name: PREFECT_SERVER_SERVICES_DB_VACUUM_RETENTION_PERIOD
+      value: "1296000"
+    - name: PREFECT_SERVER_SERVICES_DB_VACUUM_LOOP_SECONDS
+      value: "3600"
     - name: PREFECT_SERVER_CONCURRENCY_INITIAL_DEPLOYMENT_LEASE_DURATION
       value: "3600"
     # Increase asyncpg command timeout (default 30s) to reduce spurious
@@ -22,6 +28,22 @@ server:
     limits:
       cpu: "1"
       memory: 1Gi
+  livenessProbe:
+    enabled: true
+    config:
+      initialDelaySeconds: 10
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+      successThreshold: 1
+  readinessProbe:
+    enabled: true
+    config:
+      initialDelaySeconds: 10
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+      successThreshold: 1
 
 ## Database Migration Configuration
 migrations:

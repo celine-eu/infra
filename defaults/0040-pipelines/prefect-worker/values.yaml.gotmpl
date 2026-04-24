@@ -5,6 +5,14 @@ worker:
   replicaCount: 2
   selfHostedServerApiConfig:
     apiUrl: http://prefect-server:4200/api
+  livenessProbe:
+    enabled: true
+    config:
+      initialDelaySeconds: 10
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+      successThreshold: 1
   config:
     workPool: celine
     # jobNamespace controls the observer watch namespace only.
