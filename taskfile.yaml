@@ -535,6 +535,7 @@ tasks:
           echo "Copied $f"
         done
 
+        kubectl exec -n celine-{{ .DEPLOYMENT_ENV }} "$POD" -- rm -rf /tmp/governance_src
         kubectl cp "$TMPDIR/gov" "$POD":/tmp/governance_src -n celine-{{ .DEPLOYMENT_ENV }}
 
         kubectl exec -n celine-{{ .DEPLOYMENT_ENV }} -it "$POD" -- sh -c '
