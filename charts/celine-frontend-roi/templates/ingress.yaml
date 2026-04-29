@@ -29,6 +29,7 @@ spec:
                 name: {{ .Values.ingress.roiBackend.service }}
                 port:
                   number: {{ .Values.ingress.roiBackend.port }}
+          {{- if .Values.ingress.auth.enabled }}
           - path: /oauth2
             pathType: Prefix
             backend:
@@ -36,6 +37,7 @@ spec:
                 name: oauth2-proxy
                 port:
                   number: 80
+          {{- end }}
           - path: /
             pathType: Prefix
             backend:

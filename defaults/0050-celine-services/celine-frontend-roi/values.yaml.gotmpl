@@ -6,3 +6,5 @@ image:
 ingress:
   host: roi.{{ .Environment.Values.domain }}
   domain: {{ .Environment.Values.domain }}
+  auth:
+    enabled: false
