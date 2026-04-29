@@ -58,7 +58,7 @@ postgres:
 # Alembic migration — disabled (celine-roi is stateless, no database)
 # --------------------------------------------------------------------------
 migrate:
-  enabled: false
+  enabled: true
 
 # --------------------------------------------------------------------------
 # Health check
