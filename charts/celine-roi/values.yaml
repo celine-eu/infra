@@ -49,13 +49,13 @@ oidc:
     clientSecret: ""
 
 # --------------------------------------------------------------------------
-# Postgres — not used, but required by celine-services helpers to avoid nil pointer
+# Postgres — estimates persistence (asyncpg)
 # --------------------------------------------------------------------------
 postgres:
-  existingSecret: ""
+  existingSecret: "postgis1-roi-connection-string"
 
 # --------------------------------------------------------------------------
-# Alembic migration — disabled (celine-roi is stateless, no database)
+# Alembic migration — disabled (DDL applied manually via sql/init.sql)
 # --------------------------------------------------------------------------
 migrate:
   enabled: true

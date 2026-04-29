@@ -2,7 +2,7 @@ apiVersion: v2
 name: celine-roi
 description: >
   CELINE ROI API (FastAPI).
-  Stateless calculation engine for PV/CER financial analysis.
+  PV/CER financial analysis engine with Postgres persistence.
   Deployed behind oauth2-proxy; JWT forwarded via X-Auth-Request-Access-Token.
 type: application
 version: 0.1.0
