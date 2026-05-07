@@ -3,11 +3,7 @@ image:
 
 oidc:
   service:
-    # skip client ID / secrets
-    passthrough: true
-    clientId: ""
-    audience: "oauth2_proxy"
-    clientSecret: ""
+    clientSecret: {{ .Environment.Values | dig "webapp" "client_secret" "svc-webapp" | quote }}
 
   includeClientIdAsAudience: false
   allowedAudiences: ""
