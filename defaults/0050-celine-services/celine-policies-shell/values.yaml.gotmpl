@@ -38,6 +38,8 @@ extraEnv:
     value: {{ .Environment.Values | dig "rec_registry" "client_secret" "svc-rec-registry" | quote }}
   - name: SVC_FLEXIBILITY_SECRET
     value: {{ .Environment.Values | dig "flexibility_api" "client_secret" "svc-flexibility" | quote }}
+  - name: SVC_WEBAPP_SECRET
+    value: {{ .Environment.Values | dig "webapp" "client_secret" "svc-webapp" | quote }}
   - name: CELINE_ADMIN_CLI_SECRET
     value: {{ .Environment.Values | dig "auth_setup" "clientCLISecret" "celine-cli" | quote }}
 
