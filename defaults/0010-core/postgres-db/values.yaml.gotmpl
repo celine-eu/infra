@@ -130,6 +130,19 @@ connection_strings:
     dialect: postgresql+asyncpg
 
 
+backup:
+  enabled: {{ .Environment.Values | dig "postgres_db" "backup" "enabled" false }}
+  destinationPath: {{ .Environment.Values | dig "postgres_db" "backup" "destinationPath" "" | quote }}
+  retentionPolicy: {{ .Environment.Values | dig "postgres_db" "backup" "retentionPolicy" "7d" | quote }}
+  schedule: {{ .Environment.Values | dig "postgres_db" "backup" "schedule" "0 2 * * *" | quote }}
+  compression: {{ .Environment.Values | dig "postgres_db" "backup" "compression" "gzip" | quote }}
+  gcs:
+    applicationCredentials: {{ .Environment.Values | dig "postgres_db" "backup" "gcs" "applicationCredentials" "" | quote }}
+  s3:
+    endpointURL: {{ .Environment.Values | dig "postgres_db" "backup" "s3" "endpointURL" "" | quote }}
+    accessKey: {{ .Environment.Values | dig "postgres_db" "backup" "s3" "accessKey" "" | quote }}
+    secretKey: {{ .Environment.Values | dig "postgres_db" "backup" "s3" "secretKey" "" | quote }}
+
 grants:
   enabled: true
   schemas:

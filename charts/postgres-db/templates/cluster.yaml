@@ -21,6 +21,33 @@ spec:
       {{- range $key, $value := .Values.cluster.parameters }}
       {{ $key }}: {{ $value | quote }}
       {{- end }}
+  {{- if .Values.backup.enabled }}
+  backup:
+    barmanObjectStore:
+      destinationPath: {{ .Values.backup.destinationPath | quote }}
+      {{- if .Values.backup.gcs.applicationCredentials }}
+      googleCredentials:
+        applicationCredentials:
+          name: cnpg-backup-gcs
+          key: credentials.json
+      {{- else }}
+      {{- if .Values.backup.s3.endpointURL }}
+      endpointURL: {{ .Values.backup.s3.endpointURL | quote }}
+      {{- end }}
+      s3Credentials:
+        accessKeyId:
+          name: cnpg-backup-s3
+          key: S3_ACCESS_KEY_ID
+        secretAccessKey:
+          name: cnpg-backup-s3
+          key: S3_SECRET_ACCESS_KEY
+      {{- end }}
+      wal:
+        compression: {{ .Values.backup.compression }}
+      data:
+        compression: {{ .Values.backup.compression }}
+    retentionPolicy: {{ .Values.backup.retentionPolicy | quote }}
+  {{- end }}
   managed:
     roles:
       {{- range .Values.roles }}

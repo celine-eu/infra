@@ -32,6 +32,16 @@ mqtt_ingestor:
     POSTGRES_TABLE: mqtt_messages
 
 postgres_db:
+  backup:
+    enabled: true
+    destinationPath: "s3://cnpg-backups/postgis1"
+    endpointURL: "https://storage.googleapis.com"
+    region: "auto"
+    # credentials go in secrets.sops.yaml (GCS HMAC keys)
+    # s3:
+    #   accessKey: ""
+    #   secretKey: ""
+
   datasets_owner: datasets_owner
   datasets_ro: datasets_ro
   meltano: meltano

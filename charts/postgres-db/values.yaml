@@ -65,6 +65,23 @@ connection_strings: []
   # - database: prefect
   #   dialect: postgresql+asyncpg
 
+backup:
+  enabled: false
+  destinationPath: ""
+  retentionPolicy: "7d"
+  schedule: "0 2 * * *"
+  compression: gzip
+  # GCS native (recommended for Google Cloud Storage)
+  # destinationPath must use gs:// prefix
+  gcs:
+    applicationCredentials: ""  # full JSON string of GCS service account key
+  # S3-compatible (AWS, MinIO, etc.)
+  # destinationPath must use s3:// prefix
+  s3:
+    endpointURL: ""             # omit for native AWS S3
+    accessKey: ""
+    secretKey: ""
+
 grants:
   enabled: false
   schemas:
