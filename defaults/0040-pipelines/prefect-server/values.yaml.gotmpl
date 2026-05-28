@@ -5,13 +5,13 @@ global:
 server:
   env:
     - name: PREFECT_EVENTS_RETENTION_PERIOD
-      value: "30d"
+      value: "7d"
     - name: PREFECT_SERVER_SERVICES_DB_VACUUM_ENABLED
       value: "events,flow_runs"
     - name: PREFECT_SERVER_SERVICES_DB_VACUUM_RETENTION_PERIOD
-      value: "1296000"
+      value: "604800"
     - name: PREFECT_SERVER_SERVICES_DB_VACUUM_LOOP_SECONDS
-      value: "3600"
+      value: "1800"
     - name: PREFECT_SERVER_CONCURRENCY_INITIAL_DEPLOYMENT_LEASE_DURATION
       value: "3600"
     # Increase asyncpg command timeout (default 30s) to reduce spurious
