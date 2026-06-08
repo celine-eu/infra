@@ -1,0 +1,21 @@
+{{- range .Values.poolers }}
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: {{ printf "%s-pooler-%s" $.Values.cluster.name .type }}
+  labels:
+    app.kubernetes.io/name: {{ $.Chart.Name }}
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+spec:
+  cluster:
+    name: {{ $.Values.cluster.name }}
+  instances: {{ .instances | default 2 }}
+  type: {{ .type }}
+  pgbouncer:
+    poolMode: {{ .poolMode | default "transaction" }}
+    parameters:
+      {{- range $key, $value := .parameters }}
+      {{ $key }}: {{ $value | quote }}
+      {{- end }}
+{{- end }}

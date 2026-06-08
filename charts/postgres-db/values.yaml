@@ -65,6 +65,14 @@ connection_strings: []
   # - database: prefect
   #   dialect: postgresql+asyncpg
 
+poolers: []
+  # - type: rw
+  #   instances: 2
+  #   poolMode: transaction
+  #   parameters:
+  #     default_pool_size: "25"
+  #     max_client_conn: "200"
+
 backup:
   enabled: false
   destinationPath: ""
