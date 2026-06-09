@@ -13,7 +13,7 @@ server:
     - name: PREFECT_SERVER_SERVICES_DB_VACUUM_LOOP_SECONDS
       value: "600"
     - name: PREFECT_SERVER_SERVICES_DB_VACUUM_BATCH_SIZE
-      value: "500"
+      value: "2000"
     - name: PREFECT_SERVER_CONCURRENCY_INITIAL_DEPLOYMENT_LEASE_DURATION
       value: "3600"
     # Increase asyncpg command timeout (default 30s) to reduce spurious

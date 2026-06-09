@@ -7,6 +7,7 @@ cluster:
   parameters:
     log_statement: ddl
     max_connections: "200"
+    idle_in_transaction_session_timeout: "30000"
 
 roles:
   - name: datasets_owner
@@ -94,6 +95,7 @@ poolers:
       default_pool_size: "25"
       max_client_conn: "200"
       max_prepared_statements: "256"
+      server_reset_query_always: "1"
 
 connection_strings:
   - database: datasets
