@@ -80,6 +80,10 @@ spec:
                   description: "{{ $flow.name }} prefect deployment"
                   entrypoint: "{{ $flow.path }}:{{ $flow.callback }}"
 
+                  pull:
+                    - prefect.deployments.steps.set_working_directory:
+                        directory: {{ dir $flow.path }}
+
                   # run once at time, assume idempotency
                   concurrency_limit: {{ $flow.concurrencyLimit | default 1 }}
                   collision_strategy: SKIP

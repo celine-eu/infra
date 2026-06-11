@@ -155,6 +155,22 @@ backup:
     accessKey: {{ .Environment.Values | dig "postgres_db" "backup" "s3" "accessKey" "" | quote }}
     secretKey: {{ .Environment.Values | dig "postgres_db" "backup" "s3" "secretKey" "" | quote }}
 
+table_tuning:
+  enabled: true
+  image: ghcr.io/cloudnative-pg/postgis:17
+  databases:
+    - name: prefect
+      secret: postgis1-prefect-connection-string
+      tables:
+        - name: deployment
+          options: "fillfactor = 50, autovacuum_vacuum_scale_factor = 0.01, autovacuum_vacuum_cost_delay = 0"
+        - name: work_queue
+          options: "fillfactor = 50, autovacuum_vacuum_scale_factor = 0.01, autovacuum_vacuum_cost_delay = 0"
+        - name: flow_run
+          options: "fillfactor = 50, autovacuum_vacuum_scale_factor = 0.01, autovacuum_vacuum_cost_delay = 0"
+        - name: concurrency_limit_v2
+          options: "autovacuum_vacuum_scale_factor = 0.01, autovacuum_vacuum_cost_delay = 0"
+
 grants:
   enabled: true
   schemas:

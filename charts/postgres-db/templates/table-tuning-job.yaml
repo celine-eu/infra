@@ -1,0 +1,43 @@
+{{- if .Values.table_tuning.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Values.cluster.name }}-table-tuning
+spec:
+  ttlSecondsAfterFinished: 30
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: table-tuning
+          image: {{ .Values.table_tuning.image }}
+          volumeMounts:
+            {{- range .Values.table_tuning.databases }}
+            - name: {{ .name }}-creds
+              mountPath: /secrets/{{ .name }}
+              readOnly: true
+            {{- end }}
+          command:
+            - bash
+            - -c
+            - |
+              set -e
+              {{- range .Values.table_tuning.databases }}
+              export PGHOST={{ $.Values.cluster.name }}-rw PGDATABASE={{ .name }}
+              export PGUSER=$(cat /secrets/{{ .name }}/username)
+              export PGPASSWORD=$(cat /secrets/{{ .name }}/password)
+              echo "Tuning {{ .name }}..."
+              {{- range .tables }}
+              echo "  {{ .name }}: {{ .options }}"
+              psql -v ON_ERROR_STOP=1 -c \
+                "ALTER TABLE IF EXISTS {{ .name }} SET ({{ .options }});"
+              {{- end }}
+              {{- end }}
+              echo "Done."
+      volumes:
+        {{- range .Values.table_tuning.databases }}
+        - name: {{ .name }}-creds
+          secret:
+            secretName: {{ .secret }}
+        {{- end }}
+{{- end }}
