@@ -23,6 +23,14 @@ extraEnv:
     value: "/tmp/training-material"
   - name: MANIFEST_PATH
     value: "/tmp/manifest.json"
+  - name: DIGITAL_TWIN_API_URL
+    value: "http://digital-twin:8002"
+  - name: DATASETS_API_URL
+    value: "http://dataset-api:8001"
+  - name: REC_REGISTRY_API_URL
+    value: "http://rec-registry:8004"
+  - name: FLEXIBILITY_API_URL
+    value: "http://flexibility-api:8017"
 
 {{- with .Environment.Values | dig "ai_assistant" "resources" nil }}
 resources:

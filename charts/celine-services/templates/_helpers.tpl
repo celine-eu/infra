@@ -435,6 +435,9 @@ spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: {{ .Values.podSecurityContext.runAsUser | default 1000 }}
+        {{- with .Values.podSecurityContext.fsGroup }}
+        fsGroup: {{ . }}
+        {{- end }}
       containers:
         - name: {{ include "celine-services.name" . }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default "latest" }}"

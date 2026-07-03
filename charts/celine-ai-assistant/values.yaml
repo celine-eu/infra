@@ -108,6 +108,7 @@ extraSecrets: {}
 podAnnotations: {}
 podSecurityContext:
   runAsUser: 1000
+  fsGroup: 1000
 resources:
   requests:
     cpu: 100m
