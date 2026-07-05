@@ -526,7 +526,7 @@ tasks:
         trap "rm -rf $TMPDIR" EXIT
         mkdir -p "$TMPDIR/gov"
 
-        find "{{ .TASKFILE_DIR }}/../../celine-pipelines/apps" \
+        find "{{ .TASKFILE_DIR }}/../../celine-dev/repositories/celine-pipelines/apps" \
              "{{ .TASKFILE_DIR }}/../../demo3/pipelines/apps" \
              -name "governance.yaml" | while read -r f; do
           app=$(basename "$(dirname "$f")")
