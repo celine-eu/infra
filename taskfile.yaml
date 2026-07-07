@@ -526,6 +526,8 @@ tasks:
         trap "rm -rf $TMPDIR" EXIT
         mkdir -p "$TMPDIR/gov"
 
+        GOV_OVERRIDES="{{ .TASKFILE_DIR }}/../recs/governance"
+
         find "{{ .TASKFILE_DIR }}/../../celine-dev/repositories/celine-pipelines/apps" \
              "{{ .TASKFILE_DIR }}/../../demo3/pipelines/apps" \
              -name "governance.yaml" | while read -r f; do
@@ -533,6 +535,11 @@ tasks:
           mkdir -p "$TMPDIR/gov/$app"
           cp "$f" "$TMPDIR/gov/$app/governance.yaml"
           echo "Copied $f"
+          # copy deployer override if present (merged by dataset-cli automatically)
+          if [ -f "$GOV_OVERRIDES/governance.${app}.yaml" ]; then
+            cp "$GOV_OVERRIDES/governance.${app}.yaml" "$TMPDIR/gov/$app/"
+            echo "Copied override for $app"
+          fi
         done
 
         kubectl exec -n celine-{{ .DEPLOYMENT_ENV }} "$POD" -- rm -rf /tmp/governance_src
