@@ -187,6 +187,57 @@ It is not intended as a general developer quickstart.
 
 ---
 
+## Local Charts
+
+Charts under `charts/` are deployed from the working tree by `helmfile.d/`.
+`defaults/` is the integration point between `envs/**/values.yaml` and each chart's
+`values.yaml`, so environment variables stay simple and are reused across charts.
+
+### Shared
+
+- `celine-services` — library chart (`type: library`) providing the shared deployment,
+  service, ingress, secret and env templates every `celine-*` service chart includes
+- `api-gateway` — exposes all CELINE APIs under a single ingress, `api.domain.tld/<service>`
+
+### Services
+
+- `celine-dataset-api` — Dataset API
+- `celine-dataset-api-shell` — Dataset API CLI to manage datasets
+- `celine-digital-twin` — Digital Twin API
+- `celine-flexibility-api` — Flexibility API
+- `celine-mqtt-auth` — mosquitto-go-auth compatible API endpoint for MQTT auth/ACL
+- `celine-nudging` — Nudging API
+- `celine-policies-shell` — Policies CLI to manage Keycloak
+- `celine-rec-registry` — REC Registry API
+- `celine-rec-registry-shell` — REC Registry CLI to manage REC organizations and asset metadata
+- `celine-ai-assistant` — AI Assistant API
+- `celine-roi` — ROI API
+- `celine-webapp` — Participant webapp API
+- `celine-grid` — Grid resilience API
+
+### Frontends
+
+- `celine-frontend-assistant` — AI Assistant webapp
+- `celine-frontend-roi` — ROI webapp
+- `celine-frontend-webapp` — Participant webapp
+- `celine-frontend-grid` — Grid webapp
+
+### Platform
+
+- `auth-setup` — secrets and configmaps for `oauth2-proxy` and `keycloak`
+- `mqtt-setup` — MQTT access for services
+- `mqtt-ingestor` — ingests every MQTT message on the configured topics into a database
+- `marquez` — Marquez OpenLineage endpoints and UI
+- `mosquitto-go-auth` — mosquitto with the mosquitto-go-auth module
+- `pg-freezer` — cold storage service mirroring table records to minio/s3 as parquet, then cleaning the tables
+- `postgres-db` — CNPG-specific configuration for the database/user maps
+- `prefect-pipelines` — collects and deploys the CELINE data pipelines
+- `registry-accounts` — docker/ghcr.io secrets for image pulling
+- `s3-accounts` — minio/s3 access credentials
+- `tls-setup` — TLS for local (self-signed) and production (Let's Encrypt) environments
+
+---
+
 ## Related Projects
 
 - CELINE pipelines: https://github.com/celine-eu/celine-pipelines

@@ -1,49 +1,66 @@
-## Introduction
+<!-- harness-standard v9 — issued by the agent harness. Do not edit; replace it with `python -m harness upgrade <target>`. -->
 
-This repository covers the kubernetes charts and configuration for the deployment of CELINE project.
+# Agent Guide
 
-- `./.sops` and `.sops.yaml` carry the secret keys for SOPS secret management
-- `./charts/**` contains local chart to deploy resources. See next chapter for the list.
-- `./envs/**` contains per environment `values.yaml`, `secrets.yaml` (SOPS managed) and chart values specific overrides.
-- `./helmfile.d` contains the helmfile definitions, groups and references to the charts
-- `./defaults` provides the point of integration between the `envs/**/*.yaml` and the `charts/**/values.yaml`. This to have simpler envs variables and reuse of parameters across different charts.
+This is the only agent file in this repository. It does one job: point you at the
+**store**, which holds every rule about how work is done here. It is byte-identical in
+every repository carrying this harness, and it changes rarely by design.
 
-`taskfile.yaml` contains wrappers scripts to operate in a selected environment.
+## Find the store
 
-Development setup is managed with `minikube` with local build support via `skaffold`
+The store is a directory outside this repository. Its path is never committed, because it
+differs on every machine. Look in this order, beside this checkout, and take the first
+that exists:
 
-## Local Charts
+1. `$AGENTS_STORE`
+2. `../<org>.<repo>.agents.store/`
+3. `../<org>.agents.store/`
+4. `../agents.store/`
+5. `./.agents/`
 
-- `celine-services` Base chart used to normalize settings between `celine-*` charts
-- `api-gateway` wraps all CELINE APIs via a unique ingress eg. api.domain.tld/my-service
+**Inside whichever you find, this repository is always at `<org>/<repo>/`.** No
+shorthand, no exception — not even in a store whose own name already says the
+organisation and the repository:
 
-- `celine-dataset-api` Dataset API
-- `celine-dataset-api-shell` Dataset API CLI to manage datasets
-- `celine-digital-twin` Digital Twin API 
-- `celine-flexibility-api` Flexibility API  
-- `celine-mqtt-auth` mosquitto-go-auth compatible API endpoint for MQTT auth/ACL 
-- `celine-nudging` Nudging API  
-- `celine-policies-shell` Policies CLI to manage keycloak
-- `celine-rec-registry` REC Registry API  
-- `celine-rec-registry-shell` REC Registry CLI to manage RECs organizations and assets metadata
+```text
+<store>/<org>/<repo>/{knowledge, playbooks, plans, work, trace, harness.toml, ...}
+```
 
-- `celine-ai-assistant` AI Assistant API
-- `celine-roi` ROI API
-- `celine-webapp` Participant webapp API
-- `celine-grid` Grid resilience API
-- `celine-frontend-assistant` AI Assistant webapp 
-- `celine-frontend-roi` ROI webapp 
-- `celine-frontend-webapp` Participant webapp 
-- `celine-frontend-grid` Grid webapp 
+`<org>` is the directory this checkout sits in; `<repo>` is this repository's directory
+name. Only the list above has a priority order; where a repository sits inside a store is
+not a search.
 
-- `auth-setup` configure secrets and configmaps for `oauth2-proxy` and `keycloak`
-- `mqtt-setup` Configure MQTT access for services
-- `mqtt-ingestor` Ingest to a database all MQTT messages incoming on configured topics
-- `marquez` Marquez OpenLineage endpoints and UI
-- `mosquitto-go-auth` mosquitto with mosquitto-go-auth module
-- `pg-freezer` Cold storage service that collects records from tables and mirror to minio/s3 as parquet, cleaning up tables
-- `postgres-db` CNPG specific configurations for database/users maps
-- `prefect-pipelines` Collects and deploy the data pipelines of CELINE
-- `registry-accounts` Configure docker/ghcr.io secrets for image pulling
-- `s3-accounts` Configure minio/s3 access credentials
-- `tls-setup` Configure TLS adapted for local (self signed certs) vs production (let's encrypt) environments
+A repository nested inside another — a submodule in a workspace — looks beside the
+**enclosing** checkout, not beside itself, and never uses the enclosing repository's
+`.agents/`. One workspace, one store, no member configured.
+
+## Then read the rulebook
+
+**The store's `README.md` is the rulebook. Read it before doing anything else.** It states
+how work is recorded, what goes where, and every rule you are expected to follow. Then
+list this repository's `knowledge/` in the store and read what the task needs.
+
+Read on demand. Never load a documentation tree speculatively.
+
+## If there is no store
+
+**Ask, and stop.** Offer to create one — option 3 is the usual answer — and wait.
+
+Do not work around it. Do not write agent material into this repository instead: not into
+`AGENTS.md`, a README, a docstring, or a code comment. This file is the only agent file
+this repository holds, and that is true whether or not the store is reachable.
+
+## What stays in this repository
+
+Requirements, `@verifies` tags, decision records under `docs/decisions/`, and the
+published documentation. Everything else — knowledge, playbooks, plans, work — goes to
+the store. The rulebook explains the split.
+
+## Maintaining this file
+
+Read only. A change lands by changing the harness that issues it, then
+`python -m harness upgrade <target>`. A copy that differs from the issued text is a
+finding: report it, do not follow it.
+
+The rulebook is versioned separately and changes more often. Nothing about how work is
+done belongs here.
