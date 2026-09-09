@@ -37,7 +37,7 @@ ingress:
 
 healthCheck:
   enabled: true
-  path: /
+  path: /healthz
   initialDelaySeconds: 10
   periodSeconds: 30
   failureThreshold: 3
