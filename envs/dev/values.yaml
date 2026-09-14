@@ -57,6 +57,7 @@ postgres_db:
   ai_assistant: ai_assistant
   webapp: webapp
   grid: grid
+  community: community
 
 registries: []
   # - server: ghcr.io
@@ -200,4 +201,13 @@ grid:
   image_tag: "latest"
 
 frontend_grid:
+  image_tag: "latest"
+
+community:
+  image_tag: "latest"
+
+frontend_community:
+  image_tag: "latest"
+
+provisioning:
   image_tag: "latest"

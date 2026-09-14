@@ -1,0 +1,27 @@
+image:
+  tag: {{ .Environment.Values | dig "community" "image_tag" "latest" | quote }}
+
+oidc:
+  service:
+    clientSecret: {{ .Environment.Values | dig "community" "client_secret" "svc-community" | quote }}
+
+extraEnv:
+  - name: ENVIRONMENT
+    value: "production"
+  - name: DEV_AUTH_ENABLED
+    value: "false"
+  - name: DIGITAL_TWIN_API_URL
+    value: "http://digital-twin:8002"
+  - name: REC_REGISTRY_URL
+    value: "http://rec-registry:8004"
+  - name: FLEXIBILITY_API_URL
+    value: "http://flexibility-api:8017"
+  - name: NUDGING_API_URL
+    value: "http://nudging:8016"
+  - name: CORS_ORIGINS
+    value: '["https://community.{{ .Values.domain }}"]'
+
+{{- with .Environment.Values | dig "community" "resources" nil }}
+resources:
+  {{- toYaml . | nindent 2 }}
+{{- end }}

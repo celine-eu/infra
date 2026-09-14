@@ -442,6 +442,13 @@ spec:
         - name: {{ include "celine-services.name" . }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default "latest" }}"
           imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
+          {{- /* Optional: for an image that ships more than one entrypoint (e.g. celine-provisioning) */}}
+          {{- with .Values.command }}
+          command: {{ toJson . }}
+          {{- end }}
+          {{- with .Values.args }}
+          args: {{ toJson . }}
+          {{- end }}
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:

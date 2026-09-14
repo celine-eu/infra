@@ -1,0 +1,55 @@
+## ----------------------------------------------------------------------------
+## celine-frontend-community — values.yaml
+## ----------------------------------------------------------------------------
+
+fullnameOverride: frontend-community
+
+image:
+  repository: ghcr.io/celine-eu/celine-frontend-community
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  port: 3007
+
+ingress:
+  enabled: true
+  domain: celine.test
+  host: "community.celine.test"
+  issuer: celine-tls
+
+  communityBackend:
+    service: community
+    port: 8019
+
+  auth:
+    enabled: true
+  tls:
+    enabled: true
+    secretName: ""
+  annotations: {}
+
+healthCheck:
+  enabled: true
+  path: /
+  initialDelaySeconds: 10
+  periodSeconds: 30
+  failureThreshold: 3
+
+extraEnv: []
+podAnnotations: {}
+podSecurityContext:
+  runAsUser: 1000
+resources:
+  requests:
+    cpu: 10m
+    memory: 256Mi
+  limits:
+    cpu: 100m
+    memory: 512Mi
+nodeSelector: {}
+tolerations: []
+affinity: {}

@@ -1,0 +1,147 @@
+## ----------------------------------------------------------------------------
+## celine-provisioning — values.yaml
+##
+## The only writer of participant accounts in the celine realm. It
+## authenticates to Keycloak as svc-provisioning, which holds manage-users +
+## manage-realm on the whole realm.
+##
+## That grant is acceptable only because nothing outside the cluster can reach
+## this service (ADR-0007 in celine-policies). Keep it ClusterIP: do NOT enable
+## an ingress and do NOT add it to charts/api-gateway.
+## ----------------------------------------------------------------------------
+
+fullnameOverride: provisioning
+
+image:
+  repository: ghcr.io/celine-eu/celine-policies
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+# The celine-policies image's CMD starts mqtt-auth; select the provisioning app.
+command:
+  - uvicorn
+  - celine.provisioning.main:create_app
+  - --factory
+  - --host
+  - 0.0.0.0
+  - --port
+  - "8010"
+
+replicaCount: 1
+
+# ClusterIP only — in-cluster callers (onboarding) only
+service:
+  type: ClusterIP
+  port: 8010
+
+# No public ingress, deliberately — see the header above
+ingress:
+  enabled: false
+  domain: celine.test
+  host: ""
+  issuer: celine-tls
+  auth:
+    enabled: false
+  tls:
+    enabled: false
+    secretName: ""
+  annotations: {}
+
+# --------------------------------------------------------------------------
+# OIDC  (CELINE_OIDC_* env vars) — verifies inbound provisioning.* tokens
+# --------------------------------------------------------------------------
+oidc:
+  baseUrl: "http://keycloak/realms/celine"
+  jwksUri: "http://keycloak/realms/celine/protocol/openid-connect/certs"
+  allowedAudiences: ""
+  includeClientIdAsAudience: true
+  timeout: 10.0
+  service:
+    clientId: "svc-provisioning"
+    audience: "svc-provisioning"
+    clientSecret: "svc-provisioning" # [secret]
+
+# --------------------------------------------------------------------------
+# Policy engine  (CELINE_POLICIES_* env vars)
+# --------------------------------------------------------------------------
+policies:
+  dir: "/app/policies"
+  dataDir: ""
+  cacheEnabled: true
+  cacheTtl: 300
+  cacheMaxsize: 10000
+
+# --------------------------------------------------------------------------
+# Keycloak admin (CELINE_KEYCLOAK_*) and registry (CELINE_PROVISIONING_*)
+# --------------------------------------------------------------------------
+extraEnv:
+  - name: CELINE_KEYCLOAK_BASE_URL
+    value: "http://keycloak"
+  - name: CELINE_KEYCLOAK_REALM
+    value: "celine"
+  - name: CELINE_KEYCLOAK_ADMIN_CLIENT_ID
+    value: "svc-provisioning"
+  - name: CELINE_KEYCLOAK_ADMIN_CLIENT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: provisioning-secrets
+        key: CELINE_OIDC_CLIENT_SECRET
+  - name: CELINE_PROVISIONING_REGISTRY_URL
+    value: "http://rec-registry:8004"
+  - name: CELINE_PROVISIONING_REGISTRY_CLIENT_ID
+    value: "svc-provisioning"
+  - name: CELINE_PROVISIONING_REGISTRY_CLIENT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: provisioning-secrets
+        key: CELINE_OIDC_CLIENT_SECRET
+
+extraSecrets: {}
+
+# --------------------------------------------------------------------------
+# Health check — liveness only, does not reach Keycloak
+# --------------------------------------------------------------------------
+healthCheck:
+  enabled: true
+  path: /health
+  initialDelaySeconds: 10
+  periodSeconds: 30
+  failureThreshold: 3
+
+# --------------------------------------------------------------------------
+# Misc
+# --------------------------------------------------------------------------
+logLevel: "INFO"
+
+volumeMounts: []
+volumes: []
+
+migrate:
+  enabled: false
+  command: []
+  extraEnv: []
+
+postgres:
+  existingSecret: ""
+  dsnEnvVar: "DATABASE_URL"
+  secretKey: "connection-string"
+
+s3:
+  endpointUrl: ""
+  region: "us-east-1"
+  existingSecret: ""
+
+podAnnotations: {}
+podSecurityContext:
+  runAsUser: 1000
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+nodeSelector: {}
+tolerations: []
+affinity: {}

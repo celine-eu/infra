@@ -1,0 +1,8 @@
+# defaults/0050-celine-services/celine-frontend-community/values.yaml.gotmpl
+
+image:
+  tag: {{ .Environment.Values | dig "frontend_community" "image_tag" "latest" | quote }}
+
+ingress:
+  host: community.{{ .Environment.Values.domain }}
+  domain: {{ .Environment.Values.domain }}

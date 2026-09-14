@@ -1,0 +1,35 @@
+# Internal only — no ingress, no api-gateway route. See charts/celine-provisioning/values.yaml.
+
+image:
+  tag: {{ .Environment.Values | dig "provisioning" "image_tag" "latest" | quote }}
+
+oidc:
+  service:
+    clientSecret: {{ .Environment.Values | dig "provisioning" "client_secret" "svc-provisioning" | quote }}
+
+extraEnv:
+  - name: CELINE_KEYCLOAK_BASE_URL
+    value: "https://keycloak.{{ .Values.domain }}"
+  - name: CELINE_KEYCLOAK_REALM
+    value: {{ .Environment.Values | dig "keycloak" "realm" "celine" | quote }}
+  - name: CELINE_KEYCLOAK_ADMIN_CLIENT_ID
+    value: "svc-provisioning"
+  - name: CELINE_KEYCLOAK_ADMIN_CLIENT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: provisioning-secrets
+        key: CELINE_OIDC_CLIENT_SECRET
+  - name: CELINE_PROVISIONING_REGISTRY_URL
+    value: "http://rec-registry:8004"
+  - name: CELINE_PROVISIONING_REGISTRY_CLIENT_ID
+    value: "svc-provisioning"
+  - name: CELINE_PROVISIONING_REGISTRY_CLIENT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: provisioning-secrets
+        key: CELINE_OIDC_CLIENT_SECRET
+
+{{- with .Environment.Values | dig "provisioning" "resources" nil }}
+resources:
+  {{- toYaml . | nindent 2 }}
+{{- end }}

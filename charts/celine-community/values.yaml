@@ -1,0 +1,124 @@
+## ----------------------------------------------------------------------------
+## celine-community — values.yaml
+##
+## FastAPI BFF for the REC Manager Dashboard.
+## Deployed behind oauth2-proxy; JWT arrives via X-Auth-Request-Access-Token.
+## ----------------------------------------------------------------------------
+
+fullnameOverride: community
+
+image:
+  repository: ghcr.io/celine-eu/celine-community
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  port: 8019
+
+# --------------------------------------------------------------------------
+# Ingress — disabled, accessed via celine-frontend-community ingress proxy
+# --------------------------------------------------------------------------
+ingress:
+  enabled: false
+  domain: celine.test
+  host: "community.celine.test"
+  issuer: celine-tls
+  auth:
+    enabled: true
+  tls:
+    enabled: true
+    secretName: ""
+  annotations: {}
+
+# --------------------------------------------------------------------------
+# OIDC — community verifies tokens and uses a service client for outbound calls
+# --------------------------------------------------------------------------
+oidc:
+  baseUrl: "http://keycloak/realms/celine"
+  jwksUri: "http://keycloak/realms/celine/protocol/openid-connect/certs"
+  allowedAudiences: ""
+  includeClientIdAsAudience: true
+  timeout: 10.0
+  service:
+    clientId: "svc-community"
+    audience: "svc-community"
+    clientSecret: "svc-community" # [secret]
+
+# --------------------------------------------------------------------------
+# Postgres — DSN injected from the connection-string Secret produced by
+# the postgres-db chart. Maps to DATABASE_URL env var.
+# --------------------------------------------------------------------------
+postgres:
+  existingSecret: "postgis1-community-connection-string"
+  dsnEnvVar: "DATABASE_URL"
+  secretKey: "connection-string"
+
+# --------------------------------------------------------------------------
+# Alembic migration init-container
+# --------------------------------------------------------------------------
+migrate:
+  enabled: true
+  command: ["alembic", "upgrade", "head"]
+  extraEnv: []
+
+# --------------------------------------------------------------------------
+# Health check
+# --------------------------------------------------------------------------
+healthCheck:
+  enabled: true
+  path: /health
+  initialDelaySeconds: 10
+  periodSeconds: 30
+  failureThreshold: 3
+
+# --------------------------------------------------------------------------
+# Policies — required by celine-services helpers
+# --------------------------------------------------------------------------
+policies:
+  dir: "/app/policies"
+  dataDir: ""
+  cacheEnabled: true
+  cacheTtl: 300
+  cacheMaxsize: 10000
+
+# --------------------------------------------------------------------------
+# Application-specific env vars
+# --------------------------------------------------------------------------
+extraEnv:
+  - name: ENVIRONMENT
+    value: "production"
+  - name: DEV_AUTH_ENABLED
+    value: "false"
+  - name: DIGITAL_TWIN_API_URL
+    value: "http://digital-twin:8002"
+  - name: REC_REGISTRY_URL
+    value: "http://rec-registry:8004"
+  - name: FLEXIBILITY_API_URL
+    value: "http://flexibility-api:8017"
+  - name: NUDGING_API_URL
+    value: "http://nudging:8016"
+
+extraSecrets: {}
+
+podAnnotations: {}
+podSecurityContext:
+  runAsUser: 1000
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+volumeMounts: []
+volumes: []
+
+logLevel: "INFO"

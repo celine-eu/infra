@@ -227,3 +227,37 @@ releases:
       - ../envs/{{ .Environment.Name }}/0050-frontends/celine-frontend-grid/values.yaml.gotmpl
     labels:
       group: celine-services
+
+  - name: provisioning
+    namespace: celine-{{ .Environment.Name }}
+    chart: ../charts/celine-provisioning
+    missingFileHandler: Warn
+    values:
+      - ../defaults/0050-celine-services/values.yaml.gotmpl
+      - ../defaults/0050-celine-services/celine-provisioning/values.yaml.gotmpl
+      - ../envs/{{ .Environment.Name }}/0050-celine-services/celine-provisioning/values.yaml.gotmpl
+    labels:
+      group: celine-services
+
+  - name: community
+    namespace: celine-{{ .Environment.Name }}
+    chart: ../charts/celine-community
+    createNamespace: true
+    missingFileHandler: Warn
+    values:
+      - ../defaults/0050-celine-services/values.yaml.gotmpl
+      - ../defaults/0050-celine-services/celine-community/values.yaml.gotmpl
+      - ../envs/{{ .Environment.Name }}/0050-celine-services/celine-community/values.yaml.gotmpl
+    labels:
+      group: celine-services
+
+  - name: frontend-community
+    namespace: celine-{{ .Environment.Name }}
+    chart: ../charts/celine-frontend-community
+    createNamespace: true
+    missingFileHandler: Warn
+    values:
+      - ../defaults/0050-celine-services/celine-frontend-community/values.yaml.gotmpl
+      - ../envs/{{ .Environment.Name }}/0050-frontends/celine-frontend-community/values.yaml.gotmpl
+    labels:
+      group: celine-services

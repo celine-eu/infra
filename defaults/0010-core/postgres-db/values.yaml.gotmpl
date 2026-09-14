@@ -45,6 +45,8 @@ roles:
     password: {{ .Environment.Values.postgres_db.grid | quote }}
   - name: roi
     password: {{ .Environment.Values.postgres_db.roi | quote }}
+  - name: community
+    password: {{ .Environment.Values.postgres_db.community | quote }}
 
 databases:
   - name: datasets
@@ -86,6 +88,8 @@ databases:
     owner: grid
   - name: roi
     owner: roi
+  - name: community
+    owner: community
 
 poolers:
   - type: rw
@@ -139,6 +143,9 @@ connection_strings:
     dialect: postgresql+asyncpg
 
   - database: roi
+    dialect: postgresql+asyncpg
+
+  - database: community
     dialect: postgresql+asyncpg
 
 
