@@ -2,6 +2,9 @@
 # See https://www.keycloak.org/server/all-config
 
 
+# Despite its name, `keycloak.theme.login` is the switch for the custom image
+# (ghcr.io/celine-eu/keycloak, which carries the `rec` themes) as a whole: unset, the
+# stock image runs and `keycloak.image_tag` is ignored.
 {{- if .Environment.Values | dig "keycloak" "theme" "login" "" }}
 image:
   repository: ghcr.io/celine-eu/keycloak

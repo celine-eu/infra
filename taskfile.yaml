@@ -450,7 +450,6 @@ tasks:
   #       CELINE_KEYCLOAK_REALM=celine \
   #       CELINE_KEYCLOAK_ADMIN_USER={{ .KEYCLOAK_ADMIN_USER | default "admin" }} \
   #       CELINE_KEYCLOAK_ADMIN_PASSWORD={{ .KEYCLOAK_ADMIN_PASSWORD | default "admin" }} \
-  #       CELINE_SYNC_USERS_GROUPS="/viewers" \
   #       cd {{.CLI_DIR}} && uv run celine-policies keycloak sync-users "$REC_YAML"
 
   # dev:sync-clients:
@@ -467,8 +466,28 @@ tasks:
   #       CELINE_KEYCLOAK_ADMIN_PASSWORD={{ .KEYCLOAK_ADMIN_PASSWORD | default "admin" }} \
   #       cd {{.CLI_DIR}} && uv run celine-policies keycloak sync clients.yaml
 
+  keycloak:bootstrap:check:*:
+    desc: "Report whether the realm's platform level matches celine-policies' platform.yaml (exits 1 on drift), via the policies-shell pod. Usage: task keycloak:bootstrap:check:dev"
+    vars:
+      DEPLOYMENT_ENV: "{{ index .MATCH 0 }}"
+    cmds:
+      - |
+        set -e
+        POD=$(kubectl get pod -n celine-{{ .DEPLOYMENT_ENV }} \
+          -l app.kubernetes.io/name=celine-policies-shell \
+          -o jsonpath='{.items[0].metadata.name}')
+        test -n "$POD" || { echo "No policies-shell pod found in celine-{{ .DEPLOYMENT_ENV }}"; exit 1; }
+        OVERLAY=""
+        if kubectl exec "$POD" -n celine-{{ .DEPLOYMENT_ENV }} -c shell -- test -f /etc/celine-policies-platform/platform.overlay.yaml 2>/dev/null; then
+          OVERLAY="--overlay /etc/celine-policies-platform/platform.overlay.yaml"
+        fi
+        kubectl exec "$POD" -n celine-{{ .DEPLOYMENT_ENV }} -c shell -- \
+          celine-policies keycloak bootstrap --check --secrets-file /tmp/.secrets.yaml $OVERLAY
+
+  # The realm must be bootstrapped and synced first, which the policies-shell pod's init
+  # containers and startup do: sync-users refuses otherwise and names the command to run.
   import:keycloak-users:*:
-    desc: "Import REC users into keycloak via the policies-shell pod. Usage: task import:keycloak-users:dev -- recs/my-rec.yaml"
+    desc: "Import REC users into keycloak via the policies-shell pod (needs the realm bootstrapped and synced). Usage: task import:keycloak-users:dev -- recs/my-rec.yaml"
     vars:
       DEPLOYMENT_ENV: "{{ index .MATCH 0 }}"
       FILE: "{{ .CLI_ARGS }}"

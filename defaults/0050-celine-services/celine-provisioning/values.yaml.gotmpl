@@ -1,4 +1,5 @@
 # Internal only — no ingress, no api-gateway route. See charts/celine-provisioning/values.yaml.
+{{- $emailDevRecipients := .Environment.Values | dig "provisioning" "email_dev_recipients" "" }}
 
 image:
   tag: {{ .Environment.Values | dig "provisioning" "image_tag" "latest" | quote }}
@@ -28,6 +29,27 @@ extraEnv:
       secretKeyRef:
         name: provisioning-secrets
         key: CELINE_OIDC_CLIENT_SECRET
+  # Invitations. Keycloak sends the email; this service only asks it to.
+  # "dev" sends only to EMAIL_DEV_RECIPIENTS (none: nothing is sent, a WARNING is
+  # logged). An environment that should email participants sets "deliver".
+  - name: CELINE_PROVISIONING_EMAIL_MODE
+    value: {{ .Environment.Values | dig "provisioning" "email_mode" "dev" | quote }}
+  - name: CELINE_PROVISIONING_INVITE_REDIRECT_URI
+    value: {{ .Environment.Values | dig "provisioning" "invite_redirect_uri" (printf "https://webapp.%s/" .Values.domain) | quote }}
+  # Must be the client the redirect URI is registered on: the realm's OAuth2 client.
+  - name: CELINE_PROVISIONING_INVITE_CLIENT_ID
+    value: {{ .Environment.Values | dig "auth_setup" "clientID" "oauth2_proxy" | quote }}
+{{- if $emailDevRecipients }}
+  - name: EMAIL_DEV_RECIPIENTS
+    valueFrom:
+      secretKeyRef:
+        name: provisioning-secrets
+        key: EMAIL_DEV_RECIPIENTS
+
+# Addresses are personal data: keep them out of the Deployment spec.
+extraSecrets:
+  EMAIL_DEV_RECIPIENTS: {{ $emailDevRecipients | quote }}
+{{- end }}
 
 {{- with .Environment.Values | dig "provisioning" "resources" nil }}
 resources:

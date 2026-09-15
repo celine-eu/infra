@@ -28,27 +28,42 @@ dashboard_items:
   #   host: prometheus
 
 
+# SMTP: the environment's shared `smtp` block, unless `keycloak.smtp.host` is set, in
+# which case `keycloak.smtp` is the provider as a whole (host, port, TLS, credentials:
+# never mixed across blocks). Sender fields fall back one by one: `keycloak.smtp`, then
+# `smtp`. Email is on when the chosen host is non-empty, unless
+# `keycloak.smtp.enabled` is explicitly false. Import only: reaches new realms, never a
+# running one.
+{{- $smtpShared := .Environment.Values | dig "smtp" (dict) | default (dict) }}
+{{- $smtpOwn := .Environment.Values | dig "keycloak" "smtp" (dict) | default (dict) }}
+{{- $smtp := $smtpShared }}
+{{- if $smtpOwn | dig "host" "" }}
+{{- $smtp = $smtpOwn }}
+{{- end }}
 smtp:
-  enabled: {{ .Environment.Values | dig "keycloak" "smtp" "enabled" false }}
-  host: {{ .Environment.Values | dig "keycloak" "smtp" "host" "" | quote }}
-  port: {{ .Environment.Values | dig "keycloak" "smtp" "port" 587 }}
-  from: {{ .Environment.Values | dig "keycloak" "smtp" "from" "noreply@celine.test" | quote }}
-  fromDisplayName: {{ .Environment.Values | dig "keycloak" "smtp" "fromDisplayName" "CELINE Platform" | quote }}
-  replyTo: {{ .Environment.Values | dig "keycloak" "smtp" "replyTo" "" | quote }}
-  ssl: {{ .Environment.Values | dig "keycloak" "smtp" "ssl" false }}
-  starttls: {{ .Environment.Values | dig "keycloak" "smtp" "starttls" true }}
-  auth: {{ .Environment.Values | dig "keycloak" "smtp" "auth" false }}
-  user: {{ .Environment.Values | dig "keycloak" "smtp" "user" "" | quote }}
-  password: {{ .Environment.Values | dig "keycloak" "smtp" "password" "" | quote }}
+  enabled: {{ and (ne ($smtp | dig "host" "" | toString) "") (.Environment.Values | dig "keycloak" "smtp" "enabled" true) }}
+  host: {{ $smtp | dig "host" "" | quote }}
+  port: {{ $smtp | dig "port" 587 }}
+  from: {{ $smtpOwn | dig "from" "" | default ($smtpShared | dig "from" "") | default "noreply@celine.test" | quote }}
+  fromDisplayName: {{ $smtpOwn | dig "fromDisplayName" "" | default ($smtpShared | dig "fromDisplayName" "") | default "CELINE Platform" | quote }}
+  replyTo: {{ $smtpOwn | dig "replyTo" "" | default ($smtpShared | dig "replyTo" "") | quote }}
+  ssl: {{ $smtp | dig "ssl" false }}
+  starttls: {{ $smtp | dig "starttls" true }}
+  auth: {{ $smtp | dig "auth" (ne ($smtp | dig "user" "" | toString) "") }}
+  user: {{ $smtp | dig "user" "" | quote }}
+  password: {{ $smtp | dig "password" "" | quote }}
 
 bruteForce:
   enabled: {{ .Environment.Values | dig "keycloak" "brute_force" "enabled" false }}
-  maxLoginFailures: {{ .Environment.Values | dig "keycloak" "brute_force" "maxLoginFailures" 5 }}
   waitIncrementSeconds: {{ .Environment.Values | dig "keycloak" "brute_force" "waitIncrementSeconds" 60 }}
   quickLoginCheckMilliSeconds: {{ .Environment.Values | dig "keycloak" "brute_force" "quickLoginCheckMilliSeconds" 1000 }}
   minimumQuickLoginWaitSeconds: {{ .Environment.Values | dig "keycloak" "brute_force" "minimumQuickLoginWaitSeconds" 60 }}
   maxFailureWaitSeconds: {{ .Environment.Values | dig "keycloak" "brute_force" "maxFailureWaitSeconds" 900 }}
-  failureFactor: {{ .Environment.Values | dig "keycloak" "brute_force" "failureFactor" 50 }}
+  # Keycloak's "max login failures" is `failureFactor`; no realm has a `maxLoginFailures`, and an
+  # import naming one stops Keycloak from starting (measured on 26.7.3). An environment that set
+  # `keycloak.brute_force.maxLoginFailures` meant this value, so it is read as the fallback. The
+  # default, 5, is celine-policies' platform.yaml, which `bootstrap` applies to every realm.
+  failureFactor: {{ .Environment.Values | dig "keycloak" "brute_force" "failureFactor" (.Environment.Values | dig "keycloak" "brute_force" "maxLoginFailures" 5) }}
   permanentLockout: {{ .Environment.Values | dig "keycloak" "brute_force" "permanentLockout" false }}  
 
 {{- $adminMfa := .Environment.Values | dig "keycloak" "admin_mfa" (dict) }}

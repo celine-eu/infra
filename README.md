@@ -135,6 +135,77 @@ Plaintext secrets must never be committed.
 
 ---
 
+## Email (SMTP)
+
+Services that send email read one shared `smtp` block from the environment's values and
+secrets:
+
+```yaml
+smtp:
+  host: ""            # empty: no email
+  port: 587
+  ssl: false
+  starttls: true
+  auth: true          # defaults to true when `user` is set
+  user: ""            # keep in secrets
+  password: ""        # keep in secrets
+  from: ""
+  fromDisplayName: ""
+  replyTo: ""
+```
+
+A service can use a different provider through its own block, `keycloak.smtp` or
+`superset.smtp`:
+
+- **Provider settings** (`host`, `port`, `ssl`, `starttls`, `auth`, `user`, `password`)
+  are taken as a whole. The service's own block is used when its `host` is set.
+  Otherwise the shared block is used. Values are never mixed across blocks.
+- **Sender settings** fall back one at a time. Each field comes from the service's own
+  block when set there, and otherwise from the shared block. The Keycloak fields are
+  `from`, `fromDisplayName` and `replyTo`. Superset's is `superset.smtp.mailFrom`, which
+  falls back to `smtp.from`.
+- Keycloak email is off when `keycloak.smtp.enabled` is `false`, even if a host resolves.
+- Superset's image always uses STARTTLS, so it ignores `ssl` and `starttls`.
+
+The Keycloak realm import applies SMTP to a **new** realm only. An existing realm is not
+changed by the import.
+
+The provisioning service does not send email itself: it asks Keycloak to. Its
+`provisioning.email_mode` defaults to `dev`, which emails nobody except the addresses in
+`provisioning.email_dev_recipients`. Set `deliver` only in an environment that should
+email participants.
+
+---
+
+## Keycloak realm bootstrap
+
+The realm's platform level (Organizations, sign-in settings, languages, themes, lifespans,
+brute force, `smtpServer`, the realm role groups) is written by `celine-policies keycloak
+bootstrap`, never by the realm import. It runs in the `policies-shell` pod's init containers:
+plan (with a realm export first), apply, then a check that must find nothing left to change.
+Only then does the shell run `keycloak sync`. `sync-orgs` and `sync-users` refuse a realm that
+has not been through both.
+
+The run's export, plan, apply and check output is stored under
+`<bucket>/<environment>/<UTC time>-<policies_shell.image_tag>/`. Pin `policies_shell.image_tag`
+to a release: the tag is the version of `platform.yaml`.
+
+| Value | Effect |
+|---|---|
+| `policies_shell.bootstrap.bucket`, `policies_shell.bootstrap.s3_secret` | where the run is stored; a Secret with `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_ENDPOINT_URL`. Unset: logs only |
+| `policies_shell.bootstrap.allow_destructive` | passes `--allow-destructive`, for a plan that turns a setting off or removes a list entry. Set for one release only |
+| `keycloak.brute_force.enabled` | `CELINE_KEYCLOAK_BRUTE_FORCE_ENABLED`, only when set. Unset: brute-force protection is **on**. The realm import reads `keycloak.brute_force.failureFactor` (max login failures, default 5); there is no `maxLoginFailures` in Keycloak, and an import naming one stops Keycloak from starting |
+| `keycloak.platform` | an overlay on `platform.yaml`: `realm_settings.supportedLocales` only |
+| the resolved `smtp` block (see [Email (SMTP)](#email-smtp)) | `CELINE_KEYCLOAK_SMTP_*`; user and password through a Secret |
+| `auth_setup.realmAdminUser`, `realmAdminEmail`, `realmAdminPassword` | `CELINE_KEYCLOAK_REALM_ADMIN_*`: the operator realm admin, created once (password through a Secret) and kept in `/admins` |
+| `auth_setup.clientSecret`, `domain` | `OAUTH2_PROXY_CLIENT_SECRET`, `CELINE_DOMAIN`: `sync` owns the `oauth2_proxy` client, its secret and its redirect URIs (`sso`, `superset`, `webapp`, `assistant` on the domain) |
+
+`task keycloak:bootstrap:check:<env>` reports drift (exit 1). Do not run `bootstrap` by hand while
+the pod is starting. Rolling back is manual: put the platform-level keys back from the stored
+`export.json`, then pin the previous image tag so the next start does not re-apply.
+
+---
+
 ## Applying Infrastructure (Helmfile)
 
 From the `infra/` directory:
@@ -207,7 +278,10 @@ Charts under `charts/` are deployed from the working tree by `helmfile.d/`.
 - `celine-flexibility-api` — Flexibility API
 - `celine-mqtt-auth` — mosquitto-go-auth compatible API endpoint for MQTT auth/ACL
 - `celine-nudging` — Nudging API
-- `celine-policies-shell` — Policies CLI to manage Keycloak
+- `celine-policies-shell` — Policies CLI to manage Keycloak. On every start, init containers run
+  `keycloak bootstrap` (the realm's platform level, from `platform.yaml` in the image) and store the
+  run, then the shell runs `keycloak sync`; a failure of either fails the pod. See
+  [Keycloak realm bootstrap](#keycloak-realm-bootstrap)
 - `celine-rec-registry` — REC Registry API
 - `celine-rec-registry-shell` — REC Registry CLI to manage REC organizations and asset metadata
 - `celine-ai-assistant` — AI Assistant API

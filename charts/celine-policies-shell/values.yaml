@@ -13,9 +13,12 @@
 ##   kubectl exec -it <pod> -- \
 ##     .venv/bin/celine-policies keycloak sync /tmp/clients.yaml
 ##
-##   # Or use the bootstrap command (requires admin user/password)
-##   kubectl exec -it <pod> -- \
-##     .venv/bin/celine-policies keycloak bootstrap /tmp/clients.yaml
+##   # Is the realm's platform level what platform.yaml declares? (exits 1 on drift)
+##   kubectl exec -it <pod> -- celine-policies keycloak bootstrap --check
+##
+## On every start, two init containers run `keycloak bootstrap` (plan, apply, check) before
+## the shell's `sync`, and store the run (see `bootstrap` below). A failed bootstrap or sync
+## fails the pod. Do not run `bootstrap` by hand while a pod is starting.
 ## ----------------------------------------------------------------------------
 
 image:
@@ -48,6 +51,53 @@ keycloak:
   existingSecret: "keycloak-admin-credentials"
   adminPasswordKey: "admin-password"
   adminClientSecretKey: "" # optional; only if using client-credentials flow
+
+# --------------------------------------------------------------------------
+# keycloak bootstrap: the realm's platform level, before `sync`
+# --------------------------------------------------------------------------
+bootstrap:
+  enabled: true
+  # Passed as --allow-destructive: a plan that turns a setting off or removes a list entry
+  # is refused without it. Set for one release, then unset.
+  allowDestructive: false
+  # CELINE_KEYCLOAK_BRUTE_FORCE_ENABLED. Empty: not set, and bootstrap turns brute force on.
+  bruteForceEnabled: ""
+  waitRetries: 20
+  waitDelaySeconds: 15
+  # An overlay on platform.yaml (realm_settings.supportedLocales only). Empty: none.
+  overlay: {}
+  # CELINE_KEYCLOAK_SMTP_*. Empty host: smtpServer is left alone. user and password go
+  # into a Secret, never into the pod spec.
+  smtp:
+    host: ""
+    port: 587
+    from: ""
+    fromDisplayName: ""
+    replyTo: ""
+    ssl: false
+    starttls: false
+    auth: false
+    user: ""
+    password: ""
+  # CELINE_KEYCLOAK_REALM_ADMIN_*: the operator realm admin, created once (it needs the
+  # password then) and kept in /admins. Empty username: none is managed. The password goes
+  # into a Secret, and is never re-sent to an existing account.
+  realmAdmin:
+    username: ""
+    email: ""
+    firstName: ""
+    lastName: ""
+    password: ""
+  # Where each run's export, plan, apply and check output is stored.
+  record:
+    image: "curlimages/curl:8.21.0"
+    # Empty: nothing is stored, and the run is in the init containers' logs only.
+    bucket: ""
+    # A Secret with S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY and S3_ENDPOINT_URL.
+    s3Secret: ""
+    region: us-east-1
+    # The first path segment. Default: the release namespace.
+    environment: ""
 
 # --------------------------------------------------------------------------
 # Extra environment variables (plain value or secretKeyRef)

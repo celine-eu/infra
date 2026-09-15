@@ -98,6 +98,8 @@ keycloak:
   # theme: "celine"
   # image_tag: 26.04.0-1.0.0
   admin_mfa: false
+  # Keycloak's own SMTP block. The shared top-level `smtp` block is the default
+  # provider; this block overrides it only when `host` is set. See README "Email (SMTP)".
   smtp:
     enabled: false
     host: ""

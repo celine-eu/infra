@@ -1,0 +1,13 @@
+{{- if and .Values.bootstrap.enabled .Values.bootstrap.overlay }}
+# A deployment's overlay on celine-policies' platform.yaml. `bootstrap` accepts
+# `realm_settings.supportedLocales` only and refuses anything else, so nothing is filtered here.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "celine-policies-shell.fullname" . }}-platform-overlay
+  labels:
+    {{- include "celine-policies-shell.labels" . | nindent 4 }}
+data:
+  platform.overlay.yaml: |
+    {{- toYaml .Values.bootstrap.overlay | nindent 4 }}
+{{- end }}

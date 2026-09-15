@@ -32,12 +32,13 @@ admin_mfa:
 
 brute_force:
   enabled: false
-  maxLoginFailures: 5
+  # Keycloak's "max login failures". There is no `maxLoginFailures` realm field: Keycloak
+  # 26.7.3 refuses to start on an import that names one.
+  failureFactor: 5
   waitIncrementSeconds: 60
   quickLoginCheckMilliSeconds: 1000
   minimumQuickLoginWaitSeconds: 60
   maxFailureWaitSeconds: 900
-  failureFactor: 50
   permanentLockout: false
 
 oauth2Proxy:

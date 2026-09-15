@@ -6,6 +6,11 @@ metadata:
     {{- include "celine-policies-shell.labels" . | nindent 4 }}
 spec:
   replicas: 1
+  # Recreate, not RollingUpdate: the old pod stops before the new pod's init containers
+  # start, so two `bootstrap` runs never write the realm at once (plan
+  # the-realm-is-bootstrapped-before-anything-syncs-it, decision 2's lock).
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       {{- include "celine-policies-shell.selectorLabels" . | nindent 6 }}
@@ -24,6 +29,186 @@ spec:
       {{- end }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if .Values.bootstrap.enabled }}
+      # The platform level first (celine-policies `keycloak bootstrap`, platform.yaml), then
+      # the shell's own `sync`: a realm is never synced before it is bootstrapped. The first
+      # container records every step and never fails; the second stores the record and exits
+      # with the first failure, so a failed run is both stored and blocking.
+      initContainers:
+        - name: bootstrap
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              D=/run/bootstrap
+              OVERLAY=""
+              if [ -f /etc/celine-policies-platform/platform.overlay.yaml ]; then
+                OVERLAY="--overlay /etc/celine-policies-platform/platform.overlay.yaml"
+              fi
+              ALLOW="{{ if .Values.bootstrap.allowDestructive }}--allow-destructive{{ end }}"
+              BOOTSTRAP="celine-policies keycloak bootstrap $OVERLAY --secrets-file /tmp/.secrets.yaml"
+              rc=0
+
+              i=0
+              until python -c "import httpx, os; httpx.get(os.environ['CELINE_KEYCLOAK_BASE_URL'].rstrip('/') + '/realms/master/.well-known/openid-configuration', timeout=10).raise_for_status()" 2>/dev/null; do
+                i=$((i + 1))
+                if [ "$i" -ge {{ .Values.bootstrap.waitRetries }} ]; then
+                  echo "bootstrap: Keycloak not reachable after {{ .Values.bootstrap.waitRetries }} attempts" | tee $D/plan.txt
+                  rc=1
+                  break
+                fi
+                echo "Keycloak not ready, retrying in {{ .Values.bootstrap.waitDelaySeconds }}s ($i/{{ .Values.bootstrap.waitRetries }})..."
+                sleep {{ .Values.bootstrap.waitDelaySeconds }}
+              done
+
+              # 1. plan, with the export written before anything else runs
+              if [ "$rc" -eq 0 ]; then
+                $BOOTSTRAP --export $D/export.json --dry-run > $D/plan.txt 2>&1 || rc=$?
+                cat $D/plan.txt
+              fi
+              # 2. apply
+              if [ "$rc" -eq 0 ]; then
+                $BOOTSTRAP $ALLOW > $D/apply.txt 2>&1 || rc=$?
+                cat $D/apply.txt
+              fi
+              # 3. the self-check: anything left to change means a setting did not stick
+              if [ "$rc" -eq 0 ]; then
+                $BOOTSTRAP --check > $D/check.txt 2>&1 || rc=$?
+                cat $D/check.txt
+              fi
+              echo "$rc" > $D/rc
+              exit 0
+          env:
+            {{- include "celine-policies-shell.keycloakEnv" . | nindent 12 }}
+            {{- with .Values.bootstrap.bruteForceEnabled | toString }}
+            - name: CELINE_KEYCLOAK_BRUTE_FORCE_ENABLED
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.bootstrap.smtp }}
+            {{- if .host }}
+            - name: CELINE_KEYCLOAK_SMTP_HOST
+              value: {{ .host | quote }}
+            - name: CELINE_KEYCLOAK_SMTP_PORT
+              value: {{ .port | toString | quote }}
+            - name: CELINE_KEYCLOAK_SMTP_FROM
+              value: {{ .from | quote }}
+            - name: CELINE_KEYCLOAK_SMTP_FROM_DISPLAY_NAME
+              value: {{ .fromDisplayName | quote }}
+            - name: CELINE_KEYCLOAK_SMTP_REPLY_TO
+              value: {{ .replyTo | quote }}
+            - name: CELINE_KEYCLOAK_SMTP_SSL
+              value: {{ .ssl | toString | quote }}
+            - name: CELINE_KEYCLOAK_SMTP_STARTTLS
+              value: {{ .starttls | toString | quote }}
+            - name: CELINE_KEYCLOAK_SMTP_AUTH
+              value: {{ .auth | toString | quote }}
+            {{- if .auth }}
+            - name: CELINE_KEYCLOAK_SMTP_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "celine-policies-shell.fullname" $ }}-bootstrap-smtp
+                  key: user
+            - name: CELINE_KEYCLOAK_SMTP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "celine-policies-shell.fullname" $ }}-bootstrap-smtp
+                  key: password
+            {{- end }}
+            {{- end }}
+            {{- end }}
+            {{- with .Values.bootstrap.realmAdmin }}
+            {{- if .username }}
+            # The operator realm admin bootstrap creates once and keeps in its group.
+            - name: CELINE_KEYCLOAK_REALM_ADMIN_USERNAME
+              value: {{ .username | quote }}
+            - name: CELINE_KEYCLOAK_REALM_ADMIN_EMAIL
+              value: {{ .email | quote }}
+            {{- if .firstName }}
+            - name: CELINE_KEYCLOAK_REALM_ADMIN_FIRST_NAME
+              value: {{ .firstName | quote }}
+            {{- end }}
+            {{- if .lastName }}
+            - name: CELINE_KEYCLOAK_REALM_ADMIN_LAST_NAME
+              value: {{ .lastName | quote }}
+            {{- end }}
+            {{- if .password }}
+            - name: CELINE_KEYCLOAK_REALM_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "celine-policies-shell.fullname" $ }}-bootstrap-realm-admin
+                  key: password
+            {{- end }}
+            {{- end }}
+            {{- end }}
+            {{- include "celine-policies-shell.caEnv" . | nindent 12 }}
+          volumeMounts:
+            - name: bootstrap-record
+              mountPath: /run/bootstrap
+            {{- if .Values.bootstrap.overlay }}
+            - name: platform-overlay
+              mountPath: /etc/celine-policies-platform
+              readOnly: true
+            {{- end }}
+            {{- with .Values.volumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+        - name: bootstrap-record
+          image: {{ .Values.bootstrap.record.image | quote }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              D=/run/bootstrap
+              rc=$(cat $D/rc 2>/dev/null || echo 1)
+              if [ -z "$BUCKET" ]; then
+                echo "bootstrap-record: no bucket configured, the run is in this pod's logs only"
+                exit "$rc"
+              fi
+              PREFIX="$ENVIRONMENT/$(date -u +%Y%m%dT%H%M%SZ)-$IMAGE_TAG"
+              for f in export.json plan.txt apply.txt check.txt; do
+                [ -f "$D/$f" ] || continue
+                if curl -fsS --aws-sigv4 "aws:amz:$REGION:s3" --user "$S3_ACCESS_KEY_ID:$S3_SECRET_ACCESS_KEY" \
+                    -T "$D/$f" "${S3_ENDPOINT_URL%/}/$BUCKET/$PREFIX/$f"; then
+                  echo "stored $BUCKET/$PREFIX/$f"
+                else
+                  echo "bootstrap-record: could not store $f"
+                  [ "$rc" -eq 0 ] && rc=1
+                fi
+              done
+              exit "$rc"
+          env:
+            - name: BUCKET
+              value: {{ .Values.bootstrap.record.bucket | quote }}
+            - name: ENVIRONMENT
+              value: {{ .Values.bootstrap.record.environment | default .Release.Namespace | quote }}
+            - name: IMAGE_TAG
+              value: {{ .Values.image.tag | quote }}
+            - name: REGION
+              value: {{ .Values.bootstrap.record.region | quote }}
+            {{- if .Values.bootstrap.record.bucket }}
+            {{- range list "S3_ACCESS_KEY_ID" "S3_SECRET_ACCESS_KEY" "S3_ENDPOINT_URL" }}
+            - name: {{ . }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.bootstrap.record.s3Secret | quote }}
+                  key: {{ . }}
+            {{- end }}
+            {{- end }}
+          volumeMounts:
+            - name: bootstrap-record
+              mountPath: /run/bootstrap
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+      {{- end }}
       containers:
         - name: shell
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -43,8 +228,10 @@ spec:
               until celine-policies keycloak sync --secrets-file "$SECRET_FILE" "$CLIENTS_FILE"; do
                 i=$((i + 1))
                 if [ "$i" -ge "$MAX_RETRIES" ]; then
+                  # Fail the pod: a shell that idles after a sync that never ran looks
+                  # healthy, and sync-users then refuses for missing claim scopes.
                   echo "ERROR: keycloak sync failed after $MAX_RETRIES attempts, giving up"
-                  break
+                  exit 1
                 fi
                 echo "Keycloak not ready, retrying in ${RETRY_DELAY}s ($i/$MAX_RETRIES)..."
                 sleep $RETRY_DELAY
@@ -52,33 +239,7 @@ spec:
               echo "celine-policies shell ready"
               tail -f /dev/null
           env:
-            # ----------------------------------------------------------------
-            # Keycloak connection  (CELINE_KEYCLOAK_* → KeycloakSettings)
-            # ----------------------------------------------------------------
-            - name: CELINE_KEYCLOAK_BASE_URL
-              value: {{ .Values.keycloak.baseUrl | quote }}
-            - name: CELINE_KEYCLOAK_REALM
-              value: {{ .Values.keycloak.realm | quote }}
-            {{- if .Values.keycloak.adminUser }}
-            - name: CELINE_KEYCLOAK_ADMIN_USER
-              value: {{ .Values.keycloak.adminUser | quote }}
-            {{- end }}
-            {{- if .Values.keycloak.existingSecret }}
-            {{- if .Values.keycloak.adminPasswordKey }}
-            - name: CELINE_KEYCLOAK_ADMIN_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.keycloak.existingSecret }}
-                  key: {{ .Values.keycloak.adminPasswordKey }}
-            {{- end }}
-            {{- if .Values.keycloak.adminClientSecretKey }}
-            - name: CELINE_KEYCLOAK_ADMIN_CLIENT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.keycloak.existingSecret }}
-                  key: {{ .Values.keycloak.adminClientSecretKey }}
-            {{- end }}
-            {{- end }}
+            {{- include "celine-policies-shell.keycloakEnv" . | nindent 12 }}
             # ----------------------------------------------------------------
             # Extra env vars (for ad-hoc use)
             # ----------------------------------------------------------------
@@ -99,9 +260,23 @@ spec:
           {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-      {{- with .Values.volumes }}
+      {{- if or .Values.volumes .Values.bootstrap.enabled }}
       volumes:
+        {{- with .Values.volumes }}
         {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- if .Values.bootstrap.enabled }}
+        - name: bootstrap-record
+          emptyDir: {}
+        {{- if .Values.bootstrap.overlay }}
+        - name: platform-overlay
+          configMap:
+            name: {{ include "celine-policies-shell.fullname" . }}-platform-overlay
+            items:
+              - key: platform.overlay.yaml
+                path: platform.overlay.yaml
+        {{- end }}
+        {{- end }}
       {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:

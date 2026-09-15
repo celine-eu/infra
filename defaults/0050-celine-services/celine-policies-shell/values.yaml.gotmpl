@@ -44,8 +44,25 @@ extraEnv:
     value: {{ .Environment.Values | dig "community" "client_secret" "svc-community" | quote }}
   - name: SVC_PROVISIONING_SECRET
     value: {{ .Environment.Values | dig "provisioning" "client_secret" "svc-provisioning" | quote }}
+  - name: SVC_GRID_SECRET
+    value: {{ .Environment.Values | dig "grid" "client_secret" "svc-grid" | quote }}
+  - name: SVC_FORECAST_SECRET
+    value: {{ .Environment.Values | dig "forecasting" "client_secret" "svc-forecast" | quote }}
+  # Onboarding has no release yet; its clients still exist on the realm.
+  - name: SVC_ONBOARDING_SECRET
+    value: {{ .Environment.Values | dig "onboarding" "client_secret" "svc-onboarding" | quote }}
+  - name: SVC_ONBOARDING_CLI_SECRET
+    value: {{ .Environment.Values | dig "onboarding" "cli_client_secret" "svc-onboarding-cli" | quote }}
   - name: CELINE_ADMIN_CLI_SECRET
     value: {{ .Environment.Values | dig "auth_setup" "clientCLISecret" "celine-cli" | quote }}
+  # oauth2_proxy is declared in celine-policies' clients.yaml since 2026-09-14: `sync` sets its
+  # secret (the one oauth2-proxy is configured with) and its redirect URIs on this domain.
+  - name: OAUTH2_PROXY_CLIENT_SECRET
+    value: {{ .Environment.Values | dig "auth_setup" "clientSecret" "oauth2_proxy" | quote }}
+  - name: CELINE_DOMAIN
+    value: {{ .Values.domain | quote }}
+  - name: CELINE_URL_SCHEME
+    value: "https"
 
 {{- if .Values.tls_setup.self_signed }}
   - name: SSL_CERT_FILE
@@ -68,3 +85,50 @@ volumes:
         - key: ca.crt
           path: ca.crt
 {{- end }}
+# ---------------------------------------------------------------------------
+# keycloak bootstrap: the realm's platform level, run by the shell's init containers before
+# its sync (plan the-realm-is-bootstrapped-before-anything-syncs-it). Every key read with dig.
+# ---------------------------------------------------------------------------
+# SMTP: the same resolution as defaults/0020-auth/auth-setup (the shared `smtp` block, unless
+# `keycloak.smtp.host` is set; sender fields fall back one by one; off when
+# `keycloak.smtp.enabled` is false), so the realm import and bootstrap never disagree.
+{{- $smtpShared := .Environment.Values | dig "smtp" (dict) | default (dict) }}
+{{- $smtpOwn := .Environment.Values | dig "keycloak" "smtp" (dict) | default (dict) }}
+{{- $smtp := $smtpShared }}
+{{- if $smtpOwn | dig "host" "" }}
+{{- $smtp = $smtpOwn }}
+{{- end }}
+{{- $smtpOn := and (ne ($smtp | dig "host" "" | toString) "") (.Environment.Values | dig "keycloak" "smtp" "enabled" true) }}
+{{- $bruteForce := .Environment.Values | dig "keycloak" "brute_force" (dict) | default (dict) }}
+bootstrap:
+  allowDestructive: {{ .Environment.Values | dig "policies_shell" "bootstrap" "allow_destructive" false }}
+  # Rendered only when the environment says so: unset, bootstrap turns brute force on.
+  bruteForceEnabled: {{ if hasKey $bruteForce "enabled" }}{{ $bruteForce.enabled | toString | quote }}{{ else }}""{{ end }}
+  overlay:
+    {{- with .Environment.Values | dig "keycloak" "platform" (dict) }}
+    {{- toYaml . | nindent 4 }}
+    {{- else }} {}
+    {{- end }}
+  smtp:
+    host: {{ if $smtpOn }}{{ $smtp | dig "host" "" | quote }}{{ else }}""{{ end }}
+    port: {{ $smtp | dig "port" 587 }}
+    from: {{ $smtpOwn | dig "from" "" | default ($smtpShared | dig "from" "") | quote }}
+    fromDisplayName: {{ $smtpOwn | dig "fromDisplayName" "" | default ($smtpShared | dig "fromDisplayName" "") | quote }}
+    replyTo: {{ $smtpOwn | dig "replyTo" "" | default ($smtpShared | dig "replyTo" "") | quote }}
+    ssl: {{ $smtp | dig "ssl" false }}
+    starttls: {{ $smtp | dig "starttls" true }}
+    auth: {{ $smtp | dig "auth" (ne ($smtp | dig "user" "" | toString) "") }}
+    user: {{ $smtp | dig "user" "" | quote }}
+    password: {{ $smtp | dig "password" "" | quote }}
+  # The operator realm admin the realm import has always created (auth_setup.realmAdmin*),
+  # now created by bootstrap, so a realm without the import has one too.
+  realmAdmin:
+    username: {{ .Environment.Values | dig "auth_setup" "realmAdminUser" "celine-admin" | quote }}
+    email: {{ .Environment.Values | dig "auth_setup" "realmAdminEmail" "admin@celine.test" | quote }}
+    firstName: "Celine"
+    lastName: "Admin"
+    password: {{ .Environment.Values | dig "auth_setup" "realmAdminPassword" "celine-admin" | quote }}
+  record:
+    bucket: {{ .Environment.Values | dig "policies_shell" "bootstrap" "bucket" "" | quote }}
+    s3Secret: {{ .Environment.Values | dig "policies_shell" "bootstrap" "s3_secret" "" | quote }}
+    environment: {{ .Environment.Name | quote }}
