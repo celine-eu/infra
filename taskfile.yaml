@@ -42,6 +42,11 @@ tasks:
     cmds:
       - minikube delete
 
+  test:auth-setup:
+    desc: "Render the auth-setup realm for every admin_mfa form and check it (KEYCLOAK_URL: also import into that throwaway Keycloak)"
+    cmds:
+      - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/auth-setup -v {{.CLI_ARGS}}
+
   set-context:
     desc: Set kubectl default namespace to celine
     cmds:

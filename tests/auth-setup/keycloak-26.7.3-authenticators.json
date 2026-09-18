@@ -1,0 +1,135 @@
+{
+ "allow-access-authenticator": [],
+ "auth-conditional-otp-form": [
+  "defaultOtpOutcome",
+  "forceOtpForHeaderPattern",
+  "forceOtpRole",
+  "noOtpRequiredForHeaderPattern",
+  "otpControlAttribute",
+  "skipOtpRole"
+ ],
+ "auth-cookie": [],
+ "auth-otp-form": [],
+ "auth-password-form": [],
+ "auth-recovery-authn-code-form": [],
+ "auth-spnego": [],
+ "auth-username-form": [],
+ "auth-username-password-form": [],
+ "auth-x509-client-username-form": [
+  "x509-cert-auth-crl-abort-if-non-updated",
+  "x509-cert-auth.canonical-dn-enabled",
+  "x509-cert-auth.certificate-policy",
+  "x509-cert-auth.certificate-policy-mode",
+  "x509-cert-auth.confirmation-page-disallowed",
+  "x509-cert-auth.crl-checking-enabled",
+  "x509-cert-auth.crl-relative-path",
+  "x509-cert-auth.crldp-checking-enabled",
+  "x509-cert-auth.extendedkeyusage",
+  "x509-cert-auth.keyusage",
+  "x509-cert-auth.mapper-selection",
+  "x509-cert-auth.mapper-selection.user-attribute-name",
+  "x509-cert-auth.mapping-source-selection",
+  "x509-cert-auth.ocsp-checking-enabled",
+  "x509-cert-auth.ocsp-fail-open",
+  "x509-cert-auth.ocsp-responder-certificate",
+  "x509-cert-auth.ocsp-responder-uri",
+  "x509-cert-auth.regular-expression",
+  "x509-cert-auth.revalidate-certificate-enabled",
+  "x509-cert-auth.serialnumber-hex-enabled",
+  "x509-cert-auth.timestamp-validation-enabled"
+ ],
+ "conditional-client-scope": [
+  "client_scope",
+  "negate"
+ ],
+ "conditional-credential": [
+  "credentials",
+  "included"
+ ],
+ "conditional-level-of-authentication": [
+  "loa-condition-level",
+  "loa-max-age"
+ ],
+ "conditional-sub-flow-executed": [
+  "check_result",
+  "flow_to_check"
+ ],
+ "conditional-user-attribute": [
+  "attribute_expected_value",
+  "attribute_name",
+  "include_group_attributes",
+  "not",
+  "regex"
+ ],
+ "conditional-user-configured": [],
+ "conditional-user-role": [
+  "condUserRole",
+  "negate"
+ ],
+ "deny-access-authenticator": [
+  "denyErrorMessage"
+ ],
+ "direct-grant-auth-x509-username": [
+  "x509-cert-auth-crl-abort-if-non-updated",
+  "x509-cert-auth.canonical-dn-enabled",
+  "x509-cert-auth.certificate-policy",
+  "x509-cert-auth.certificate-policy-mode",
+  "x509-cert-auth.confirmation-page-disallowed",
+  "x509-cert-auth.crl-checking-enabled",
+  "x509-cert-auth.crl-relative-path",
+  "x509-cert-auth.crldp-checking-enabled",
+  "x509-cert-auth.extendedkeyusage",
+  "x509-cert-auth.keyusage",
+  "x509-cert-auth.mapper-selection",
+  "x509-cert-auth.mapper-selection.user-attribute-name",
+  "x509-cert-auth.mapping-source-selection",
+  "x509-cert-auth.ocsp-checking-enabled",
+  "x509-cert-auth.ocsp-fail-open",
+  "x509-cert-auth.ocsp-responder-certificate",
+  "x509-cert-auth.ocsp-responder-uri",
+  "x509-cert-auth.regular-expression",
+  "x509-cert-auth.revalidate-certificate-enabled",
+  "x509-cert-auth.serialnumber-hex-enabled",
+  "x509-cert-auth.timestamp-validation-enabled"
+ ],
+ "direct-grant-validate-otp": [],
+ "direct-grant-validate-password": [],
+ "direct-grant-validate-username": [],
+ "docker-http-basic-authenticator": [],
+ "http-basic-authenticator": [],
+ "identity-provider-redirector": [
+  "defaultProvider"
+ ],
+ "idp-add-organization-member": [],
+ "idp-auto-link": [],
+ "idp-confirm-link": [],
+ "idp-confirm-override-link": [],
+ "idp-create-user-if-unique": [
+  "require.password.update.after.registration"
+ ],
+ "idp-detect-existing-broker-user": [],
+ "idp-email-verification": [],
+ "idp-review-profile": [
+  "update.profile.on.first.login"
+ ],
+ "idp-username-password-form": [],
+ "organization": [
+  "requiresUserMembership"
+ ],
+ "reset-credential-email": [
+  "force-login"
+ ],
+ "reset-credentials-choose-user": [],
+ "reset-otp": [
+  "action_on_otp_reset_flag"
+ ],
+ "reset-password": [],
+ "user-session-limits": [
+  "behavior",
+  "errorMessage",
+  "userClientLimit",
+  "userRealmLimit"
+ ],
+ "webauthn-authenticator": [],
+ "webauthn-authenticator-passwordless": []
+}

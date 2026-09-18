@@ -27,8 +27,9 @@ theme:
   account: ""
   email: ""
 
-admin_mfa:
+adminMfa:
   enabled: false
+  role: "admin"
 
 brute_force:
   enabled: false

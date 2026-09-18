@@ -52,13 +52,21 @@
   {{- end }}
   {{- end }}
 
-  "browserFlow": {{ if .Values.adminMfa.enabled }}"browser-with-otp-for-admins"{{ else }}"browser"{{ end }},
+  {{- /*
+    The admin second factor (keycloak.admin_mfa). Provider ids are Keycloak 26.7.3's
+    `conditional-*`: an unknown id is accepted by the import and then fails every browser
+    sign-in, for every user. The shape was verified on a throwaway 26.7.3 realm
+    (celine-policies' passkey plan, Phase 1): a non-admin is never asked; an admin who used
+    a passkey is not asked; an admin with TOTP or recovery codes is asked for one; an admin
+    with neither enrols both.
+  */}}
+  "browserFlow": {{ if .Values.adminMfa.enabled }}"browser-admin-second-factor"{{ else }}"browser"{{ end }},
 
   {{- if .Values.adminMfa.enabled }}
   "authenticationFlows": [
     {
-      "alias": "browser-with-otp-for-admins",
-      "description": "Browser flow — OTP required for admins group",
+      "alias": "browser-admin-second-factor",
+      "description": "Password or passkey for everyone; platform admins who did not use a passkey also need TOTP or a recovery code",
       "providerId": "basic-flow",
       "topLevel": true,
       "builtIn": false,
@@ -67,30 +75,73 @@
           "authenticator": "auth-cookie",
           "requirement": "ALTERNATIVE",
           "priority": 10,
-          "autheticatorFlow": false
+          "authenticatorFlow": false
         },
         {
           "authenticator": "auth-spnego",
           "requirement": "DISABLED",
           "priority": 20,
-          "autheticatorFlow": false
+          "authenticatorFlow": false
         },
         {
           "authenticator": "identity-provider-redirector",
           "requirement": "ALTERNATIVE",
           "priority": 25,
-          "autheticatorFlow": false
+          "authenticatorFlow": false
         },
         {
-          "flowAlias": "browser-with-otp-for-admins forms",
+          "flowAlias": "browser-admin-second-factor organization",
+          "requirement": "ALTERNATIVE",
+          "priority": 26,
+          "authenticatorFlow": true
+        },
+        {
+          "flowAlias": "browser-admin-second-factor forms",
           "requirement": "ALTERNATIVE",
           "priority": 30,
-          "autheticatorFlow": true
+          "authenticatorFlow": true
         }
       ]
     },
     {
-      "alias": "browser-with-otp-for-admins forms",
+      "alias": "browser-admin-second-factor organization",
+      "description": "As in Keycloak's own browser flow",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "flowAlias": "browser-admin-second-factor conditional organization",
+          "requirement": "CONDITIONAL",
+          "priority": 10,
+          "authenticatorFlow": true
+        }
+      ]
+    },
+    {
+      "alias": "browser-admin-second-factor conditional organization",
+      "description": "Organization identity-first login, for users who belong to one",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "conditional-user-configured",
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "authenticatorFlow": false
+        },
+        {
+          "authenticator": "organization",
+          "requirement": "ALTERNATIVE",
+          "priority": 20,
+          "authenticatorFlow": false
+        }
+      ]
+    },
+    {
+      "alias": "browser-admin-second-factor forms",
+      "description": "Username and password, or a passkey from the same page",
       "providerId": "basic-flow",
       "topLevel": false,
       "builtIn": false,
@@ -99,51 +150,127 @@
           "authenticator": "auth-username-password-form",
           "requirement": "REQUIRED",
           "priority": 10,
-          "autheticatorFlow": false
+          "authenticatorFlow": false
         },
         {
-          "flowAlias": "browser-with-otp-for-admins otp conditional",
+          "flowAlias": "browser-admin-second-factor admin",
           "requirement": "CONDITIONAL",
           "priority": 20,
-          "autheticatorFlow": true
+          "authenticatorFlow": true
         }
       ]
     },
     {
-      "alias": "browser-with-otp-for-admins otp conditional",
+      "alias": "browser-admin-second-factor admin",
+      "description": "Platform admins who did not sign in with a passkey",
       "providerId": "basic-flow",
       "topLevel": false,
       "builtIn": false,
       "authenticationExecutions": [
         {
-          "authenticator": "condition-user-configured",
+          "authenticator": "conditional-user-role",
+          "authenticatorConfig": "browser-admin-second-factor-admin-role",
           "requirement": "REQUIRED",
           "priority": 10,
-          "autheticatorFlow": false
+          "authenticatorFlow": false
         },
         {
-          "authenticator": "condition-user-role",
+          "authenticator": "conditional-credential",
+          "authenticatorConfig": "browser-admin-second-factor-no-passkey",
           "requirement": "REQUIRED",
           "priority": 20,
-          "autheticatorFlow": false,
-          "authenticatorConfig": "admin-group-condition"
+          "authenticatorFlow": false
+        },
+        {
+          "flowAlias": "browser-admin-second-factor configured",
+          "requirement": "CONDITIONAL",
+          "priority": 30,
+          "authenticatorFlow": true
+        },
+        {
+          "flowAlias": "browser-admin-second-factor enrol",
+          "requirement": "CONDITIONAL",
+          "priority": 40,
+          "authenticatorFlow": true
+        }
+      ]
+    },
+    {
+      "alias": "browser-admin-second-factor configured",
+      "description": "An admin who has a second factor uses it",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "conditional-user-configured",
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "authenticatorFlow": false
+        },
+        {
+          "authenticator": "auth-otp-form",
+          "requirement": "ALTERNATIVE",
+          "priority": 20,
+          "authenticatorFlow": false
+        },
+        {
+          "authenticator": "auth-recovery-authn-code-form",
+          "requirement": "ALTERNATIVE",
+          "priority": 30,
+          "authenticatorFlow": false
+        }
+      ]
+    },
+    {
+      "alias": "browser-admin-second-factor enrol",
+      "description": "An admin who has none enrols TOTP and recovery codes. Without this branch Keycloak refuses them as 'invalid username or password'",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "conditional-sub-flow-executed",
+          "authenticatorConfig": "browser-admin-second-factor-not-configured",
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "authenticatorFlow": false
         },
         {
           "authenticator": "auth-otp-form",
           "requirement": "REQUIRED",
+          "priority": 20,
+          "authenticatorFlow": false
+        },
+        {
+          "authenticator": "auth-recovery-authn-code-form",
+          "requirement": "REQUIRED",
           "priority": 30,
-          "autheticatorFlow": false
+          "authenticatorFlow": false
         }
       ]
     }
   ],
   "authenticatorConfig": [
     {
-      "alias": "admin-group-condition",
+      "alias": "browser-admin-second-factor-admin-role",
       "config": {
-        "conditionProvider": "group",
-        "groupPath": {{ .Values.adminMfa.groupPath | quote }},
+        "condUserRole": {{ required "adminMfa.role is required when admin MFA is enabled" .Values.adminMfa.role | quote }},
         "negate": "false"
+      }
+    },
+    {
+      "alias": "browser-admin-second-factor-no-passkey",
+      "config": {
+        "credentials": "webauthn-passwordless",
+        "included": "false"
+      }
+    },
+    {
+      "alias": "browser-admin-second-factor-not-configured",
+      "config": {
+        "flow_to_check": "browser-admin-second-factor configured",
+        "check_result": "not-executed"
       }
     }
   ],

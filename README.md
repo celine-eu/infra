@@ -195,6 +195,7 @@ to a release: the tag is the version of `platform.yaml`.
 | `policies_shell.bootstrap.bucket`, `policies_shell.bootstrap.s3_secret` | where the run is stored; a Secret with `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_ENDPOINT_URL`. Unset: logs only |
 | `policies_shell.bootstrap.allow_destructive` | passes `--allow-destructive`, for a plan that turns a setting off or removes a list entry. Set for one release only |
 | `keycloak.brute_force.enabled` | `CELINE_KEYCLOAK_BRUTE_FORCE_ENABLED`, only when set. Unset: brute-force protection is **on**. The realm import reads `keycloak.brute_force.failureFactor` (max login failures, default 5); there is no `maxLoginFailures` in Keycloak, and an import naming one stops Keycloak from starting |
+| `keycloak.admin_mfa` | `true`/`false`, or `{enabled: true\|false}`; anything else stops the render. The realm import only (new realms): members of `/admins` (realm role `admin`) who sign in with a password need TOTP or a recovery code, and one with neither enrols both; a passkey sign-in needs nothing more. `task test:auth-setup` checks the render |
 | `keycloak.platform` | an overlay on `platform.yaml`: `realm_settings.supportedLocales` only |
 | the resolved `smtp` block (see [Email (SMTP)](#email-smtp)) | `CELINE_KEYCLOAK_SMTP_*`; user and password through a Secret |
 | `auth_setup.realmAdminUser`, `realmAdminEmail`, `realmAdminPassword` | `CELINE_KEYCLOAK_REALM_ADMIN_*`: the operator realm admin, created once (password through a Secret) and kept in `/admins` |
