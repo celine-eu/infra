@@ -489,29 +489,9 @@ tasks:
         kubectl exec "$POD" -n celine-{{ .DEPLOYMENT_ENV }} -c shell -- \
           celine-policies keycloak bootstrap --check --secrets-file /tmp/.secrets.yaml $OVERLAY
 
-  # The realm must be bootstrapped and synced first, which the policies-shell pod's init
-  # containers and startup do: sync-users refuses otherwise and names the command to run.
-  import:keycloak-users:*:
-    desc: "Import REC users into keycloak via the policies-shell pod (needs the realm bootstrapped and synced). Usage: task import:keycloak-users:dev -- recs/my-rec.yaml"
-    vars:
-      DEPLOYMENT_ENV: "{{ index .MATCH 0 }}"
-      FILE: "{{ .CLI_ARGS }}"
-    cmds:
-      - |
-        set -e
-        FILE="{{ .FILE }}"
-        test -n "$FILE" || { echo "Usage: task import:rec-registry:{{ .DEPLOYMENT_ENV }} -- path/to/rec.yaml"; exit 1; }
-        test -f "$FILE" || { echo "File not found: $FILE"; exit 1; }
-
-
-        POD=$(kubectl get pod -n celine-{{ .DEPLOYMENT_ENV }} \
-          -l app.kubernetes.io/name=celine-policies-shell \
-          -o jsonpath='{.items[0].metadata.name}')
-        test -n "$POD" || { echo "No policies-shell pod found in celine-{{ .DEPLOYMENT_ENV }}"; exit 1; }
-
-        kubectl cp "$FILE" "$POD":/tmp/rec.yaml -n celine-{{ .DEPLOYMENT_ENV }}
-        kubectl exec -it "$POD" -n celine-{{ .DEPLOYMENT_ENV }} -- \
-          celine-policies keycloak sync-users /tmp/rec.yaml
+  # Users are not imported from a YAML on a deployed realm: `celine-policies keycloak sync-users`
+  # refuses unless ENV=dev. Participants arrive through onboarding; a platform admin promotes
+  # managers with `celine-policies keycloak set-user-organization`.
 
   import:rec-registry:*:
     desc: "Import a REC YAML directly via the rec-registry pod. Usage: task import:rec-registry:dev -- recs/my-rec.yaml"

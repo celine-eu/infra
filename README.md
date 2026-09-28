@@ -184,7 +184,8 @@ brute force, `smtpServer`, the realm role groups) is written by `celine-policies
 bootstrap`, never by the realm import. It runs in the `policies-shell` pod's init containers:
 plan (with a realm export first), apply, then a check that must find nothing left to change.
 Only then does the shell run `keycloak sync`. `sync-orgs` and `sync-users` refuse a realm that
-has not been through both.
+has not been through both, and `sync-users` refuses outright unless `ENV` names a non-production environment (`dev`, `development`, `local`, `test`, `ci`): a deployed realm
+gets its users from onboarding, not from a YAML.
 
 The run's export, plan, apply and check output is stored under
 `<bucket>/<environment>/<UTC time>-<policies_shell.image_tag>/`. Pin `policies_shell.image_tag`
