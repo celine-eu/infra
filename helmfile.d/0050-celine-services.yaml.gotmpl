@@ -261,3 +261,32 @@ releases:
       - ../envs/{{ .Environment.Name }}/0050-frontends/celine-frontend-community/values.yaml.gotmpl
     labels:
       group: celine-services
+
+  # Onboarding: API and UI, one host. Off unless the environment sets
+  # `onboarding.enabled: true`, because it cannot start without values no
+  # environment has by default (the encryption key, the forwarded-IP range).
+  # See defaults/0050-celine-services/celine-onboarding/values.yaml.gotmpl.
+  - name: onboarding
+    namespace: celine-{{ .Environment.Name }}
+    chart: ../charts/celine-onboarding
+    createNamespace: true
+    installed: {{ .Environment.Values | dig "onboarding" "enabled" false }}
+    missingFileHandler: Warn
+    values:
+      - ../defaults/0050-celine-services/values.yaml.gotmpl
+      - ../defaults/0050-celine-services/celine-onboarding/values.yaml.gotmpl
+      - ../envs/{{ .Environment.Name }}/0050-celine-services/celine-onboarding/values.yaml.gotmpl
+    labels:
+      group: celine-services
+
+  - name: frontend-onboarding
+    namespace: celine-{{ .Environment.Name }}
+    chart: ../charts/celine-frontend-onboarding
+    createNamespace: true
+    installed: {{ .Environment.Values | dig "onboarding" "enabled" false }}
+    missingFileHandler: Warn
+    values:
+      - ../defaults/0050-celine-services/celine-frontend-onboarding/values.yaml.gotmpl
+      - ../envs/{{ .Environment.Name }}/0050-frontends/celine-frontend-onboarding/values.yaml.gotmpl
+    labels:
+      group: celine-services

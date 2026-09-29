@@ -47,6 +47,12 @@ roles:
     password: {{ .Environment.Values.postgres_db.roi | quote }}
   - name: community
     password: {{ .Environment.Values.postgres_db.community | quote }}
+{{- /* Only where onboarding is on: its role password is then as mandatory as
+       every other role's, and an environment without onboarding needs no key. */}}
+{{- if .Environment.Values | dig "onboarding" "enabled" false }}
+  - name: onboarding
+    password: {{ .Environment.Values.postgres_db.onboarding | quote }}
+{{- end }}
 
 databases:
   - name: datasets
@@ -90,6 +96,10 @@ databases:
     owner: roi
   - name: community
     owner: community
+{{- if .Environment.Values | dig "onboarding" "enabled" false }}
+  - name: onboarding
+    owner: onboarding
+{{- end }}
 
 poolers:
   - type: rw
@@ -147,6 +157,10 @@ connection_strings:
 
   - database: community
     dialect: postgresql+asyncpg
+{{- if .Environment.Values | dig "onboarding" "enabled" false }}
+  - database: onboarding
+    dialect: postgresql+asyncpg
+{{- end }}
 
 
 backup:

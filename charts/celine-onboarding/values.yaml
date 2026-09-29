@@ -1,0 +1,206 @@
+## ----------------------------------------------------------------------------
+## celine-onboarding — values.yaml
+##
+## The REC onboarding API: the public member wizard's backend and the operator
+## console's API. The UI is a separate release (celine-frontend-onboarding),
+## whose ingress routes /api here.
+##
+## The service reads flat OIDC_* / SMTP_* / … variables, not CELINE_OIDC_*: the
+## chart renders them from the `onboarding` block below (templates/_helpers.tpl).
+## The library's CELINE_OIDC_* variables are rendered too and read by nothing.
+## ----------------------------------------------------------------------------
+
+fullnameOverride: onboarding
+
+image:
+  repository: ghcr.io/celine-eu/onboarding
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+# The image's CMD is `uv run uvicorn …`, which needs a writable uv cache and
+# project directory; the pod runs as a non-root user and /app belongs to root.
+# The virtualenv's own binaries need neither.
+command:
+  - /app/.venv/bin/uvicorn
+  - celine.onboarding.main:app
+  - --host
+  - 0.0.0.0
+  - --port
+  - "8040"
+
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  port: 8040
+
+# No ingress of its own: celine-frontend-onboarding owns the host and routes
+# /api here, with /api/admin and /api/me behind oauth2-proxy.
+ingress:
+  enabled: false
+  domain: celine.test
+  host: ""
+  issuer: celine-tls
+  auth:
+    enabled: false
+  tls:
+    enabled: false
+    secretName: ""
+  annotations: {}
+
+# Inbound tokens (operators via oauth2-proxy, service accounts) and the
+# service's own outbound client. baseUrl is compared with the token's `iss`, so
+# it is the realm's public URL.
+oidc:
+  baseUrl: "https://keycloak.celine.test/realms/celine"
+  jwksUri: "https://keycloak.celine.test/realms/celine/protocol/openid-connect/certs"
+  allowedAudiences: ""
+  includeClientIdAsAudience: true
+  timeout: 10.0
+  service:
+    clientId: "svc-onboarding"
+    audience: "svc-onboarding"
+    clientSecret: "svc-onboarding" # [secret]
+
+# Read by the library only (CELINE_POLICIES_*). Onboarding evaluates its own
+# policies from the image (POLICIES_DIR, below).
+policies:
+  dir: "/app/policies"
+  dataDir: ""
+  cacheEnabled: true
+  cacheTtl: 300
+  cacheMaxsize: 10000
+
+# DATABASE_URL, from the Secret charts/postgres-db publishes for database
+# `onboarding` (dialect postgresql+asyncpg).
+postgres:
+  existingSecret: "postgis1-onboarding-connection-string"
+  dsnEnvVar: "DATABASE_URL"
+  secretKey: "connection-string"
+
+s3:
+  endpointUrl: ""
+  region: "us-east-1"
+  existingSecret: ""
+
+# Alembic, as an init container of the API pod (the library's pattern): it runs
+# before the new API container starts, after the release's secrets exist.
+migrate:
+  enabled: true
+  command: ["/app/.venv/bin/alembic", "upgrade", "head"]
+  extraEnv: []
+
+healthCheck:
+  enabled: true
+  path: /api/health
+  initialDelaySeconds: 10
+  periodSeconds: 30
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+onboarding:
+  # Where uvicorn accepts X-Forwarded-For from: the ingress controller's pod
+  # address range. REQUIRED, and never "*" — every rate limit, consent evidence
+  # IP and audit row is the address uvicorn resolves (onboarding README,
+  # "Security"). The chart refuses to render without it.
+  forwardedAllowIps: ""
+
+  # Fernet key for the personal data at rest. REQUIRED; no default, because a
+  # guessable key encrypts nothing. Losing it loses every submission's data.
+  encryptionKey: "" # [secret]
+
+  # Off: no dataspace identity, and the registry member is written as
+  # oidc.service.clientId. A template that declares `consent.data_sharing`
+  # also needs dsConnectorUrl, or the API refuses to start.
+  dataspaceEnabled: false
+  dsConnectorUrl: ""
+  dsOnboardingClientSecret: "" # [secret] only when dataspaceEnabled
+  identityRegistryUrl: ""
+
+  # The CLI's service account (`onboarding-cli admin …` in the pod).
+  cliClientId: "svc-onboarding-cli"
+  cliClientSecret: "svc-onboarding-cli" # [secret]
+  # The API as the CLI inside the pod reaches it.
+  apiUrl: "http://onboarding:8040"
+
+  # In-cluster dependencies. The provisioning service has no public route and
+  # must not be given one.
+  recRegistryUrl: "http://rec-registry:8004"
+  digitalTwinUrl: "http://digital-twin:8002"
+  provisioningUrl: "http://provisioning:8010"
+
+  # Comma-separated, e.g. https://onboarding.<domain>
+  corsOrigins: ""
+
+  # Document scanning sends bills and ID cards to an external model: off unless
+  # a processing agreement covers it (onboarding README). Uploads then need
+  # persistence below.
+  extractionEnabled: false
+
+  # Phone verification by SMS. The service's own default, `log`, is a
+  # development provider: it prints the code to the pod log and the participant
+  # never receives it. `none` switches verification off (the wizard drops the
+  # phone_verify step). `brevo` sends real SMS, and only with dpaSmsSigned:
+  # the gateway receives participants' phone numbers (GDPR Art. 28).
+  smsProvider: "none"
+  dpaSmsSigned: false
+  brevoSmsSender: ""
+  brevoApiKey: "" # [secret] only with smsProvider: brevo
+
+  # Empty host: no email at all. Never left to the service's own default,
+  # which is a development Mailpit. STARTTLS (tls: true) or plain; the
+  # service has no implicit-TLS (port 465) mode.
+  smtp:
+    host: ""
+    port: 587
+    user: ""
+    password: "" # [secret]
+    from: ""
+    tls: true
+    notify: ""
+
+# The community templates, mounted from a ConfigMap at mountPath (TEMPLATES_DIR).
+# Keys are paths under that directory: `<slug>/manifest.yaml`,
+# `<slug>/content/welcome.md`, `<slug>/consent/policy.pdf`, … The image's own
+# templates/ directory is not read. After a template changes, import it:
+#   kubectl exec deploy/onboarding -- /app/.venv/bin/onboarding-cli import-templates --filter <slug>
+# A ConfigMap holds at most 1 MiB; larger consent documents go in the manifest
+# as `url:` entries instead of files.
+templates:
+  mountPath: /app/rec-templates
+  # path → text
+  files: {}
+  # path → base64 (PDFs, images)
+  binaryFiles: {}
+
+# DATA_DIR: uploaded documents (only with extractionEnabled) and short-lived
+# exports. emptyDir unless enabled. A ReadWriteOnce claim can hold a rolling
+# update on a multi-node cluster.
+persistence:
+  enabled: false
+  existingClaim: ""
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  size: 1Gi
+  mountPath: /app/data
+
+logLevel: "INFO"
+extraEnv: []
+extraSecrets: {}
+volumeMounts: []
+volumes: []
+
+podAnnotations: {}
+podSecurityContext:
+  runAsUser: 1000
+  fsGroup: 1000
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+nodeSelector: {}
+tolerations: []
+affinity: {}

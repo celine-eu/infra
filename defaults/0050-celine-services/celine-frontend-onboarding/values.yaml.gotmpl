@@ -1,0 +1,17 @@
+# defaults/0050-celine-services/celine-frontend-onboarding/values.yaml.gotmpl
+#
+# The onboarding UI and the host it shares with the API. Installed only where
+# `onboarding.enabled` is true. Keys: see celine-onboarding's defaults file.
+
+image:
+  tag: {{ .Environment.Values | dig "onboarding" "ui_image_tag" (.Environment.Values | dig "onboarding" "image_tag" "latest") | quote }}
+
+ingress:
+  host: {{ .Environment.Values | dig "onboarding" "host" (printf "onboarding.%s" .Environment.Values.domain) }}
+  domain: {{ .Environment.Values.domain }}
+  issuer: {{ .Environment.Values | dig "tls_setup" "issuer" "celine-tls" }}
+
+{{- with .Environment.Values | dig "onboarding" "ui_resources" nil }}
+resources:
+  {{- toYaml . | nindent 2 }}
+{{- end }}

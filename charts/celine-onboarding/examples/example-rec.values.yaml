@@ -1,0 +1,79 @@
+# An example community for this chart, and what `helm lint`/`helm template`
+# run against:
+#
+#   helm dependency build charts/celine-onboarding
+#   helm template onboarding charts/celine-onboarding \
+#     -f charts/celine-onboarding/examples/example-rec.values.yaml
+#
+# Everything here is made up. A real environment gives its templates through
+# `onboarding.templates` in its own values (defaults/0050-celine-services/
+# celine-onboarding), never in this repository.
+
+onboarding:
+  forwardedAllowIps: "10.244.0.0/16"
+  # A made-up Fernet key. Never reuse it.
+  encryptionKey: "ZXhhbXBsZS1leGFtcGxlLWV4YW1wbGUtZXhhbXBsZS0="
+  corsOrigins: "https://onboarding.example.org"
+  smtp:
+    host: smtp.example.org
+    port: 587
+    user: onboarding
+    password: example-password
+    from: noreply@example.org
+    tls: true
+
+templates:
+  files:
+    example-rec/manifest.yaml: |
+      slug: example-rec
+      name: "Example REC"
+      locale: en
+      organization: example-rec
+
+      # Each area is one primary-substation boundary, keyed by its id.
+      # AC000E0000x are not real substation ids.
+      rec_registry:
+        community: example-rec
+        areas:
+          AC000E00001:
+            name: "Example substation north"
+            boundary: {source: gse_cabine_primarie, id: AC000E00001}
+          AC000E00002:
+            name: "Example substation south"
+            boundary: {source: gse_cabine_primarie, id: AC000E00002}
+
+      branding:
+        primary_color: "#0d9488"
+
+      notifications:
+        from: "noreply@example.org"
+        notify:
+          - operator@example.org
+
+      consent:
+        gdpr:
+          version: "1.0"
+          url: "https://rec.example.org/privacy"
+          required: true
+        statute:
+          version: "1.0"
+          file: consent/statute.pdf
+          required: true
+
+      # A template with boundary areas needs `eligibility`, after `consents`.
+      steps:
+        - consents
+        - personal
+        - eligibility
+        - statute
+        - review
+
+      content:
+        welcome: content/welcome.md
+    example-rec/content/welcome.md: |
+      Join the Example REC.
+    example-rec/consent/statute.pdf.json: |
+      {"slug": "statute", "title": "Statute", "version": "1.0", "language": "en", "filename": "statute.pdf", "mime_type": "application/pdf"}
+  binaryFiles:
+    # "%PDF-1.4 example" — not a real document.
+    example-rec/consent/statute.pdf: "JVBERi0xLjQgZXhhbXBsZQo="

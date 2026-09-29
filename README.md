@@ -177,6 +177,46 @@ email participants.
 
 ---
 
+## Onboarding
+
+The REC onboarding service runs as two releases on one host, `onboarding.<domain>`:
+`onboarding` (the API, `charts/celine-onboarding`) and `frontend-onboarding` (the UI,
+`charts/celine-frontend-onboarding`). **Both are off** until the environment sets
+`onboarding.enabled: true`, which also adds the `onboarding` database to `postgres-db` and
+`ONBOARDING_URL` to the `community` release.
+
+The member wizard is public. Only `/api/admin` and `/api/me` go through oauth2-proxy, and
+every `/api` path goes straight to the API, so the API sees the ingress controller as its
+peer.
+
+| Value | Effect |
+|---|---|
+| `onboarding.enabled` | installs both releases, the database and `ONBOARDING_URL` |
+| `onboarding.forwarded_allow_ips` | **required**: the ingress controller's pod address range, uvicorn's `FORWARDED_ALLOW_IPS`. Rate limits, consent evidence and audit rows use the address it resolves. The chart refuses `*` |
+| `onboarding.encryption_key` | **required**, secret: the Fernet key for personal data at rest. Losing it loses the data |
+| `postgres_db.onboarding` | **required**, secret: the database role's password. It goes into a connection URI unescaped, so use a URL-safe value |
+| `onboarding.client_secret`, `onboarding.cli_client_secret` | secret: `svc-onboarding` and `svc-onboarding-cli`, the same keys `policies-shell` syncs to the realm |
+| `onboarding.image_tag`, `onboarding.ui_image_tag` | the API image tag, and the UI's (defaults to the API's) |
+| `onboarding.host` | defaults to `onboarding.<domain>` |
+| `onboarding.dataspace_enabled` | `false` by default. A template declaring `consent.data_sharing` also needs a connector, or the API does not start |
+| `onboarding.sms_provider` | `none` by default: no phone verification. The service's own default, `log`, only prints the code to the pod log. `brevo` also needs `dpa_sms_signed` and `brevo_api_key` |
+| `onboarding.smtp` | overrides the shared `smtp` block, as in [Email (SMTP)](#email-smtp). STARTTLS or plain only: a resolved block with `ssl: true` stops the render |
+| `onboarding.templates.files`, `onboarding.templates.binary_files` | the community templates, `<slug>/<path>` to text or base64, mounted from a ConfigMap (1 MiB at most) |
+| `onboarding.persistence` | `{enabled, size, storage_class}`: a volume for uploaded documents. Off by default, because document scanning is off |
+| `onboarding.env` | further plain settings for the API, `NAME: value` |
+
+`charts/celine-onboarding/examples/example-rec.values.yaml` is a complete example. The API
+runs its Alembic migrations in an init container. After a template changes, import it:
+
+```bash
+kubectl -n celine-<env> exec deploy/onboarding -- \
+  /app/.venv/bin/onboarding-cli import-templates --filter <slug>
+```
+
+The import checks each boundary id with the Digital Twin, so the Digital Twin must be up.
+
+---
+
 ## Keycloak realm bootstrap
 
 The realm's platform level (Organizations, sign-in settings, languages, themes, lifespans,
@@ -289,6 +329,7 @@ Charts under `charts/` are deployed from the working tree by `helmfile.d/`.
 - `celine-ai-assistant` — AI Assistant API
 - `celine-roi` — ROI API
 - `celine-webapp` — Participant webapp API
+- `celine-onboarding` — REC onboarding API (member wizard and operator console). See [Onboarding](#onboarding)
 - `celine-grid` — Grid resilience API
 
 ### Frontends
@@ -297,6 +338,7 @@ Charts under `charts/` are deployed from the working tree by `helmfile.d/`.
 - `celine-frontend-roi` — ROI webapp
 - `celine-frontend-webapp` — Participant webapp
 - `celine-frontend-grid` — Grid webapp
+- `celine-frontend-onboarding` — REC onboarding UI, and the host the onboarding API answers on
 
 ### Platform
 

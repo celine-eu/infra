@@ -1,0 +1,98 @@
+# defaults/0050-celine-services/celine-onboarding/values.yaml.gotmpl
+#
+# The onboarding API. Installed only where `onboarding.enabled` is true
+# (helmfile.d/0050-celine-services.yaml.gotmpl). Environment keys:
+#
+#   onboarding:
+#     enabled: false
+#     image_tag: latest
+#     host: onboarding.<domain>          # also the UI's (celine-frontend-onboarding)
+#     forwarded_allow_ips: ""            # REQUIRED: the ingress controller's pod range; never "*"
+#     encryption_key: ""                 # REQUIRED, secret: a Fernet key
+#     client_secret: svc-onboarding      # secret; the same key policies-shell syncs to the realm
+#     cli_client_secret: svc-onboarding-cli   # secret; likewise
+#     dataspace_enabled: false
+#     sms_provider: none                 # none: no phone verification; brevo needs dpa_sms_signed
+#     dpa_sms_signed: false
+#     brevo_sms_sender: ""
+#     brevo_api_key: ""                  # secret, with sms_provider: brevo
+#     smtp: {}                           # overrides the shared `smtp` block (README "Email (SMTP)")
+#     templates:
+#       files: {}                        # <slug>/<path> → text
+#       binary_files: {}                 # <slug>/<path> → base64
+#     persistence: {enabled: false, size: 1Gi, storage_class: ""}
+#     env: {}                            # further plain settings, NAME: value
+#     resources: {}
+#
+# and `postgres_db.onboarding`, the database role's password (secret), which
+# postgres-db reads only when onboarding is enabled.
+{{- $o := .Environment.Values | dig "onboarding" (dict) | default (dict) }}
+{{- $host := $o | dig "host" (printf "onboarding.%s" .Values.domain) }}
+
+# SMTP: the environment's shared `smtp` block, unless `onboarding.smtp.host` is
+# set, in which case `onboarding.smtp` is the provider as a whole. The sender
+# falls back to `smtp.from`. Onboarding speaks STARTTLS or plain SMTP only.
+{{- $smtpShared := .Environment.Values | dig "smtp" (dict) | default (dict) }}
+{{- $smtpOwn := $o | dig "smtp" (dict) | default (dict) }}
+{{- $smtp := $smtpShared }}
+{{- if $smtpOwn | dig "host" "" }}
+{{- $smtp = $smtpOwn }}
+{{- end }}
+{{- /* Only where onboarding is on: values files render at group load, so an
+       unconditional fail here would stop every celine-services release. */}}
+{{- if and ($o | dig "enabled" false) ($smtp | dig "host" "") ($smtp | dig "ssl" false) }}
+{{- fail "onboarding: the resolved SMTP block has ssl: true; onboarding has no implicit-TLS mode. Use STARTTLS (ssl: false, starttls: true, usually port 587) or set onboarding.smtp" }}
+{{- end }}
+
+image:
+  tag: {{ $o | dig "image_tag" "latest" | quote }}
+
+oidc:
+  service:
+    clientSecret: {{ $o | dig "client_secret" "svc-onboarding" | quote }}
+
+healthCheck:
+  path: /api/health
+
+onboarding:
+  forwardedAllowIps: {{ $o | dig "forwarded_allow_ips" "" | quote }}
+  encryptionKey: {{ $o | dig "encryption_key" "" | quote }}
+  dataspaceEnabled: {{ $o | dig "dataspace_enabled" false }}
+  cliClientSecret: {{ $o | dig "cli_client_secret" "svc-onboarding-cli" | quote }}
+  corsOrigins: {{ printf "https://%s" $host | quote }}
+  smsProvider: {{ $o | dig "sms_provider" "none" | quote }}
+  dpaSmsSigned: {{ $o | dig "dpa_sms_signed" false }}
+  brevoSmsSender: {{ $o | dig "brevo_sms_sender" "" | quote }}
+  brevoApiKey: {{ $o | dig "brevo_api_key" "" | quote }}
+  smtp:
+    host: {{ $smtp | dig "host" "" | quote }}
+    port: {{ $smtp | dig "port" 587 }}
+    user: {{ $smtp | dig "user" "" | quote }}
+    password: {{ $smtp | dig "password" "" | quote }}
+    from: {{ $smtpOwn | dig "from" "" | default ($smtpShared | dig "from" "") | quote }}
+    tls: {{ $smtp | dig "starttls" true }}
+    notify: {{ $smtpOwn | dig "notify" "" | quote }}
+
+templates:
+  files:
+    {{- $o | dig "templates" "files" (dict) | default (dict) | toYaml | nindent 4 }}
+  binaryFiles:
+    {{- $o | dig "templates" "binary_files" (dict) | default (dict) | toYaml | nindent 4 }}
+
+persistence:
+  enabled: {{ $o | dig "persistence" "enabled" false }}
+  size: {{ $o | dig "persistence" "size" "1Gi" | quote }}
+  storageClass: {{ $o | dig "persistence" "storage_class" "" | quote }}
+
+{{- with $o | dig "env" (dict) }}
+extraEnv:
+  {{- range $name, $value := . }}
+  - name: {{ $name }}
+    value: {{ $value | toString | quote }}
+  {{- end }}
+{{- end }}
+
+{{- with $o | dig "resources" nil }}
+resources:
+  {{- toYaml . | nindent 2 }}
+{{- end }}

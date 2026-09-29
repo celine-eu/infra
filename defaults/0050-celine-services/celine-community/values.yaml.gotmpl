@@ -20,6 +20,12 @@ extraEnv:
     value: "http://nudging:8016"
   - name: CORS_ORIGINS
     value: '["https://community.{{ .Values.domain }}"]'
+{{- if .Environment.Values | dig "onboarding" "enabled" false }}
+  # Send invitation / Reset password go through onboarding, the only caller of
+  # the provisioning service. Unset, those routes answer 503.
+  - name: ONBOARDING_URL
+    value: "http://onboarding:8040"
+{{- end }}
 
 {{- with .Environment.Values | dig "community" "resources" nil }}
 resources:

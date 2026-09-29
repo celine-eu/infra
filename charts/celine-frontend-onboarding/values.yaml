@@ -1,0 +1,78 @@
+## ----------------------------------------------------------------------------
+## celine-frontend-onboarding — values.yaml
+##
+## The onboarding UI (SvelteKit, adapter-node) and the host both it and the API
+## answer on. Unlike the other frontends, most of this host is PUBLIC: the member
+## wizard is anonymous. Only the console's API (/api/admin) and the member's own
+## surface (/api/me) go through oauth2-proxy; the console's pages gate themselves
+## in the browser and send the user to /oauth2/sign_in on a 401.
+## ----------------------------------------------------------------------------
+
+fullnameOverride: frontend-onboarding
+
+image:
+  repository: ghcr.io/celine-eu/onboarding-ui
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  port: 3000
+
+ingress:
+  enabled: true
+  domain: celine.test
+  host: "onboarding.celine.test"
+  issuer: celine-tls
+
+  # /api goes straight to the API, not through the UI's own /api proxy route:
+  # the API must see the ingress controller as its peer, which is what its
+  # FORWARDED_ALLOW_IPS names.
+  apiBackend:
+    service: onboarding
+    port: 8040
+
+  # Paths that require an oauth2-proxy session (or a bearer token). No
+  # auth-signin on them: a lapsed session is a bare 401, and the UI redirects.
+  authPaths:
+    - /api/admin
+    - /api/me
+
+  # Request body limit on /api (nginx's default is 1m). Above the API's
+  # MAX_UPLOAD_SIZE_MB when document scanning is on.
+  apiBodySize: "12m"
+
+  auth:
+    enabled: true
+  tls:
+    enabled: true
+    secretName: ""
+  annotations: {}
+
+# adapter-node: the public origin, so the UI builds absolute URLs and checks
+# form origins against the host the browser used, not the pod's.
+origin: ""
+
+healthCheck:
+  enabled: true
+  path: /
+  initialDelaySeconds: 10
+  periodSeconds: 30
+  failureThreshold: 3
+
+extraEnv: []
+podAnnotations: {}
+podSecurityContext:
+  runAsUser: 1000
+resources:
+  requests:
+    cpu: 10m
+    memory: 128Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi
+nodeSelector: {}
+tolerations: []
+affinity: {}

@@ -1,0 +1,23 @@
+{{- if include "celine-onboarding.hasTemplates" . }}
+{{- include "celine-onboarding.validateTemplatePaths" . }}
+# The community templates, one key per file; the Deployment mounts each key at
+# its path under templates.mountPath (TEMPLATES_DIR).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "celine-onboarding.templatesConfigMapName" . }}
+  labels:
+    {{- include "celine-services.labels" . | nindent 4 }}
+{{- with .Values.templates.files }}
+data:
+  {{- range $path, $content := . }}
+  {{ include "celine-onboarding.templateKey" $path }}: {{ $content | toString | quote }}
+  {{- end }}
+{{- end }}
+{{- with .Values.templates.binaryFiles }}
+binaryData:
+  {{- range $path, $content := . }}
+  {{ include "celine-onboarding.templateKey" $path }}: {{ $content | toString | nospace | quote }}
+  {{- end }}
+{{- end }}
+{{- end }}

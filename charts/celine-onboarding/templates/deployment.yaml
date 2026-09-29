@@ -1,0 +1,29 @@
+{{- include "celine-onboarding.validate" . }}
+{{- include "celine-onboarding.validateTemplatePaths" . }}
+{{- /*
+  The library Deployment, given a copy of .Values with the onboarding env, the
+  data directory, the templates ConfigMap and its checksum added.
+*/}}
+{{- $v := deepCopy .Values }}
+{{- $mounts := list (dict "name" "data" "mountPath" .Values.persistence.mountPath) }}
+{{- $volumes := list }}
+{{- if .Values.persistence.enabled }}
+{{- $volumes = append $volumes (dict "name" "data" "persistentVolumeClaim" (dict "claimName" (.Values.persistence.existingClaim | default (printf "%s-data" (include "celine-services.fullname" .))))) }}
+{{- else }}
+{{- $volumes = append $volumes (dict "name" "data" "emptyDir" (dict)) }}
+{{- end }}
+{{- $annotations := deepCopy (.Values.podAnnotations | default dict) }}
+{{- if include "celine-onboarding.hasTemplates" . }}
+{{- $mounts = append $mounts (dict "name" "rec-templates" "mountPath" .Values.templates.mountPath "readOnly" true) }}
+{{- $items := list }}
+{{- range $path := concat (keys (.Values.templates.files | default dict)) (keys (.Values.templates.binaryFiles | default dict)) | sortAlpha }}
+{{- $items = append $items (dict "key" (include "celine-onboarding.templateKey" $path) "path" $path) }}
+{{- end }}
+{{- $volumes = append $volumes (dict "name" "rec-templates" "configMap" (dict "name" (include "celine-onboarding.templatesConfigMapName" .) "items" $items)) }}
+{{- $_ := set $annotations "checksum/rec-templates" (dict "files" .Values.templates.files "binaryFiles" .Values.templates.binaryFiles | toJson | sha256sum) }}
+{{- end }}
+{{- $_ := set $v "volumeMounts" (concat $mounts (.Values.volumeMounts | default list)) }}
+{{- $_ := set $v "volumes" (concat $volumes (.Values.volumes | default list)) }}
+{{- $_ := set $v "podAnnotations" $annotations }}
+{{- $_ := set $v "extraEnv" (concat (include "celine-onboarding.env" . | fromYamlArray) (.Values.extraEnv | default list)) }}
+{{ include "celine-services.deployment" (dict "Values" $v "Release" .Release "Chart" .Chart "Capabilities" .Capabilities "Template" .Template) }}
