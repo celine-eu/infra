@@ -54,6 +54,18 @@ spec:
             - name: DATASET_API_URL
               value: {{ .Values.datasetApi.url | quote }}
             # ----------------------------------------------------------------
+            # OIDC client credentials (`import catalogue` needs dataset.admin)
+            # ----------------------------------------------------------------
+            - name: CELINE_OIDC_BASE_URL
+              value: {{ .Values.oidc.baseUrl | quote }}
+            - name: CELINE_OIDC_CLIENT_ID
+              value: {{ .Values.oidc.clientId | quote }}
+            - name: CELINE_OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.oidc.existingSecret }}
+                  key: {{ .Values.oidc.secretKey }}
+            # ----------------------------------------------------------------
             # Extra env vars (for ad-hoc use)
             # ----------------------------------------------------------------
             {{- range .Values.extraEnv }}

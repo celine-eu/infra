@@ -8,7 +8,8 @@
 ##   - Export OpenLineage datasets from Marquez
 ##
 ## Usage after deploy:
-##   # Import a catalogue file
+##   # Import a catalogue file (authenticates as svc-dataset-api with the
+##   # CELINE_OIDC_* credentials below; the route requires dataset.admin)
 ##   kubectl exec -it <pod> -- \
 ##     dataset-cli import catalogue \
 ##       -i /tmp/catalogue.yaml \
@@ -56,6 +57,18 @@ marquez:
 # --------------------------------------------------------------------------
 datasetApi:
   url: "http://dataset-api:8001"
+
+# --------------------------------------------------------------------------
+# OIDC client for `import catalogue`: POST /admin/catalogue requires the
+# dataset.admin scope, which svc-dataset-api holds. The CLI fetches a
+# client-credentials token with these; the secret is the one the dataset-api
+# release already renders (`<fullname>-secrets`).
+# --------------------------------------------------------------------------
+oidc:
+  baseUrl: "http://keycloak/realms/celine"
+  clientId: "svc-dataset-api"
+  existingSecret: "dataset-api-secrets"
+  secretKey: "CELINE_OIDC_CLIENT_SECRET"
 
 # --------------------------------------------------------------------------
 # Extra environment variables (plain value or secretKeyRef)
