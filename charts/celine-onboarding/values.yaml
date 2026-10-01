@@ -132,10 +132,15 @@ onboarding:
   # Comma-separated, e.g. https://onboarding.<domain>
   corsOrigins: ""
 
-  # Document scanning sends bills and ID cards to an external model: off unless
-  # a processing agreement covers it (onboarding README). Uploads then need
+  # Document scanning sends bills and ID cards to a model endpoint: off unless
+  # it is in-house or a processing agreement covers it (onboarding README), and
+  # unless the endpoint and its vision model are named. Uploads then need
   # persistence below.
   extractionEnabled: false
+  llm:
+    baseUrl: ""      # OpenAI-compatible, e.g. a self-hosted vLLM; no default
+    visionModel: ""
+    apiKey: ""       # [secret] only if the endpoint needs one
 
   # Phone verification by SMS. The service's own default, `log`, is a
   # development provider: it prints the code to the pod log and the participant

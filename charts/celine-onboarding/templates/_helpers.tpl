@@ -115,6 +115,20 @@
   value: {{ $o.corsOrigins | quote }}
 - name: EXTRACTION_ENABLED
   value: {{ $o.extractionEnabled | toString | quote }}
+{{- $llm := $o.llm | default dict }}
+{{- if $llm.baseUrl }}
+- name: LLM_BASE_URL
+  value: {{ $llm.baseUrl | quote }}
+- name: LLM_VISION_MODEL
+  value: {{ $llm.visionModel | default "" | quote }}
+{{- if $llm.apiKey }}
+- name: LLM_API_KEY
+  valueFrom:
+    secretKeyRef:
+      name: {{ $secretName }}
+      key: LLM_API_KEY
+{{- end }}
+{{- end }}
 - name: SMS_PROVIDER
   value: {{ $o.smsProvider | default "none" | quote }}
 - name: DPA_SMS_SIGNED
@@ -168,6 +182,9 @@
 {{- end }}
 {{- if eq ($o.smsProvider | default "" | lower) "brevo" }}
 {{- $_ := set $data "BREVO_API_KEY" ($o.brevoApiKey | default "" | toString) }}
+{{- end }}
+{{- if and $o.llm $o.llm.baseUrl $o.llm.apiKey }}
+{{- $_ := set $data "LLM_API_KEY" ($o.llm.apiKey | toString) }}
 {{- end }}
 {{- if $o.dataspaceEnabled }}
 {{- $_ := set $data "DS_ONBOARDING_CLIENT_SECRET" ($o.dsOnboardingClientSecret | default "" | toString) }}
