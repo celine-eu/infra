@@ -15,8 +15,28 @@ oidc:
 extraEnv:
   - name: QDRANT_URL
     value: http://qdrant:6333
-  - name: OPENAI_API_KEY
-    value: {{ .Environment.Values.ai_assistant.openai_api_key | quote }}
+  {{- $llm := .Environment.Values | dig "ai_assistant" "llm" dict }}
+  # Where members' messages and the data the tools fetch for them are sent. No default:
+  # the assistant refuses to start without a base URL and the two models.
+  - name: LLM_BASE_URL
+    value: {{ $llm | dig "base_url" "" | quote }}
+  - name: LLM_API_KEY
+    value: {{ $llm | dig "api_key" "" | quote }}
+  - name: LLM_CHAT_MODEL
+    value: {{ $llm | dig "chat_model" "" | quote }}
+  - name: LLM_VISION_MODEL
+    value: {{ $llm | dig "vision_model" "" | quote }}
+  - name: LLM_EMBED_BASE_URL
+    value: {{ $llm | dig "embed_base_url" "" | quote }}
+  - name: LLM_EMBED_API_KEY
+    value: {{ $llm | dig "embed_api_key" "" | quote }}
+  - name: LLM_EMBED_MODEL
+    value: {{ $llm | dig "embed_model" "" | quote }}
+  - name: LLM_EMBED_DIMENSIONS
+    value: {{ $llm | dig "embed_dimensions" "" | quote }}
+  # A collection holds vectors of one size: a new embedding model needs a new name.
+  - name: QDRANT_COLLECTION
+    value: {{ .Environment.Values | dig "ai_assistant" "qdrant_collection" "celine_docs" | quote }}
   - name: TRAINING_MATERIALS_REPO_URL
     value: {{ .Environment.Values.ai_assistant.training_material_url | quote }}
   - name: TRAINING_MATERIALS_PATH
