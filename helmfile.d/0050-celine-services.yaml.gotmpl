@@ -294,6 +294,21 @@ releases:
     labels:
       group: celine-services
 
+  # The legal host: the deployment's legal documents as a static site, public. Off until
+  # `legal.enabled: true` and `legal.image`. See
+  # defaults/0050-celine-services/celine-legal/values.yaml.gotmpl.
+  - name: legal
+    namespace: celine-{{ .Environment.Name }}
+    chart: ../charts/celine-legal
+    createNamespace: true
+    installed: {{ .Environment.Values | dig "legal" "enabled" false }}
+    missingFileHandler: Warn
+    values:
+      - ../defaults/0050-celine-services/celine-legal/values.yaml.gotmpl
+      - ../envs/{{ .Environment.Name }}/0050-celine-services/celine-legal/values.yaml.gotmpl
+    labels:
+      group: celine-services
+
   - name: frontend-onboarding
     namespace: celine-{{ .Environment.Name }}
     chart: ../charts/celine-frontend-onboarding

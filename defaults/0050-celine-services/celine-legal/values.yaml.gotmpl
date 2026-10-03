@@ -1,0 +1,30 @@
+# defaults/0050-celine-services/celine-legal/values.yaml.gotmpl
+#
+# The legal host. Installed only where `legal.enabled` is true. Environment keys:
+#
+#   legal:
+#     enabled: false          # install the release
+#     image: ""               # the image holding the deployment's built legal site (required)
+#     image_tag: latest
+#     host: legal.<domain>    # the public host
+#     base_url: ""            # where applications find the legal host; default https://<host>
+#                             # when enabled. Set it alone to use a legal host served elsewhere.
+#     resources: {}
+#
+# The same base URL reaches celine-webapp and celine-onboarding (`LEGAL_BASE_URL`), the
+# standalone assistant (`PUBLIC_LEGAL_BASE_URL`) and Keycloak's theme (`TERMS_URL`,
+# `PRIVACY_URL`), each computed the same way in its own defaults file.
+{{- $legal := .Environment.Values | dig "legal" (dict) | default (dict) }}
+
+image:
+  repository: {{ $legal | dig "image" "" | quote }}
+  tag: {{ $legal | dig "image_tag" "latest" | quote }}
+
+ingress:
+  host: {{ $legal | dig "host" (printf "legal.%s" .Environment.Values.domain) }}
+  issuer: {{ .Environment.Values | dig "tls_setup" "issuer" "celine-tls" }}
+
+{{- with $legal | dig "resources" nil }}
+resources:
+  {{- toYaml . | nindent 2 }}
+{{- end }}

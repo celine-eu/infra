@@ -1,3 +1,9 @@
+{{- /* The legal host's base URL: `legal.base_url`, else https://<legal host> when the
+       release is installed, else none (see celine-legal's defaults). */}}
+{{- $legal := .Environment.Values | dig "legal" (dict) | default (dict) }}
+{{- $legalHost := $legal | dig "host" (printf "legal.%s" .Environment.Values.domain) }}
+{{- $legalBase := $legal | dig "base_url" (ternary (printf "https://%s" $legalHost) "" ($legal | dig "enabled" false)) | trimSuffix "/" }}
+
 
 image:
   tag: {{ .Environment.Values.frontend_ai_assistant.image_tag | default "latest" | quote }}
@@ -6,3 +12,11 @@ image:
 ingress:
   host: assistant.{{ .Environment.Values.domain }}
   domain: {{ .Environment.Values.domain }}
+
+{{- with $legalBase }}
+extraEnv:
+  # This app knows no community: its AI notice links the legal host's page listing every
+  # community's privacy notice (celine-frontend `apps/assistant`).
+  - name: PUBLIC_LEGAL_BASE_URL
+    value: {{ . | quote }}
+{{- end }}

@@ -84,9 +84,20 @@ persistence:
   size: {{ $o | dig "persistence" "size" "1Gi" | quote }}
   storageClass: {{ $o | dig "persistence" "storage_class" "" | quote }}
 
-{{- with $o | dig "env" (dict) }}
+{{- /* The legal host's base URL: `legal.base_url`, else https://<legal host> when the
+       release is installed, else none (see celine-legal's defaults). */}}
+{{- $legal := .Environment.Values | dig "legal" (dict) | default (dict) }}
+{{- $legalHost := $legal | dig "host" (printf "legal.%s" .Environment.Values.domain) }}
+{{- $legalBase := $legal | dig "base_url" (ternary (printf "https://%s" $legalHost) "" ($legal | dig "enabled" false)) | trimSuffix "/" }}
+{{- $onboardingEnv := $o | dig "env" (dict) | default (dict) }}
+{{- if or $onboardingEnv $legalBase }}
 extraEnv:
-  {{- range $name, $value := . }}
+  {{- with $legalBase }}
+  # Consent documents resolved per community (onboarding `services/legal_documents.py`).
+  - name: LEGAL_BASE_URL
+    value: {{ . | quote }}
+  {{- end }}
+  {{- range $name, $value := $onboardingEnv }}
   - name: {{ $name }}
     value: {{ $value | toString | quote }}
   {{- end }}
