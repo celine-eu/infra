@@ -1,0 +1,14 @@
+apiVersion: v2
+name: celine-ai-assistant-shell
+description: >
+  Long-running shell pod for celine-ai-assistant maintenance tasks.
+  Runs the same ghcr.io/celine-eu/celine-ai-assistant image, with the service's
+  environment, but with `tail -f /dev/null` so operators can kubectl exec in to run
+  the `celine-assistant kb` CLI (sync sources, reindex, prune, migrate-legacy).
+type: application
+version: 0.1.0
+appVersion: "latest"
+dependencies:
+  - name: celine-services
+    version: "0.1.0"
+    repository: file://../celine-services

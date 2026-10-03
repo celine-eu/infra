@@ -1,0 +1,55 @@
+## ----------------------------------------------------------------------------
+## celine-ai-assistant-shell — values.yaml
+##
+## Operator pod for the assistant's knowledge bases. The release also reads the
+## assistant's own defaults, so `extraEnv` (Qdrant, LLM_EMBED_*, KB_*) is the
+## service's: the CLI builds exactly what the service will read.
+##
+## Usage after deploy:
+##   kubectl exec -it deploy/ai-assistant-shell -n celine-<env> -- celine-assistant kb status
+##   # or, from demo3.deployment: task kb:staging -- status
+##
+## It has no volume: git clones live in the container and are re-made on a restart,
+## and uploaded files are on the service's volume. `kb reindex --re-extract`, which
+## reads those files, runs in the service pod instead.
+## ----------------------------------------------------------------------------
+
+fullnameOverride: ai-assistant-shell
+
+image:
+  repository: ghcr.io/celine-eu/celine-ai-assistant
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+postgres:
+  existingSecret: "postgis1-ai-assistant-connection-string"
+  dsnEnvVar: "DATABASE_URL"
+  secretKey: "connection-string"
+
+s3:
+  endpointUrl: ""
+  region: "us-east-1"
+  existingSecret: ""
+
+caSecret: ""
+logLevel: "INFO"
+extraEnv: []
+
+podAnnotations: {}
+podSecurityContext:
+  runAsUser: 1000
+  fsGroup: 1000
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 1Gi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

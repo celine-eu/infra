@@ -34,15 +34,29 @@ extraEnv:
     value: {{ $llm | dig "embed_model" "" | quote }}
   - name: LLM_EMBED_DIMENSIONS
     value: {{ $llm | dig "embed_dimensions" "" | quote }}
-  # A collection holds vectors of one size: a new embedding model needs a new name.
+  # A prefix: each REC's knowledge base is the Qdrant alias
+  # <prefix>__<community_id>__<embedding fingerprint> (the assistant's ADR-0008).
   - name: QDRANT_COLLECTION
     value: {{ .Environment.Values | dig "ai_assistant" "qdrant_collection" "celine_docs" | quote }}
-  - name: TRAINING_MATERIALS_REPO_URL
-    value: {{ .Environment.Values.ai_assistant.training_material_url | quote }}
-  - name: TRAINING_MATERIALS_PATH
-    value: "/tmp/training-material"
-  - name: MANIFEST_PATH
-    value: "/tmp/manifest.json"
+  {{- $kb := .Environment.Values | dig "ai_assistant" "kb" dict }}
+  # Knowledge sources are registered per REC with `celine-assistant kb source add`;
+  # git sources are cloned onto the data volume.
+  - name: KB_SOURCES_DIR
+    value: "/app/data/kb-sources"
+  - name: KB_SYNC_ON_START
+    value: {{ $kb | dig "sync_on_start" false | toString | quote }}
+  - name: KB_GIT_TOKEN_HOST
+    value: {{ $kb | dig "git_token_host" "github.com" | quote }}
+  {{- if $kb | dig "git_token" "" }}
+  - name: KB_GIT_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: ai-assistant-secrets
+        key: KB_GIT_TOKEN
+  {{- end }}
+  # The organization type that marks a REC in the token; the same value onboarding uses.
+  - name: REC_ORGANIZATION_TYPE
+    value: {{ .Environment.Values | dig "ai_assistant" "rec_organization_type" "rec" | quote }}
   - name: DIGITAL_TWIN_API_URL
     value: "http://digital-twin:8002"
   - name: DATASETS_API_URL
@@ -51,6 +65,13 @@ extraEnv:
     value: "http://rec-registry:8004"
   - name: FLEXIBILITY_API_URL
     value: "http://flexibility-api:8017"
+
+{{- with $kb | dig "git_token" "" }}
+
+# A token for private knowledge sources: keep it out of the Deployment spec.
+extraSecrets:
+  KB_GIT_TOKEN: {{ . | quote }}
+{{- end }}
 
 {{- with .Environment.Values | dig "ai_assistant" "resources" nil }}
 resources:

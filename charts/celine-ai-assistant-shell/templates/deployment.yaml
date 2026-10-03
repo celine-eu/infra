@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "celine-services.fullname" . }}
+  labels:
+    {{- include "celine-services.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "celine-services.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "celine-services.selectorLabels" . | nindent 8 }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: {{ .Values.podSecurityContext.runAsUser | default 1000 }}
+        {{- with .Values.podSecurityContext.fsGroup }}
+        fsGroup: {{ . }}
+        {{- end }}
+      containers:
+        - name: shell
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default "latest" }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "ai-assistant shell ready: celine-assistant kb --help"
+              tail -f /dev/null
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          env:
+            - name: LOG_LEVEL
+              value: {{ .Values.logLevel | default "INFO" | quote }}
+            {{- include "celine-services.postgresEnv" . | nindent 12 }}
+            {{- include "celine-services.s3Env" . | nindent 12 }}
+            {{- include "celine-services.caEnv" . | nindent 12 }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- if .Values.caSecret }}
+          volumeMounts:
+            {{- include "celine-services.caVolumeMount" . | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- if .Values.caSecret }}
+      volumes:
+        {{- include "celine-services.caVolume" . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

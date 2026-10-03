@@ -1,0 +1,9 @@
+# Layered after the assistant's own defaults (see the release in
+# helmfile.d/0050-celine-services.yaml.gotmpl): image tag and extraEnv are the
+# service's. Only what differs for an operator pod is set here.
+fullnameOverride: ai-assistant-shell
+
+{{- with .Environment.Values | dig "ai_assistant_shell" "resources" nil }}
+resources:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
