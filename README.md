@@ -225,8 +225,8 @@ static site: one page per document, version and language, and per community
 It is **off** until the environment sets `legal.enabled: true` and an image.
 
 The site is the deployment's own content, so the platform ships no image for it. The image
-is a static file server that runs non-root, listens on `8080` and serves the built site at
-`/`.
+is a static file server that runs non-root, listens on `8080`, serves the built site at
+`/`, and writes only to `/tmp` (the root filesystem is read-only).
 
 | Value | Effect |
 |---|---|
