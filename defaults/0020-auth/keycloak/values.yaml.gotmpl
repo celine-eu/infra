@@ -102,6 +102,17 @@ extraEnv: |
     value: /opt/keycloak/data/import/celine-realm.json
   - name: KEYCLOAK_IMPORT_STRATEGY
     value: IGNORE_EXISTING  # prevents overwriting existing realm if already imported
+{{- /* Footer links of the login and email theme (celine-policies `themes/rec`), when the
+       environment has a legal host (`legal.base_url`): pages listing each community's
+       terms and privacy notice, since a login page does not know its reader's community.
+       Unset, the theme hides both links. */}}
+{{- $legal := index .Environment.Values "legal" | default dict }}
+{{- with index $legal "base_url" }}
+  - name: TERMS_URL
+    value: "{{ trimSuffix "/" . }}/terms/"
+  - name: PRIVACY_URL
+    value: "{{ trimSuffix "/" . }}/privacy/"
+{{- end }}
 
 extraVolumeMounts: |
   - name: realm-import
