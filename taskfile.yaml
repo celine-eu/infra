@@ -513,6 +513,24 @@ tasks:
         kubectl cp "$FILE" "$POD":/tmp/rec.yaml -n celine-{{ .DEPLOYMENT_ENV }}
         kubectl exec -it "$POD" -n celine-{{ .DEPLOYMENT_ENV }} -- bash -c "cd /app/src/celine/rec_registry/cli && python main.py import -f /tmp/rec.yaml"
 
+  kb:service:*:
+    desc: "Run `celine-assistant kb …` in the ai-assistant service pod itself — for `reindex --re-extract`, which reads uploaded files from the service's volume. Usage: task kb:service:staging -- reindex --community <id> --re-extract"
+    vars:
+      DEPLOYMENT_ENV: "{{ index .MATCH 0 }}"
+    cmds:
+      - kubectl exec -it deploy/ai-assistant -n celine-{{ .DEPLOYMENT_ENV }} -- celine-assistant kb {{ .CLI_ARGS }}
+
+  kb:*:
+    desc: "Run `celine-assistant kb …` in the ai-assistant-shell pod. Usage: task kb:staging -- status | sync | reindex --all | prune --dry-run | migrate-legacy --community <id> --git <url>"
+    vars:
+      DEPLOYMENT_ENV: "{{ index .MATCH 0 }}"
+    cmds:
+      - |
+        set -e
+        kubectl get deploy/ai-assistant-shell -n celine-{{ .DEPLOYMENT_ENV }} >/dev/null \
+          || { echo "No ai-assistant-shell in celine-{{ .DEPLOYMENT_ENV }}: deploy the release first"; exit 1; }
+        kubectl exec -it deploy/ai-assistant-shell -n celine-{{ .DEPLOYMENT_ENV }} -- celine-assistant kb {{ .CLI_ARGS }}
+
   import:dataset-sync:*:
     desc: "Export governance.yaml files from pipeline repos and import into the dataset-api catalogue. Usage: task import:dataset-sync:staging"
     vars:
