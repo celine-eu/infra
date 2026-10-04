@@ -53,249 +53,31 @@
   {{- end }}
 
   {{- /*
-    The admin second factor (keycloak.admin_mfa). Provider ids are Keycloak 26.7.3's
-    `conditional-*`: an unknown id is accepted by the import and then fails every browser
-    sign-in, for every user. The shape was verified on a throwaway 26.7.3 realm
-    (celine-policies' passkey plan, Phase 1): a non-admin is never asked; an admin who used
-    a passkey is not asked; an admin with TOTP or recovery codes is asked for one; an admin
-    with neither enrols both.
+    No admin second factor here. celine-policies `keycloak bootstrap` owns it (REQ-0015,
+    ADR-0013): it builds and binds the flow `browser-admin-second-factor` on the realm role
+    `platform-admin` outside dev, on every policies-shell start, and corrects an older
+    import's flow in place. An import reaches new realms only, so it could never be the
+    owner. `keycloak.admin_mfa` is now read by the policies-shell release.
   */}}
-  "browserFlow": {{ if .Values.adminMfa.enabled }}"browser-admin-second-factor"{{ else }}"browser"{{ end }},
-
-  {{- if .Values.adminMfa.enabled }}
-  "authenticationFlows": [
-    {
-      "alias": "browser-admin-second-factor",
-      "description": "Password or passkey for everyone; platform admins who did not use a passkey also need TOTP or a recovery code",
-      "providerId": "basic-flow",
-      "topLevel": true,
-      "builtIn": false,
-      "authenticationExecutions": [
-        {
-          "authenticator": "auth-cookie",
-          "requirement": "ALTERNATIVE",
-          "priority": 10,
-          "authenticatorFlow": false
-        },
-        {
-          "authenticator": "auth-spnego",
-          "requirement": "DISABLED",
-          "priority": 20,
-          "authenticatorFlow": false
-        },
-        {
-          "authenticator": "identity-provider-redirector",
-          "requirement": "ALTERNATIVE",
-          "priority": 25,
-          "authenticatorFlow": false
-        },
-        {
-          "flowAlias": "browser-admin-second-factor organization",
-          "requirement": "ALTERNATIVE",
-          "priority": 26,
-          "authenticatorFlow": true
-        },
-        {
-          "flowAlias": "browser-admin-second-factor forms",
-          "requirement": "ALTERNATIVE",
-          "priority": 30,
-          "authenticatorFlow": true
-        }
-      ]
-    },
-    {
-      "alias": "browser-admin-second-factor organization",
-      "description": "As in Keycloak's own browser flow",
-      "providerId": "basic-flow",
-      "topLevel": false,
-      "builtIn": false,
-      "authenticationExecutions": [
-        {
-          "flowAlias": "browser-admin-second-factor conditional organization",
-          "requirement": "CONDITIONAL",
-          "priority": 10,
-          "authenticatorFlow": true
-        }
-      ]
-    },
-    {
-      "alias": "browser-admin-second-factor conditional organization",
-      "description": "Organization identity-first login, for users who belong to one",
-      "providerId": "basic-flow",
-      "topLevel": false,
-      "builtIn": false,
-      "authenticationExecutions": [
-        {
-          "authenticator": "conditional-user-configured",
-          "requirement": "REQUIRED",
-          "priority": 10,
-          "authenticatorFlow": false
-        },
-        {
-          "authenticator": "organization",
-          "requirement": "ALTERNATIVE",
-          "priority": 20,
-          "authenticatorFlow": false
-        }
-      ]
-    },
-    {
-      "alias": "browser-admin-second-factor forms",
-      "description": "Username and password, or a passkey from the same page",
-      "providerId": "basic-flow",
-      "topLevel": false,
-      "builtIn": false,
-      "authenticationExecutions": [
-        {
-          "authenticator": "auth-username-password-form",
-          "requirement": "REQUIRED",
-          "priority": 10,
-          "authenticatorFlow": false
-        },
-        {
-          "flowAlias": "browser-admin-second-factor admin",
-          "requirement": "CONDITIONAL",
-          "priority": 20,
-          "authenticatorFlow": true
-        }
-      ]
-    },
-    {
-      "alias": "browser-admin-second-factor admin",
-      "description": "Platform admins who did not sign in with a passkey",
-      "providerId": "basic-flow",
-      "topLevel": false,
-      "builtIn": false,
-      "authenticationExecutions": [
-        {
-          "authenticator": "conditional-user-role",
-          "authenticatorConfig": "browser-admin-second-factor-admin-role",
-          "requirement": "REQUIRED",
-          "priority": 10,
-          "authenticatorFlow": false
-        },
-        {
-          "authenticator": "conditional-credential",
-          "authenticatorConfig": "browser-admin-second-factor-no-passkey",
-          "requirement": "REQUIRED",
-          "priority": 20,
-          "authenticatorFlow": false
-        },
-        {
-          "flowAlias": "browser-admin-second-factor configured",
-          "requirement": "CONDITIONAL",
-          "priority": 30,
-          "authenticatorFlow": true
-        },
-        {
-          "flowAlias": "browser-admin-second-factor enrol",
-          "requirement": "CONDITIONAL",
-          "priority": 40,
-          "authenticatorFlow": true
-        }
-      ]
-    },
-    {
-      "alias": "browser-admin-second-factor configured",
-      "description": "An admin who has a second factor uses it",
-      "providerId": "basic-flow",
-      "topLevel": false,
-      "builtIn": false,
-      "authenticationExecutions": [
-        {
-          "authenticator": "conditional-user-configured",
-          "requirement": "REQUIRED",
-          "priority": 10,
-          "authenticatorFlow": false
-        },
-        {
-          "authenticator": "auth-otp-form",
-          "requirement": "ALTERNATIVE",
-          "priority": 20,
-          "authenticatorFlow": false
-        },
-        {
-          "authenticator": "auth-recovery-authn-code-form",
-          "requirement": "ALTERNATIVE",
-          "priority": 30,
-          "authenticatorFlow": false
-        }
-      ]
-    },
-    {
-      "alias": "browser-admin-second-factor enrol",
-      "description": "An admin who has none enrols TOTP and recovery codes. Without this branch Keycloak refuses them as 'invalid username or password'",
-      "providerId": "basic-flow",
-      "topLevel": false,
-      "builtIn": false,
-      "authenticationExecutions": [
-        {
-          "authenticator": "conditional-sub-flow-executed",
-          "authenticatorConfig": "browser-admin-second-factor-not-configured",
-          "requirement": "REQUIRED",
-          "priority": 10,
-          "authenticatorFlow": false
-        },
-        {
-          "authenticator": "auth-otp-form",
-          "requirement": "REQUIRED",
-          "priority": 20,
-          "authenticatorFlow": false
-        },
-        {
-          "authenticator": "auth-recovery-authn-code-form",
-          "requirement": "REQUIRED",
-          "priority": 30,
-          "authenticatorFlow": false
-        }
-      ]
-    }
-  ],
-  "authenticatorConfig": [
-    {
-      "alias": "browser-admin-second-factor-admin-role",
-      "config": {
-        "condUserRole": {{ required "adminMfa.role is required when admin MFA is enabled" .Values.adminMfa.role | quote }},
-        "negate": "false"
-      }
-    },
-    {
-      "alias": "browser-admin-second-factor-no-passkey",
-      "config": {
-        "credentials": "webauthn-passwordless",
-        "included": "false"
-      }
-    },
-    {
-      "alias": "browser-admin-second-factor-not-configured",
-      "config": {
-        "flow_to_check": "browser-admin-second-factor configured",
-        "check_result": "not-executed"
-      }
-    }
-  ],
-  {{- else }}
+  "browserFlow": "browser",
   "authenticationFlows": [],
   "authenticatorConfig": [],
-  {{- end }}
 
 
+  {{- /*
+    Two levels, nothing in between (celine-policies ADR-0012). The realm role `platform-admin`
+    is the only platform-wide grant: services read it from `realm_access.roles` (the `roles`
+    scope, access token only). An organisation's own groups (admins > managers > editors >
+    viewers) reach a token only inside `organization.<alias>.groups` and are valid only in
+    that organisation. There are no realm groups and no realm roles admin/manager/editor/
+    viewer: their names collide with the organisation groups. Holders are granted the role
+    directly, never through a group or a composite role.
+  */}}
   "roles": {
     "realm": [
       {
-        "name": "admin",
-        "containerId": "0c1045cc-7e38-4235-8a5b-502a2c4ae1ac"
-      },
-      {
-        "name": "manager",
-        "containerId": "0c1045cc-7e38-4235-8a5b-502a2c4ae1ac"
-      },
-      {
-        "name": "editor",
-        "containerId": "0c1045cc-7e38-4235-8a5b-502a2c4ae1ac"
-      },
-      {
-        "name": "viewer",
+        "name": "platform-admin",
+        "description": "The only platform-wide grant (celine-policies ADR-0012)",
         "containerId": "0c1045cc-7e38-4235-8a5b-502a2c4ae1ac"
       }
     ]
@@ -316,41 +98,12 @@
           "temporary": false
         }
       ],
-      "groups": [
-        "admins"
+      "realmRoles": [
+        "platform-admin"
       ]
     }
   ],
-  "groups": [
-    {
-      "name": "admins",
-      "path": "/admins",
-      "realmRoles": [
-        "admin"
-      ]
-    },
-    {
-      "name": "managers",
-      "path": "/managers",
-      "realmRoles": [
-        "manager"
-      ]
-    },
-    {
-      "name": "editors",
-      "path": "/editors",
-      "realmRoles": [
-        "editor"
-      ]
-    },
-    {
-      "name": "viewers",
-      "path": "/viewers",
-      "realmRoles": [
-        "viewer"
-      ]
-    }
-  ],
+  "groups": [],
   "clients": [
     {
       "clientId": "oauth2_proxy",
@@ -467,35 +220,42 @@
                 "lightweight.claim": "false"
             }
         },
+        {{- /*
+          The only groups mapper: organisation groups, inside `organization.<alias>.groups`.
+          Nothing writes a top-level `groups` claim (no realm group mapper, no `microprofile-jwt`,
+          which copies realm roles into `groups`). celine-policies `sync` puts the same mapper on
+          the `organization` scope; the two together still list each group once (measured on
+          Keycloak 26.7.3).
+        */}}
         {
-          "name": "groups",
+          "name": "organization group membership",
           "protocol": "openid-connect",
-          "protocolMapper": "oidc-group-membership-mapper",
+          "protocolMapper": "oidc-organization-group-membership-mapper",
           "consentRequired": false,
           "config": {
-            "full.path": "false",
             "id.token.claim": "true",
             "access.token.claim": "true",
             "userinfo.token.claim": "true",
-            "claim.name": "groups",
-            "jsonType.label": "String"
+            "introspection.token.claim": "true",
+            "lightweight.claim": "false"
           }
         }
       ],
+      {{- /* `roles` carries `platform-admin` in realm_access.roles: required on every client
+             whose user tokens a service reads (celine-policies REQ-0013). */}}
       "defaultClientScopes": [
         "web-origins",
         "acr",
         "profile",
         "roles",
         "basic",
-        "email"
+        "email",
+        "organization"
       ],
       "optionalClientScopes": [
         "address",
         "phone",
-        "offline_access",
-        "organization",
-        "microprofile-jwt"
+        "offline_access"
       ],
       "access": {
         "view": true,

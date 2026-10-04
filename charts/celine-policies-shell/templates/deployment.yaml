@@ -86,6 +86,10 @@ spec:
             - name: CELINE_KEYCLOAK_BRUTE_FORCE_ENABLED
               value: {{ . | quote }}
             {{- end }}
+            {{- with .Values.bootstrap.adminMfaRequired | toString }}
+            - name: CELINE_KEYCLOAK_ADMIN_MFA_REQUIRED
+              value: {{ . | quote }}
+            {{- end }}
             {{- with .Values.bootstrap.smtp }}
             {{- if .host }}
             - name: CELINE_KEYCLOAK_SMTP_HOST

@@ -33,7 +33,10 @@ ingress:
   annotations:
     cert-manager.io/issuer: {{ .Environment.Values.tls_setup.issuer | default "celine-tls" }}
     # nginx.ingress.kubernetes.io/rewrite-target: /
-    nginx.ingress.kubernetes.io/auth-url: "https://sso.{{ .Environment.Values.domain }}/oauth2/auth?allowed_groups=admins"
+    # Platform admins only. oauth2-proxy's keycloak-oidc provider turns each realm role in
+    # realm_access.roles into the group `role:<name>`, for a cookie session and for a
+    # bearer token (skip_jwt_bearer_tokens) alike (celine-policies ADR-0012).
+    nginx.ingress.kubernetes.io/auth-url: "https://sso.{{ .Environment.Values.domain }}/oauth2/auth?allowed_groups=role:platform-admin"
     nginx.ingress.kubernetes.io/auth-signin: "https://sso.{{ .Environment.Values.domain }}/oauth2/start?rd=$scheme://$host$request_uri"
     nginx.ingress.kubernetes.io/auth-response-headers: "Authorization, X-Auth-Request-Email, X-Auth-Request-User"
 

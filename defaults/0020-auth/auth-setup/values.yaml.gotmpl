@@ -20,8 +20,11 @@ dashboard_items:
     host: superset
   - name: Data Lineage (Marquez)
     host: marquez
-  - name: Security (Keycloak)
+  # The public Keycloak host serves the platform realm only; the admin console is reached
+  # through a port-forward (task keycloak:forward), so the link is the account console.
+  - name: Account (Keycloak)
     host: keycloak
+    path: /realms/{{ .Environment.Values | dig "keycloak" "realm" "celine" }}/account
   - name: Data Pipelines (Prefect)
     host: prefect
   # - name: Monitoring (Prometheus)
@@ -65,23 +68,6 @@ bruteForce:
   # default, 5, is celine-policies' platform.yaml, which `bootstrap` applies to every realm.
   failureFactor: {{ .Environment.Values | dig "keycloak" "brute_force" "failureFactor" (.Environment.Values | dig "keycloak" "brute_force" "maxLoginFailures" 5) }}
   permanentLockout: {{ .Environment.Values | dig "keycloak" "brute_force" "permanentLockout" false }}  
-
-{{- /* keycloak.admin_mfa: `true` / `false`, or `{enabled: <bool>}`. Anything else stops the
-       render: `admin_mfa: true` used to render as disabled without a word. */}}
-{{- $adminMfa := .Environment.Values | dig "keycloak" "admin_mfa" false }}
-{{- $adminMfaEnabled := false }}
-{{- if kindIs "bool" $adminMfa }}
-{{- $adminMfaEnabled = $adminMfa }}
-{{- else if and (kindIs "map" $adminMfa) (kindIs "bool" ($adminMfa | dig "enabled" false)) }}
-{{- $adminMfaEnabled = $adminMfa | dig "enabled" false }}
-{{- else }}
-{{- fail (printf "keycloak.admin_mfa must be true, false or {enabled: true|false}, got %v" $adminMfa) }}
-{{- end }}
-adminMfa:
-  enabled: {{ $adminMfaEnabled }}
-  # The realm role the /admins group maps (celine-policies platform.yaml role_groups).
-  # Keycloak has no group-membership condition; a group's realm role is what it can test.
-  role: "admin"
 
 theme:
   login: {{ .Environment.Values | dig "keycloak" "theme" "login" "rec" | quote }}

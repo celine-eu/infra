@@ -27,10 +27,6 @@ theme:
   account: ""
   email: ""
 
-adminMfa:
-  enabled: false
-  role: "admin"
-
 brute_force:
   enabled: false
   # Keycloak's "max login failures". There is no `maxLoginFailures` realm field: Keycloak
@@ -58,7 +54,10 @@ dashboard_items:
     host: superset
   - name: Data Lineage (Marquez)
     host: marquez
-  - name: Security (Keycloak)
+  # The public Keycloak host serves the platform realm only; the admin console is reached
+  # through a port-forward (task keycloak:forward), so the link is the account console.
+  - name: Account (Keycloak)
     host: keycloak
+    path: /realms/celine/account
   - name: Data Pipelines (Prefect)
     host: prefect

@@ -43,9 +43,19 @@ tasks:
       - minikube delete
 
   test:auth-setup:
-    desc: "Render the auth-setup realm for every admin_mfa form and check it (KEYCLOAK_URL: also import into that throwaway Keycloak)"
+    desc: "Render the auth-setup realm for every admin_mfa form and check the import carries no admin flow (celine-policies bootstrap owns it)"
     cmds:
       - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/auth-setup -v {{.CLI_ARGS}}
+
+  test:platform-admin:
+    desc: "Render the realm, the Prefect/Marquez gates and the MQTT broker and check the platform-admin role (KEYCLOAK_URL: also import the realm into that throwaway Keycloak and read real tokens)"
+    cmds:
+      - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/platform-admin -v {{.CLI_ARGS}}
+
+  test:keycloak-access:
+    desc: "Render Keycloak, policies-shell and provisioning and check who reaches Keycloak through which door: the public host serves the platform realm only, the admin console is on the port-forward, administrators use the Service"
+    cmds:
+      - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/keycloak-access -v {{.CLI_ARGS}}
 
   set-context:
     desc: Set kubectl default namespace to celine
@@ -142,6 +152,37 @@ tasks:
   postgres:forward:
     cmds:
       - kubectl port-forward svc/postgis1-rw 5432:5432
+
+  keycloak:forward:
+    desc: "Forward the Keycloak Service to localhost: the admin console and the master realm, which the public host does not serve. Current kubectl context; NAMESPACE=<ns> to pick another namespace"
+    vars:
+      NAMESPACE: '{{ .NAMESPACE | default "" }}'
+      STATEFULSET: keycloak-keycloakx
+    cmds:
+      - |
+        NS="{{ .NAMESPACE }}"
+        [ -n "$NS" ] || NS=$(kubectl config view --minify -o jsonpath='{..namespace}')
+        [ -n "$NS" ] || NS=default
+        # The port is the one Keycloak was deployed with (KC_HOSTNAME_ADMIN,
+        # keycloak.admin_forward_port): the console only works on that exact URL.
+        URL=$(kubectl get statefulset -n "$NS" {{ .STATEFULSET }} \
+          -o jsonpath='{.spec.template.spec.containers[?(@.name=="keycloak")].env[?(@.name=="KC_HOSTNAME_ADMIN")].value}')
+        if [ -z "$URL" ]; then
+          echo "No KC_HOSTNAME_ADMIN on statefulset {{ .STATEFULSET }} in $NS: deploy the keycloak release from this infra first"
+          exit 1
+        fi
+        PORT=${URL##*:}
+        # The console signs in to master through master's own URL, so master's Frontend URL
+        # must be this URL too (README, "Keycloak admin access"). Read through the API
+        # server's service proxy: no forward needed yet.
+        ISS=$(kubectl get --raw "/api/v1/namespaces/$NS/services/{{ .STATEFULSET }}-http:http/proxy/realms/master/.well-known/openid-configuration" 2>/dev/null \
+          | sed -n 's/.*"issuer":"\([^"]*\)".*/\1/p')
+        if [ "$ISS" != "$URL/realms/master" ]; then
+          echo "WARNING: master's issuer is '${ISS:-unknown}', not $URL/realms/master: the console will not sign in"
+          echo "until master's Frontend URL is set to $URL (one-time, README 'Keycloak admin access')."
+        fi
+        echo "Admin console: $URL/admin/master/console/   (namespace $NS, Ctrl-C to stop)"
+        kubectl port-forward -n "$NS" svc/{{ .STATEFULSET }}-http "$PORT:http"
 
   sops:encrypt:
     desc: Encrypt secrets.yaml -> secrets.sops.yaml (per-env key)

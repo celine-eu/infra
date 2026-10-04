@@ -36,9 +36,27 @@ fullnameOverride: "policies-shell"
 # All fields map to CELINE_KEYCLOAK_* environment variables (KeycloakSettings).
 # --------------------------------------------------------------------------
 keycloak:
-  # Base URL of the Keycloak instance reachable from within the cluster.
+  # Base URL of the Keycloak Service inside the cluster, never the public host: the public
+  # host serves no /admin and no /realms/master, and bootstrap and sync need both.
   baseUrl: "http://keycloak"
   realm: "celine"
+
+  # CELINE_KEYCLOAK_ENV for bootstrap and sync. Anything but `dev` (empty included) is
+  # production to celine-policies: brute force and the admin second factor on the platform
+  # realm and on master, and the bootstrap client below is required.
+  env: ""
+
+  # The master-realm client bootstrap signs in with (celine-policies REQ-0016, ADR-0014):
+  # CELINE_KEYCLOAK_BOOTSTRAP_CLIENT_*. The first run creates it with the master admin
+  # below; every later run, and `sync`, signs in as it, since the master admin's password
+  # grant stops working once the admin has a second factor. The secret (at least 32
+  # characters, e.g. `openssl rand -hex 32`) goes into a Secret, never into the pod spec,
+  # and reaches both the bootstrap init container and the shell. It holds master's `admin`
+  # role: treat it as the master credential. Empty clientId: celine-policies' default,
+  # svc-celine-policies-bootstrap.
+  bootstrapClient:
+    clientId: ""
+    secret: ""
 
   # Admin credentials — typically injected from the keycloak secret.
   # If existingSecret is set, adminUser and adminPassword are read from there.
@@ -60,11 +78,17 @@ bootstrap:
   # Passed as --allow-destructive: a plan that turns a setting off or removes a list entry
   # is refused without it. Set for one release, then unset.
   allowDestructive: false
-  # CELINE_KEYCLOAK_BRUTE_FORCE_ENABLED. Empty: not set, and bootstrap turns brute force on.
+  # CELINE_KEYCLOAK_BRUTE_FORCE_ENABLED. Empty: not set, and bootstrap turns brute force on
+  # (platform realm and master) unless keycloak.env is dev.
   bruteForceEnabled: ""
+  # CELINE_KEYCLOAK_ADMIN_MFA_REQUIRED: platform admins (and master admins) sign in with a
+  # second factor. Empty: not set, and bootstrap turns it on unless keycloak.env is dev.
+  # Turning either switch off on a realm that has it needs allowDestructive.
+  adminMfaRequired: ""
   waitRetries: 20
   waitDelaySeconds: 15
-  # An overlay on platform.yaml (realm_settings.supportedLocales only). Empty: none.
+  # An overlay on platform.yaml (realm_settings.supportedLocales and platform_admin.users,
+  # the accounts that hold the realm role platform-admin). Empty: none.
   overlay: {}
   # CELINE_KEYCLOAK_SMTP_*. Empty host: smtpServer is left alone. user and password go
   # into a Secret, never into the pod spec.
@@ -80,7 +104,8 @@ bootstrap:
     user: ""
     password: ""
   # CELINE_KEYCLOAK_REALM_ADMIN_*: the operator realm admin, created once (it needs the
-  # password then) and kept in /admins. Empty username: none is managed. The password goes
+  # password then) and granted the realm role platform-admin directly. Empty username: none
+  # is managed. The password goes
   # into a Secret, and is never re-sent to an existing account.
   realmAdmin:
     username: ""

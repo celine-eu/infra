@@ -45,6 +45,24 @@ secrets:
       username: {{ .Environment.Values.keycloak.username }}
       password: {{ .Environment.Values.keycloak.password }}
 
+{{- /*
+  The public host serves the platform realm and nothing else (requester, 2026-10-04). The
+  Ingress lists the paths that are allowed, so everything else - `/admin` (the admin console
+  and the admin REST API), `/realms/master`, any other realm, `/` - matches no rule and gets
+  the ingress controller's 404. Path rules need no snippet annotation, which ingress-nginx
+  refuses by default.
+
+  The master realm and the admin console are reached only through `kubectl port-forward` to
+  the Keycloak Service (`task keycloak:forward`), on http://localhost:<keycloak.admin_forward_port>.
+  Everything inside the cluster that administers Keycloak (the policies-shell bootstrap and
+  sync, provisioning) uses the Service, never this host.
+*/}}
+{{- $realm := .Environment.Values | dig "keycloak" "realm" "celine" }}
+{{- $publicRealms := .Environment.Values | dig "keycloak" "public_realms" (list $realm) }}
+{{- if has "master" $publicRealms }}
+{{- fail "keycloak.public_realms must not name master: the master realm is reached only through a port-forward" }}
+{{- end }}
+{{- $adminPort := .Environment.Values | dig "keycloak" "admin_forward_port" 18080 | int }}
 ingress:
   # If `true`, an Ingress is created
   enabled: true
@@ -64,9 +82,16 @@ ingress:
     # List of rules for the Ingress
   rules:
     - host: "keycloak.{{ .Environment.Values.domain }}"
-      # Paths for the host
+      # Only these paths reach Keycloak from outside: each public realm (sign-in, tokens,
+      # discovery, JWKS, the account console, logout) and the static resources its pages
+      # load. A Prefix path matches whole segments: /realms/celine does not match
+      # /realms/celine2. The console ingress of the chart (ingress.console) stays off.
       paths:
-        - path: /
+        {{- range $publicRealms }}
+        - path: /realms/{{ . }}
+          pathType: Prefix
+        {{- end }}
+        - path: /resources
           pathType: Prefix
   # TLS configuration
   tls:
@@ -98,6 +123,13 @@ extraEnv: |
     value: "https://keycloak.{{ .Environment.Values.domain }}"
   - name: KC_HOSTNAME_STRICT
     value: "false"
+  # The admin console's own links and redirects, for the port-forward (`task keycloak:forward`
+  # forwards to this port). localhost is a secure context, so plain http needs no
+  # certificate. KC_HOSTNAME above stays the URL of every realm, issuers included. The
+  # console also needs the master realm's Frontend URL set to the same value (see the
+  # README, "Keycloak admin access").
+  - name: KC_HOSTNAME_ADMIN
+    value: "http://localhost:{{ $adminPort }}"
   - name: KEYCLOAK_IMPORT
     value: /opt/keycloak/data/import/celine-realm.json
   - name: KEYCLOAK_IMPORT_STRATEGY

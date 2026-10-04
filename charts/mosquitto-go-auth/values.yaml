@@ -38,7 +38,9 @@ mosquitto:
 goAuth:
   logLevel: info
   logDest: stdout
-  disableSuperuser: false
+  # auth_opt_disable_superuser: the broker never asks the backends for a superuser. The
+  # platform has none (celine-policies REQ-0014).
+  disableSuperuser: true
 
   # ----------------------------------------------------------------------------
   # JWT backend — primary auth for new JWT clients

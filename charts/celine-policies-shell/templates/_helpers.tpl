@@ -47,6 +47,23 @@ bootstrap init container.
   value: {{ .Values.keycloak.baseUrl | quote }}
 - name: CELINE_KEYCLOAK_REALM
   value: {{ .Values.keycloak.realm | quote }}
+{{- if .Values.keycloak.env }}
+- name: CELINE_KEYCLOAK_ENV
+  value: {{ .Values.keycloak.env | quote }}
+{{- end }}
+{{- with .Values.keycloak.bootstrapClient }}
+{{- if .clientId }}
+- name: CELINE_KEYCLOAK_BOOTSTRAP_CLIENT_ID
+  value: {{ .clientId | quote }}
+{{- end }}
+{{- if .secret }}
+- name: CELINE_KEYCLOAK_BOOTSTRAP_CLIENT_SECRET
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "celine-policies-shell.fullname" $ }}-bootstrap-client
+      key: secret
+{{- end }}
+{{- end }}
 {{- if .Values.keycloak.adminUser }}
 - name: CELINE_KEYCLOAK_ADMIN_USER
   value: {{ .Values.keycloak.adminUser | quote }}

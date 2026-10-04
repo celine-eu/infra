@@ -31,7 +31,6 @@
 ##
 ##   MQTT auth-specific
 ##     CELINE_MQTT_POLICY_PACKAGE            → mqttPolicyPackage
-##     CELINE_MQTT_SUPERUSER_SCOPE           → mqttSuperuserScope
 ##
 ##   Application
 ##     CELINE_LOG_LEVEL                      → logLevel
@@ -128,9 +127,7 @@ mqttAuth:
     # env: CELINE_MQTT_POLICY_PACKAGE
     policyPackage: "celine.mqtt.acl"
 
-    # OAuth scope that grants MQTT superuser access.
-    # env: CELINE_MQTT_SUPERUSER_SCOPE
-    superuserScope: "mqtt.admin"
+    # There is no superuser scope: mqtt-auth has no MQTT superuser (celine-policies REQ-0014).
 
   # --------------------------------------------------------------------------
   # Application

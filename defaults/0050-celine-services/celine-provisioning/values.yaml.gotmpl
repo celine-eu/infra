@@ -9,8 +9,10 @@ oidc:
     clientSecret: {{ .Environment.Values | dig "provisioning" "client_secret" "svc-provisioning" | quote }}
 
 extraEnv:
+  # The Keycloak Service: provisioning calls the admin REST API, which the public host does
+  # not serve. Tokens still carry the public issuer (KC_HOSTNAME), so the registry accepts them.
   - name: CELINE_KEYCLOAK_BASE_URL
-    value: "https://keycloak.{{ .Values.domain }}"
+    value: {{ .Environment.Values | dig "keycloak" "internal_url" "http://keycloak-keycloakx-http" | quote }}
   - name: CELINE_KEYCLOAK_REALM
     value: {{ .Environment.Values | dig "keycloak" "realm" "celine" | quote }}
   - name: CELINE_KEYCLOAK_ADMIN_CLIENT_ID

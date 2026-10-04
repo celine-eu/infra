@@ -14,10 +14,41 @@ resources:
     memory: 128Mi
 {{- end }}
 
+{{- /*
+  The deployment environment celine-policies is told (CELINE_KEYCLOAK_ENV): `dev` for the
+  helmfile environment `dev`, `prod` for any other, unless `policies_shell.env` says
+  otherwise. Outside dev, bootstrap turns on brute force and the admin second factor on the
+  platform realm and on master, and does it only as its master-realm client, whose secret
+  `policies_shell.bootstrap.client_secret` is then required here.
+*/}}
+{{- $env := .Environment.Values | dig "policies_shell" "env" (ternary "dev" "prod" (eq .Environment.Name "dev")) | toString }}
+{{- $clientSecret := .Environment.Values | dig "policies_shell" "bootstrap" "client_secret" "" | toString }}
+{{- if and (ne (lower $env) "dev") (lt (len $clientSecret) 32) }}
+{{- fail (printf "policies_shell.bootstrap.client_secret is required outside dev (environment %s, policies_shell.env %s), at least 32 characters: the celine-policies bootstrap hardens the master realm only as its master client. Generate it once, e.g. `openssl rand -hex 32`" .Environment.Name $env) }}
+{{- end }}
+{{- /* keycloak.admin_mfa: `true` / `false`, or `{enabled: <bool>}`; unset, bootstrap decides
+       (on unless dev). Anything else stops the render: `admin_mfa: true` once rendered as
+       disabled without a word. */}}
+{{- $adminMfa := .Environment.Values | dig "keycloak" "admin_mfa" nil }}
+{{- $adminMfaRequired := "" }}
+{{- if kindIs "invalid" $adminMfa }}
+{{- else if kindIs "bool" $adminMfa }}
+{{- $adminMfaRequired = $adminMfa | toString }}
+{{- else if and (kindIs "map" $adminMfa) (kindIs "bool" ($adminMfa | dig "enabled" "")) }}
+{{- $adminMfaRequired = $adminMfa.enabled | toString }}
+{{- else }}
+{{- fail (printf "keycloak.admin_mfa must be true, false or {enabled: true|false}, got %v" $adminMfa) }}
+{{- end }}
 keycloak:
-  # Base URL of the Keycloak instance reachable from within the cluster.
-  baseUrl: "https://keycloak.{{ .Values.domain }}"
+  # The Keycloak Service inside the cluster, never the public host: the public host serves
+  # no /admin and no /realms/master (defaults/0020-auth/keycloak), and bootstrap and sync
+  # need both. Tokens still carry the public issuer: KC_HOSTNAME fixes it.
+  baseUrl: {{ .Environment.Values | dig "keycloak" "internal_url" "http://keycloak-keycloakx-http" | quote }}
   realm: {{ .Values.keycloak.realm | default "celine" | quote }}
+  env: {{ $env | quote }}
+  bootstrapClient:
+    clientId: {{ .Environment.Values | dig "policies_shell" "bootstrap" "client_id" "" | quote }}
+    secret: {{ $clientSecret | quote }}
 
   adminUser: {{ .Values.keycloak.username | default "admin" | quote }}
   existingSecret: "keycloak-keycloakx-keycloak-admin-secret"
@@ -104,6 +135,8 @@ bootstrap:
   allowDestructive: {{ .Environment.Values | dig "policies_shell" "bootstrap" "allow_destructive" false }}
   # Rendered only when the environment says so: unset, bootstrap turns brute force on.
   bruteForceEnabled: {{ if hasKey $bruteForce "enabled" }}{{ $bruteForce.enabled | toString | quote }}{{ else }}""{{ end }}
+  # Rendered only when keycloak.admin_mfa is set: unset, bootstrap turns it on unless dev.
+  adminMfaRequired: {{ $adminMfaRequired | quote }}
   overlay:
     {{- with .Environment.Values | dig "keycloak" "platform" (dict) }}
     {{- toYaml . | nindent 4 }}

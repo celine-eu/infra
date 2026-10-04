@@ -59,7 +59,7 @@
     <ul>
         {{- range .Values.dashboard_items }}
         <li>
-            <a href="//{{ .host }}.{{ $.Values.domain }}">{{ .name }}</a>
+            <a href="//{{ .host }}.{{ $.Values.domain }}{{ .path | default "" }}">{{ .name }}</a>
         </li>
         {{- end }}
     </ul>
