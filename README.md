@@ -213,6 +213,38 @@ kubectl -n celine-<env> exec deploy/onboarding -- \
   /app/.venv/bin/onboarding-cli import-templates --filter <slug>
 ```
 
+---
+
+## Legal host
+
+The deployment's legal documents (privacy notices, terms of use, data-sharing notices) as a
+static site: one page per document, version and language, and per community
+`<community>/current.json`, `<community>/history.json` and one address per document,
+`<community>/<slot>/`. Release `legal` (`charts/celine-legal`), at `legal.<domain>`,
+**public**: legal documents are read before anyone signs in, so there is no oauth2-proxy.
+It is **off** until the environment sets `legal.enabled: true` and an image.
+
+The site is the deployment's own content, so the platform ships no image for it. The image
+is a static file server that runs non-root, listens on `8080`, serves the built site at
+`/`, and writes only to `/tmp` (the root filesystem is read-only).
+
+| Value | Effect |
+|---|---|
+| `legal.enabled` | installs the release |
+| `legal.image`, `legal.image_tag` | **required** when enabled: the image holding the built site |
+| `legal.host` | defaults to `legal.<domain>` |
+| `legal.base_url` | where applications find the legal host: defaults to `https://<legal.host>` when the release is installed. Set it alone to use a legal host served elsewhere |
+
+With a base URL, the applications use the community's own documents:
+
+- `webapp` and `onboarding` get `LEGAL_BASE_URL`. Community links the registry leaves
+  empty, the terms gate and the onboarding consent documents resolve there;
+- `frontend-assistant` gets `PUBLIC_LEGAL_BASE_URL`, for the AI notice's privacy link;
+- Keycloak gets `TERMS_URL` and `PRIVACY_URL`, the pages listing every community's
+  documents, for the login and email footer.
+
+Without one, every application behaves as before.
+
 The import checks each boundary id with the Digital Twin, so the Digital Twin must be up.
 
 ---
@@ -426,6 +458,7 @@ Charts under `charts/` are deployed from the working tree by `helmfile.d/`.
 - `celine-frontend-webapp` — Participant webapp
 - `celine-frontend-grid` — Grid webapp
 - `celine-frontend-onboarding` — REC onboarding UI, and the host the onboarding API answers on
+- `celine-legal` — the legal host: the deployment's legal documents as a public static site. See [Legal host](#legal-host)
 
 ### Platform
 

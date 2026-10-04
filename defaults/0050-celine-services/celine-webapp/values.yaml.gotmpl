@@ -1,3 +1,9 @@
+{{- /* The legal host's base URL: `legal.base_url`, else https://<legal host> when the
+       release is installed, else none (see celine-legal's defaults). */}}
+{{- $legal := .Environment.Values | dig "legal" (dict) | default (dict) }}
+{{- $legalHost := $legal | dig "host" (printf "legal.%s" .Environment.Values.domain) }}
+{{- $legalBase := $legal | dig "base_url" (ternary (printf "https://%s" $legalHost) "" ($legal | dig "enabled" false)) | trimSuffix "/" }}
+
 image:
   tag: {{ .Environment.Values.webapp.image_tag | default "latest" | quote }}
 
@@ -18,6 +24,11 @@ extraEnv:
     value: "http://flexibility-api:8017"
   - name: CORS_ORIGINS
     value: '["https://webapp.{{ .Values.domain }}"]'
+  {{- with $legalBase }}
+  # Each community's legal links and the terms gate (celine-webapp `legal.py`).
+  - name: LEGAL_BASE_URL
+    value: {{ . | quote }}
+  {{- end }}
 
 {{- with .Environment.Values | dig "webapp" "resources" nil }}
 resources:

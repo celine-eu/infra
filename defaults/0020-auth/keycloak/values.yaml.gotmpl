@@ -135,15 +135,17 @@ extraEnv: |
   - name: KEYCLOAK_IMPORT_STRATEGY
     value: IGNORE_EXISTING  # prevents overwriting existing realm if already imported
 {{- /* Footer links of the login and email theme (celine-policies `themes/rec`), when the
-       environment has a legal host (`legal.base_url`): pages listing each community's
-       terms and privacy notice, since a login page does not know its reader's community.
-       Unset, the theme hides both links. */}}
-{{- $legal := index .Environment.Values "legal" | default dict }}
-{{- with index $legal "base_url" }}
+       environment has a legal host (`legal.base_url`, or the `legal` release installed):
+       pages listing each community's terms and privacy notice, since a login page does
+       not know its reader's community. Without one, the theme hides both links. */}}
+{{- $legal := .Environment.Values | dig "legal" (dict) | default (dict) }}
+{{- $legalHost := $legal | dig "host" (printf "legal.%s" .Environment.Values.domain) }}
+{{- $legalBase := $legal | dig "base_url" (ternary (printf "https://%s" $legalHost) "" ($legal | dig "enabled" false)) | trimSuffix "/" }}
+{{- with $legalBase }}
   - name: TERMS_URL
-    value: "{{ trimSuffix "/" . }}/terms/"
+    value: "{{ . }}/terms/"
   - name: PRIVACY_URL
-    value: "{{ trimSuffix "/" . }}/privacy/"
+    value: "{{ . }}/privacy/"
 {{- end }}
 
 extraVolumeMounts: |

@@ -1,0 +1,54 @@
+## ----------------------------------------------------------------------------
+## celine-legal — values.yaml
+##
+## The legal host: every legal document a deployment publishes (privacy notices, terms
+## of use, data-sharing notices, …), one page per document, version and language, plus
+## per community `<community>/current.json`, `<community>/history.json` and one address
+## per document slot (`<community>/<slot>/`). The applications link those addresses and
+## record the versions they read there.
+##
+## The site is built by the deployment from its own documents and baked into an image
+## (`image.repository`, no default: the content is the deployment's, not the platform's).
+## **The image contract:** a static file server, running as a non-root user, listening on
+## `service.port` (8080) and serving the built site at `/`. The root filesystem is
+## read-only; `/tmp` is the only writable path (an emptyDir).
+##
+## The host is public on purpose, without oauth2-proxy: a privacy notice or terms of use
+## must be readable before anyone signs in.
+## ----------------------------------------------------------------------------
+
+fullnameOverride: legal
+
+image:
+  repository: ""        # required when the release is installed
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: true
+  host: "legal.celine.test"
+  issuer: celine-tls
+  tls:
+    enabled: true
+    secretName: ""
+  annotations: {}
+
+podSecurityContext:
+  runAsUser: 1000
+
+healthCheck:
+  enabled: true
+  path: /index.json
+
+resources: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
