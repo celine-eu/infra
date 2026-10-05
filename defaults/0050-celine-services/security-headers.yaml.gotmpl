@@ -1,0 +1,31 @@
+{{- /*
+  Security headers of the public hosts: the frontends, the legal host and the API
+  gateway. Layered by those releases only (helmfile.d/0050-celine-services). The chart
+  holds each host's headers and Content-Security-Policy (`securityHeaders` in its
+  values.yaml); ingress-nginx adds them from a ConfigMap (README "Security headers").
+
+    security_headers:
+      enabled: true               # only the dev environment may set false
+      csp:
+        <release>:                # e.g. frontend-webapp, legal, api-gateway
+          report_only: false      # true: Content-Security-Policy-Report-Only
+          directives: {}          # merged over the chart's; null drops a directive
+*/}}
+{{- $sh := .Environment.Values | dig "security_headers" (dict) | default (dict) }}
+{{- $on := $sh | dig "enabled" true }}
+{{- if and (not $on) (ne .Environment.Name "dev") }}
+{{- fail (printf "security_headers.enabled is false in environment %s: only the dev environment may serve the public hosts without security headers" .Environment.Name) }}
+{{- end }}
+{{- $app := $sh | dig "csp" .Release.Name (dict) | default (dict) }}
+securityHeaders:
+  enabled: {{ $on }}
+  {{- if or (hasKey $app "report_only") (hasKey $app "directives") }}
+  csp:
+    {{- if hasKey $app "report_only" }}
+    reportOnly: {{ $app.report_only }}
+    {{- end }}
+    {{- with $app.directives }}
+    directives:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+  {{- end }}

@@ -32,6 +32,31 @@ ingress:
     secretName: ""
   annotations: {}
 
+# Response headers ingress-nginx adds on this host's Ingresses (custom-headers; README
+# "Security headers"). Off only in the dev environment.
+# SvelteKit (adapter-node, ssr off, no kit.csp) with MapLibre: an inline bootstrap and
+# theme script, inline style attributes, a blob: map worker, the CARTO basemap styles,
+# tiles, sprites and glyphs and the ArcGIS imagery, fetched. Report-Only until the
+# browser reports nothing on the map pages (README "Security headers").
+securityHeaders:
+  enabled: true
+  referrerPolicy: strict-origin-when-cross-origin
+  csp:
+    reportOnly: true
+    directives:
+      default-src: "'self'"
+      script-src: "'self' 'unsafe-inline'"
+      style-src: "'self' 'unsafe-inline'"
+      img-src: "'self' data: blob: https://*.basemaps.cartocdn.com https://server.arcgisonline.com"
+      font-src: "'self'"
+      connect-src: "'self' https://basemaps.cartocdn.com https://*.basemaps.cartocdn.com https://server.arcgisonline.com"
+      worker-src: "'self' blob:"
+      child-src: "'self' blob:"
+      object-src: "'none'"
+      base-uri: "'self'"
+      form-action: "'self' https://sso.{{ .Values.ingress.domain }} https://keycloak.{{ .Values.ingress.domain }}"
+      frame-ancestors: "'none'"
+
 healthCheck:
   enabled: true
   path: /

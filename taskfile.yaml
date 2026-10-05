@@ -57,6 +57,11 @@ tasks:
     cmds:
       - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/keycloak-access -v {{.CLI_ARGS}}
 
+  test:security-headers:
+    desc: "Render the public hosts (frontends, legal host, API gateway) and check their security headers: on by default, off in dev only, Report-Only and directive overrides per host, values the controller accepts"
+    cmds:
+      - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/security-headers -v {{.CLI_ARGS}}
+
   set-context:
     desc: Set kubectl default namespace to celine
     cmds:

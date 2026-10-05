@@ -49,6 +49,30 @@ ingress:
     secretName: ""
   annotations: {}
 
+# Response headers ingress-nginx adds on this host's Ingresses (custom-headers; README
+# "Security headers"). Off only in the dev environment.
+# SvelteKit (adapter-node, no kit.csp): an inline bootstrap and theme script, inline
+# style attributes and injected HTML, OpenStreetMap tiles (Leaflet), address search on
+# Nominatim, a static map image for printing, html2canvas and jsPDF for the PDF.
+# Report-Only until the browser reports nothing on the calculator and its PDF export
+# (README "Security headers").
+securityHeaders:
+  enabled: true
+  referrerPolicy: strict-origin-when-cross-origin
+  csp:
+    reportOnly: true
+    directives:
+      default-src: "'self'"
+      script-src: "'self' 'unsafe-inline'"
+      style-src: "'self' 'unsafe-inline'"
+      img-src: "'self' data: blob: https://*.tile.openstreetmap.org https://staticmap.openstreetmap.de"
+      font-src: "'self'"
+      connect-src: "'self' https://nominatim.openstreetmap.org https://*.tile.openstreetmap.org"
+      object-src: "'none'"
+      base-uri: "'self'"
+      form-action: "'self' https://sso.{{ .Values.ingress.domain }} https://keycloak.{{ .Values.ingress.domain }}"
+      frame-ancestors: "'none'"
+
 healthCheck:
   enabled: true
   path: /

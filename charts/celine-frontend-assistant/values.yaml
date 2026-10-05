@@ -30,6 +30,28 @@ ingress:
         secretName: ""
     annotations: {}
 
+# Response headers ingress-nginx adds on this host's Ingresses (custom-headers; README
+# "Security headers"). Off only in the dev environment.
+# SvelteKit (adapter-node, no kit.csp): an inline bootstrap script, inline style
+# attributes. Same-origin /api, blob: attachment previews. Images an answer links on
+# other hosts are not shown.
+securityHeaders:
+  enabled: true
+  referrerPolicy: strict-origin-when-cross-origin
+  csp:
+    reportOnly: false
+    directives:
+      default-src: "'self'"
+      script-src: "'self' 'unsafe-inline'"
+      style-src: "'self' 'unsafe-inline'"
+      img-src: "'self' data: blob:"
+      font-src: "'self'"
+      connect-src: "'self'"
+      object-src: "'none'"
+      base-uri: "'self'"
+      form-action: "'self' https://sso.{{ .Values.ingress.domain }} https://keycloak.{{ .Values.ingress.domain }}"
+      frame-ancestors: "'none'"
+
 healthCheck:
     enabled: true
     path: /

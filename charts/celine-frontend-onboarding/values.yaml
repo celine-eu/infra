@@ -55,6 +55,29 @@ ingress:
 # form origins against the host the browser used, not the pod's.
 origin: ""
 
+# Response headers ingress-nginx adds on the UI's paths and the sign-out redirects; the
+# API sets its own on /api (SecurityHeadersMiddleware). README "Security headers". Off
+# only in the dev environment. SvelteKit (adapter-node, no kit.csp) writes an inline
+# bootstrap script on every page; everything else is this host. The camera is left to
+# the page: the document upload offers `capture`.
+securityHeaders:
+  enabled: true
+  referrerPolicy: strict-origin-when-cross-origin
+  permissionsPolicy: "camera=(self), microphone=(), geolocation=(), payment=(), usb=()"
+  csp:
+    reportOnly: false
+    directives:
+      default-src: "'self'"
+      script-src: "'self' 'unsafe-inline'"
+      style-src: "'self' 'unsafe-inline'"
+      img-src: "'self' data: blob:"
+      font-src: "'self'"
+      connect-src: "'self'"
+      object-src: "'none'"
+      base-uri: "'self'"
+      form-action: "'self' https://sso.{{ .Values.ingress.domain }} https://keycloak.{{ .Values.ingress.domain }}"
+      frame-ancestors: "'none'"
+
 healthCheck:
   enabled: true
   path: /

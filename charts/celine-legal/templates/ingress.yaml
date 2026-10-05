@@ -10,6 +10,7 @@ metadata:
     {{- include "celine-services.labels" . | nindent 4 }}
   annotations:
     cert-manager.io/issuer: {{ .Values.ingress.issuer | default "celine-tls" }}
+    {{- with include "celine-services.securityHeaders.annotation" . }}{{ . | nindent 4 }}{{ end }}
     {{- with .Values.ingress.annotations }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
