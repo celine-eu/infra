@@ -266,6 +266,58 @@ Derived, not set:
 
 ---
 
+## Security headers
+
+Outside dev, every public host - the frontends, the legal host and the API gateway - answers
+with security response headers set by ingress-nginx, not by the applications. Each release
+renders a ConfigMap `<release>-security-headers` and names it on its Ingresses with
+`nginx.ingress.kubernetes.io/custom-headers`. This is not a snippet annotation, so the
+controller's default `allow-snippet-annotations: false` and `annotations-risk-level: High`
+stay as they are.
+
+| Header | Value |
+|---|---|
+| `X-Content-Type-Options` | `nosniff` |
+| `Referrer-Policy` | `strict-origin-when-cross-origin`; `no-referrer` on the API gateway |
+| `X-Frame-Options` | `DENY` |
+| `Permissions-Policy` | no camera, microphone, geolocation, payment or USB; the onboarding UI keeps the camera for document capture |
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains`, where the Ingress terminates TLS (`ingress.tls.enabled`; the gateway's `tls.enabled`) |
+| `Content-Security-Policy` | per host, in the chart's `securityHeaders.csp`; origins of the platform come from `domain` (`sso.<domain>`, `keycloak.<domain>`) |
+
+An Ingress whose backend sets its own headers carries no annotation, because the controller
+would replace them: the assistant API (on the gateway, on the assistant host and under
+`/api/assistant` of the webapp host), the community API and the onboarding API.
+
+| Host | Policy | Allows besides the host itself |
+|---|---|---|
+| webapp, assistant, community | enforced | inline scripts and styles (SvelteKit's bootstrap), `data:`/`blob:` images; community: OpenStreetMap tiles |
+| onboarding | enforced | inline scripts and styles, `data:`/`blob:` images |
+| grid | Report-Only | inline scripts and styles, a `blob:` worker, the CARTO and ArcGIS map hosts |
+| roi | Report-Only | inline scripts and styles, OpenStreetMap tiles, Nominatim, the static map image |
+| legal | enforced | inline styles only; no script |
+| api gateway | enforced | nothing (`default-src 'none'`) |
+
+**Before the first deployment with these headers**, the controller must allow the header
+names. It refuses any other with a 503 on every path of the Ingress that names it. In the
+ingress-nginx ConfigMap (Helm chart: `controller.config`):
+
+```yaml
+global-allowed-response-headers: "X-Content-Type-Options,Referrer-Policy,X-Frame-Options,Permissions-Policy,Strict-Transport-Security,Content-Security-Policy,Content-Security-Policy-Report-Only"
+```
+
+| Value | Effect |
+|---|---|
+| `security_headers.enabled` | `true` unless set. `false` renders neither ConfigMap nor annotation; only the environment `dev` may set it, elsewhere it stops the render |
+| `security_headers.csp.<release>.report_only` | `true` sends `Content-Security-Policy-Report-Only` for that release's host instead |
+| `security_headers.csp.<release>.directives` | merged over the chart's directives; `null` drops one. Values may use `{{ .Values.ingress.domain }}` and `{{ .Values.ingress.host }}` |
+
+`<release>` is the helmfile release: `frontend-webapp`, `frontend-assistant`,
+`frontend-community`, `frontend-grid`, `frontend-roi`, `frontend-onboarding`, `legal`,
+`api-gateway`. A Report-Only host is promoted by setting `report_only: false` once the
+browser console shows no report on its pages. `task test:security-headers` renders all of it.
+
+---
+
 ## Legal host
 
 The deployment's legal documents (privacy notices, terms of use, data-sharing notices) as a
@@ -510,6 +562,8 @@ Charts under `charts/` are deployed from the working tree by `helmfile.d/`.
 - `celine-frontend-grid` — Grid webapp
 - `celine-frontend-onboarding` — REC onboarding UI, and the host the onboarding API answers on
 - `celine-legal` — the legal host: the deployment's legal documents as a public static site. See [Legal host](#legal-host)
+
+The frontends, the legal host and the API gateway carry the [security headers](#security-headers).
 
 ### Platform
 

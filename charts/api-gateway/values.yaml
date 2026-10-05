@@ -10,10 +10,29 @@ tls:
   enabled: true
   secretName: api-gateway-tls
 
+# Response headers ingress-nginx adds on the API paths (`custom-headers`, a ConfigMap
+# beside the Ingress; README "Security headers"). The controller must list every header
+# name in `global-allowed-response-headers` first, or it answers 503 on these paths.
+# Off only in the dev environment. The APIs answer JSON and serve no documentation
+# outside dev (celine-sdk `docs_urls`), so the policy allows nothing.
+securityHeaders:
+  enabled: true
+  referrerPolicy: no-referrer
+  frameOptions: DENY
+  permissionsPolicy: "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+  hsts: "max-age=31536000; includeSubDomains"   # only with tls.enabled
+  csp:
+    reportOnly: false
+    directives:
+      default-src: "'none'"
+      frame-ancestors: "'none'"
+
 # Services exposed under api.{domain}/{name}
 # name:    path prefix and ingress rule identifier
 # service: k8s service name
 # port:    k8s service port
+# ownSecurityHeaders: the service sets its own security headers; its path goes on a
+#          second Ingress without the gateway's
 services:
   - name: rec-registry
     service: rec-registry
@@ -26,6 +45,7 @@ services:
   - name: ai-assistant
     service: ai-assistant
     port: 8012
+    ownSecurityHeaders: true   # SecurityHeadersMiddleware: no gateway headers on its paths
 
   - name: nudging
     service: nudging

@@ -423,6 +423,95 @@ spec:
 
 
 {{/* ----------------------------------------------------------------------------
+  Security headers — response headers ingress-nginx adds on the Ingress paths that
+  carry the annotation (`nginx.ingress.kubernetes.io/custom-headers`, a ConfigMap in
+  the release's namespace). The controller serves only header names listed in its
+  `global-allowed-response-headers`; a name missing there makes it answer 503 on
+  every path of that Ingress, so the controller is configured first (README,
+  "Security headers").
+
+  .Values.securityHeaders:
+    enabled            false renders neither the ConfigMap nor the annotation
+    referrerPolicy     default strict-origin-when-cross-origin
+    frameOptions       X-Frame-Options, default DENY; "" leaves it out
+    permissionsPolicy  default: no camera, microphone, geolocation, payment, usb
+    hsts               Strict-Transport-Security when the Ingress terminates TLS
+                       (ingress.tls.enabled); "" leaves it out
+    csp.reportOnly     true sends Content-Security-Policy-Report-Only instead
+    csp.directives     directive -> sources; each value goes through `tpl`, so
+                       "https://keycloak.{{ .Values.ingress.domain }}" works. true
+                       renders a bare directive, "" / false / null leave it out.
+----------------------------------------------------------------------------- */}}
+
+{{- define "celine-services.securityHeaders.name" -}}
+{{- printf "%s-security-headers" (include "celine-services.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{- define "celine-services.securityHeaders.enabled" -}}
+{{- if (.Values.securityHeaders | default dict).enabled }}true{{ end }}
+{{- end }}
+
+{{/* The annotation, for an Ingress's metadata.annotations; nothing when disabled. */}}
+{{- define "celine-services.securityHeaders.annotation" -}}
+{{- if include "celine-services.securityHeaders.enabled" . -}}
+nginx.ingress.kubernetes.io/custom-headers: {{ printf "%s/%s" .Release.Namespace (include "celine-services.securityHeaders.name" .) | quote }}
+{{- end }}
+{{- end }}
+
+{{/* The Content-Security-Policy value: the directives, sorted, joined by "; ". */}}
+{{- define "celine-services.securityHeaders.csp" -}}
+{{- $root := . }}
+{{- $out := list }}
+{{- range $name, $value := ((.Values.securityHeaders | default dict).csp | default dict).directives }}
+{{- if kindIs "bool" $value }}
+{{- if $value }}{{ $out = append $out $name }}{{ end }}
+{{- else if $value }}
+{{- $out = append $out (printf "%s %s" $name (tpl (toString $value) $root | trim)) }}
+{{- end }}
+{{- end }}
+{{- join "; " $out }}
+{{- end }}
+
+{{/* name -> value of every header, as YAML; values checked against what the controller accepts. */}}
+{{- define "celine-services.securityHeaders.data" -}}
+{{- $sh := .Values.securityHeaders | default dict }}
+{{- $tls := dig "ingress" "tls" "enabled" false (.Values | toYaml | fromYaml) }}
+{{- $headers := dict "X-Content-Type-Options" "nosniff" }}
+{{- $_ := set $headers "Referrer-Policy" (hasKey $sh "referrerPolicy" | ternary $sh.referrerPolicy "strict-origin-when-cross-origin") }}
+{{- $_ := set $headers "X-Frame-Options" (hasKey $sh "frameOptions" | ternary $sh.frameOptions "DENY") }}
+{{- $_ := set $headers "Permissions-Policy" (hasKey $sh "permissionsPolicy" | ternary $sh.permissionsPolicy "camera=(), microphone=(), geolocation=(), payment=(), usb=()") }}
+{{- if $tls }}
+{{- $_ := set $headers "Strict-Transport-Security" (hasKey $sh "hsts" | ternary $sh.hsts "max-age=31536000; includeSubDomains") }}
+{{- end }}
+{{- with include "celine-services.securityHeaders.csp" . }}
+{{- $_ := set $headers (($sh.csp | default dict).reportOnly | ternary "Content-Security-Policy-Report-Only" "Content-Security-Policy") . }}
+{{- end }}
+{{- range $name, $value := $headers }}
+{{- if $value }}
+{{- if not (regexMatch "^[a-zA-Z0-9_ :;.,\\\\/\"'?!(){}\\[\\]@<>=+*#$&`|~^%-]+$" (toString $value)) }}
+{{- fail (printf "securityHeaders: the value of %s has a character ingress-nginx refuses in a custom header: %s" $name $value) }}
+{{- end }}
+{{ $name }}: {{ $value | quote }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{/* The ConfigMap the annotation names; nothing when disabled. */}}
+{{- define "celine-services.securityHeaders.configMap" -}}
+{{- if include "celine-services.securityHeaders.enabled" . }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "celine-services.securityHeaders.name" . }}
+  labels:
+    {{- include "celine-services.labels" . | nindent 4 }}
+data:
+  {{- include "celine-services.securityHeaders.data" . | nindent 2 }}
+{{- end }}
+{{- end }}
+
+
+{{/* ----------------------------------------------------------------------------
   Deployment — default used by most services as-is
 ----------------------------------------------------------------------------- */}}
 

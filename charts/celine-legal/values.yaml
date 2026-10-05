@@ -41,6 +41,23 @@ ingress:
     secretName: ""
   annotations: {}
 
+# Response headers ingress-nginx adds on this host (custom-headers; README "Security
+# headers"). Off only in the dev environment. The site is static: no script, one inline
+# <style> block and an inline style attribute (celine-legal's page templates), no fetch,
+# no font or image from elsewhere.
+securityHeaders:
+  enabled: true
+  referrerPolicy: strict-origin-when-cross-origin
+  csp:
+    reportOnly: false
+    directives:
+      default-src: "'none'"
+      style-src: "'unsafe-inline'"
+      img-src: "'self'"
+      base-uri: "'none'"
+      form-action: "'none'"
+      frame-ancestors: "'none'"
+
 podSecurityContext:
   runAsUser: 1000
 

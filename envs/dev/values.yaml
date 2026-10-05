@@ -1,5 +1,11 @@
 domain: celine.test
 
+# Security headers and Content-Security-Policy of the public hosts (README "Security
+# headers"). Off here only: no other environment may turn them off, and dev's
+# controller needs no allow-list.
+security_headers:
+  enabled: false
+
 seaweedfs:
   enabled: true
   buckets:

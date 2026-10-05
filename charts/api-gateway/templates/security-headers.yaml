@@ -1,0 +1,40 @@
+{{- /*
+  The gateway's response headers (values `securityHeaders`), for ingress-nginx's
+  `custom-headers` annotation. Same contract as celine-services' securityHeaders helpers;
+  this chart does not depend on that library.
+*/}}
+{{- $sh := .Values.securityHeaders | default dict }}
+{{- if $sh.enabled }}
+{{- $headers := dict "X-Content-Type-Options" "nosniff" }}
+{{- $_ := set $headers "Referrer-Policy" (hasKey $sh "referrerPolicy" | ternary $sh.referrerPolicy "no-referrer") }}
+{{- $_ := set $headers "X-Frame-Options" (hasKey $sh "frameOptions" | ternary $sh.frameOptions "DENY") }}
+{{- $_ := set $headers "Permissions-Policy" ($sh.permissionsPolicy | default "") }}
+{{- if .Values.tls.enabled }}
+{{- $_ := set $headers "Strict-Transport-Security" (hasKey $sh "hsts" | ternary $sh.hsts "max-age=31536000; includeSubDomains") }}
+{{- end }}
+{{- $csp := list }}
+{{- range $name, $value := (($sh.csp | default dict).directives | default dict) }}
+{{- if kindIs "bool" $value }}{{ if $value }}{{ $csp = append $csp $name }}{{ end }}
+{{- else if $value }}{{ $csp = append $csp (printf "%s %s" $name (tpl (toString $value) $ | trim)) }}
+{{- end }}
+{{- end }}
+{{- if $csp }}
+{{- $_ := set $headers ((($sh.csp | default dict).reportOnly) | ternary "Content-Security-Policy-Report-Only" "Content-Security-Policy") (join "; " $csp) }}
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-gateway-security-headers
+  labels:
+    app.kubernetes.io/name: api-gateway
+    app.kubernetes.io/instance: {{ .Release.Name }}
+data:
+  {{- range $name, $value := $headers }}
+  {{- if $value }}
+  {{- if not (regexMatch "^[a-zA-Z0-9_ :;.,\\\\/\"'?!(){}\\[\\]@<>=+*#$&`|~^%-]+$" (toString $value)) }}
+  {{- fail (printf "securityHeaders: the value of %s has a character ingress-nginx refuses in a custom header: %s" $name $value) }}
+  {{- end }}
+  {{ $name }}: {{ $value | quote }}
+  {{- end }}
+  {{- end }}
+{{- end }}
