@@ -4,8 +4,10 @@
 #
 #   legal:
 #     enabled: false          # install the release
-#     image: ""               # the image holding the deployment's built legal site (required)
+#     image: ""               # the API image holding the deployment's built legal site (required)
 #     image_tag: latest
+#     ui_image: ghcr.io/celine-eu/celine-legal-ui   # the UI image (generic)
+#     ui_image_tag: latest
 #     host: legal.<domain>    # the public host
 #     base_url: ""            # where applications find the legal host; default https://<host>
 #                             # when enabled. Set it alone to use a legal host served elsewhere.
@@ -19,6 +21,11 @@
 image:
   repository: {{ $legal | dig "image" "" | quote }}
   tag: {{ $legal | dig "image_tag" "latest" | quote }}
+
+ui:
+  image:
+    repository: {{ $legal | dig "ui_image" "ghcr.io/celine-eu/celine-legal-ui" | quote }}
+    tag: {{ $legal | dig "ui_image_tag" "latest" | quote }}
 
 ingress:
   host: {{ $legal | dig "host" (printf "legal.%s" .Environment.Values.domain) }}

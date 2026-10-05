@@ -268,21 +268,30 @@ Derived, not set:
 
 ## Legal host
 
-The deployment's legal documents (privacy notices, terms of use, data-sharing notices) as a
-static site: one page per document, version and language, and per community
-`<community>/current.json`, `<community>/history.json` and one address per document,
-`<community>/<slot>/`. Release `legal` (`charts/celine-legal`), at `legal.<domain>`,
-**public**: legal documents are read before anyone signs in, so there is no oauth2-proxy.
-It is **off** until the environment sets `legal.enabled: true` and an image.
+The deployment's legal documents (privacy notices, terms of use, data-sharing notices),
+scoped per community: people read `/<slot>/<community>` (e.g. `/terms/example-rec`), the
+landing page shows the platform's documents only, and no page lists one community's
+documents beside another's. Applications keep linking `<community>/<slot>/` (redirected)
+and reading `<community>/current.json` and `<community>/history.json`. Release `legal`
+(`charts/celine-legal`), at `legal.<domain>`, **public**: legal documents are read before
+anyone signs in, so there is no oauth2-proxy. It is **off** until the environment sets
+`legal.enabled: true` and an image.
 
-The site is the deployment's own content, so the platform ships no image for it. The image
-is a static file server that runs non-root, listens on `8080`, serves the built site at
-`/`, and writes only to `/tmp` (the root filesystem is read-only).
+One pod, two containers:
+
+- **api**: the deployment's own content, so the platform ships no image for it. It holds the
+  built site, listens on `8080` inside the pod only, and answers `/healthz`.
+- **ui**: generic (`ghcr.io/celine-eu/celine-legal-ui`). It listens on `3000`, behind the
+  Service and the Ingress, and passes the API's own paths through to it on localhost.
+
+Both run non-root, write only to `/tmp` (the root filesystem is read-only), and are probed
+on `/healthz`.
 
 | Value | Effect |
 |---|---|
 | `legal.enabled` | installs the release |
-| `legal.image`, `legal.image_tag` | **required** when enabled: the image holding the built site |
+| `legal.image`, `legal.image_tag` | **required** when enabled: the API image holding the built site |
+| `legal.ui_image`, `legal.ui_image_tag` | the UI image; defaults to `ghcr.io/celine-eu/celine-legal-ui:latest` |
 | `legal.host` | defaults to `legal.<domain>` |
 | `legal.base_url` | where applications find the legal host: defaults to `https://<legal.host>` when the release is installed. Set it alone to use a legal host served elsewhere |
 
@@ -509,7 +518,7 @@ Charts under `charts/` are deployed from the working tree by `helmfile.d/`.
 - `celine-frontend-webapp` — Participant webapp
 - `celine-frontend-grid` — Grid webapp
 - `celine-frontend-onboarding` — REC onboarding UI, and the host the onboarding API answers on
-- `celine-legal` — the legal host: the deployment's legal documents as a public static site. See [Legal host](#legal-host)
+- `celine-legal` — the legal host: the deployment's legal documents, public and scoped per community (API + UI). See [Legal host](#legal-host)
 
 ### Platform
 

@@ -2,16 +2,22 @@
 ## celine-legal — values.yaml
 ##
 ## The legal host: every legal document a deployment publishes (privacy notices, terms
-## of use, data-sharing notices, …), one page per document, version and language, plus
-## per community `<community>/current.json`, `<community>/history.json` and one address
-## per document slot (`<community>/<slot>/`). The applications link those addresses and
-## record the versions they read there.
+## of use, data-sharing notices, …). People read `/<slot>/<community>` (e.g.
+## `/terms/example-rec`); the landing page shows the platform's documents only, and no page
+## lists one community's documents beside another's. Applications keep linking
+## `<community>/<slot>/` (redirected) and reading `<community>/current.json` and
+## `<community>/history.json` for the versions they record.
 ##
-## The site is built by the deployment from its own documents and baked into an image
-## (`image.repository`, no default: the content is the deployment's, not the platform's).
-## **The image contract:** a static file server, running as a non-root user, listening on
-## `service.port` (8080) and serving the built site at `/`. The root filesystem is
-## read-only; `/tmp` is the only writable path (an emptyDir).
+## One pod, two containers:
+## - **api** (`image`, no default repository: the content is the deployment's, not the
+##   platform's): the API with the deployment's built site in it, listening on `api.port`
+##   (8080). It decides which community a request is for and serves the files applications
+##   read. Not exposed outside the pod.
+## - **ui** (`ui.image`, generic): every page, listening on `service.port` (3000), passing the
+##   API's own paths through to it on localhost. The Service and the Ingress reach it only.
+##
+## **The image contract:** both run as a non-root user with a read-only root filesystem;
+## `/tmp` is the only writable path (an emptyDir). Both answer `/healthz`.
 ##
 ## The host is public on purpose, without oauth2-proxy: a privacy notice or terms of use
 ## must be readable before anyone signs in.
@@ -19,18 +25,30 @@
 
 fullnameOverride: legal
 
+# The API, with the deployment's built site in it.
 image:
   repository: ""        # required when the release is installed
   tag: "latest"
   pullPolicy: IfNotPresent
 
+api:
+  port: 8080
+
+ui:
+  image:
+    repository: ghcr.io/celine-eu/celine-legal-ui
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  resources: {}
+
 imagePullSecrets: []
 
 replicaCount: 1
 
+# The UI's port: what the Service and the Ingress reach.
 service:
   type: ClusterIP
-  port: 8080
+  port: 3000
 
 ingress:
   enabled: true
@@ -46,9 +64,9 @@ podSecurityContext:
 
 healthCheck:
   enabled: true
-  path: /index.json
+  path: /healthz          # the UI's; the API's own probe is always /healthz
 
-resources: {}
+resources: {}           # the API container's
 nodeSelector: {}
 tolerations: []
 affinity: {}
