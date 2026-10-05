@@ -237,6 +237,35 @@ older image ignores them.
 
 ---
 
+## Environment signal and token verification
+
+Every celine service, the operator shell of the assistant, the pipelines and Superset get
+`CELINE_ENV`, the environment's name. Only `dev` relaxes anything; any other value, unset
+included, is hardened, and a hardened service refuses to start with a development value
+(default database password, client secret equal to the client id, missing issuer or key).
+Images before the celine-sdk release that carries `posture` ignore the variable.
+
+| Value | Effect |
+|---|---|
+| `celine_env` | overrides `CELINE_ENV`. Default: the helmfile environment's name. `dev` outside the environment `dev` stops the render |
+| `qdrant.api_key` | secret: the key Qdrant enforces (`apiKey`) and the assistant sends (`QDRANT_API_KEY`, through `ai-assistant-secrets`). Required by the assistant outside dev. Unset: neither is rendered. Sync `ai-assistant` and `ai-assistant-shell` before `qdrant` |
+| `nudging.click_tracking_secret` | secret: `CLICK_TRACKING_SECRET`, the HMAC key of tracked notification links, through `nudging-secrets`. Required by nudging outside dev from the release that carries `posture`. Older images sign with `VAPID_PRIVATE_KEY` when it is unset, so setting it invalidates the links already sent |
+
+Derived, not set:
+
+- **Superset** trusts the tokens of one issuer: `CUSTOM_SECURITY_MANAGER_KEYCLOAK_ISSUER` is
+  `https://keycloak.<domain>/realms/<keycloak.realm>`, the realm oauth2-proxy signs users in
+  with, and `CUSTOM_SECURITY_MANAGER_KEYCLOAK_AUDIENCE` is `auth_setup.clientID`
+  (`oauth2_proxy`). Plain env on web, worker, beat and the `run-setup` container: from
+  celine-superset ADR-0003, Superset does not start outside dev without the issuer.
+  `superset.acceptSelfSignedCerts` still turns TLS verification of the key fetch off.
+- **The assistant** gets `OAUTH2_ISSUER` (the same realm URL), `OAUTH2_AUDIENCE`
+  (`auth_setup.clientID`) and `OAUTH2_TRUST_HEADERS=false`; it reads the key set from
+  `CELINE_OIDC_JWKS_URI` (celine-services), or discovers it from the issuer on images that
+  do not read that variable.
+
+---
+
 ## Legal host
 
 The deployment's legal documents (privacy notices, terms of use, data-sharing notices) as a

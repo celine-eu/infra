@@ -14,6 +14,13 @@ env: []
   # - name: QDRANT_ALLOW_RECOVERY_MODE
   #   value: true
 
+{{- with .Environment.Values | dig "qdrant" "api_key" "" }}
+# Qdrant refuses requests without this key (`qdrant.api_key`). The assistant sends the same
+# value as QDRANT_API_KEY; an assistant that sends a key Qdrant does not enforce yet still
+# works, the reverse does not: sync `ai-assistant` (and `ai-assistant-shell`) before `qdrant`.
+apiKey: {{ . | quote }}
+{{- end }}
+
 ingress:
   enabled: false
 

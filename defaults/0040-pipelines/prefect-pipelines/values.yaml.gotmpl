@@ -7,6 +7,9 @@ global:
   env:
     - name: PREFECT_MODE
       value: prod
+    # The posture signal (celine-sdk / celine-utils): only `dev` relaxes.
+    - name: CELINE_ENV
+      value: {{ .Environment.Values | dig "celine_env" .Environment.Name | quote }}
 
     - name: PREFECT_API_URL
       value: "http://prefect-server:4200/api"

@@ -9,6 +9,18 @@
 {{- if $smtpOwn | dig "host" "" }}
 {{- $smtp = $smtpOwn }}
 {{- end }}
+{{- /* Token verification (celine-superset ADR-0003). Superset trusts the access tokens of
+       one issuer, the realm oauth2-proxy signs users in with; outside CELINE_ENV=dev, web,
+       worker, beat and the setup container refuse to start without it. The audience is the
+       edge client those tokens are issued to. Not secrets: plain env, not the Secret. */}}
+{{- $celineEnv := .Environment.Values | dig "celine_env" .Environment.Name | toString }}
+{{- if and (ne .Environment.Name "dev") (eq ($celineEnv | trim | lower) "dev") }}
+{{- fail (printf "celine_env is dev in environment %s: only the dev environment may relax Superset" .Environment.Name) }}
+{{- end }}
+{{- $tokenEnv := dict
+      "CELINE_ENV" $celineEnv
+      "CUSTOM_SECURITY_MANAGER_KEYCLOAK_ISSUER" (printf "https://keycloak.%s/realms/%s" .Environment.Values.domain (.Environment.Values | dig "keycloak" "realm" "celine"))
+      "CUSTOM_SECURITY_MANAGER_KEYCLOAK_AUDIENCE" (.Environment.Values | dig "auth_setup" "clientID" "oauth2_proxy") }}
 configMountPath: "/foobar"
 
 image:
@@ -40,6 +52,10 @@ extraSecretEnv:
 {{- end }}
   WEBDRIVER_BASEURL: "http://superset:8088"
   WEBDRIVER_BASEURL_USER_FRIENDLY: "https://superset.{{ .Environment.Values.domain }}"
+
+# Every Superset container (web, worker, beat, flower, ws); `run-setup` below gets the same.
+extraEnv:
+  {{- toYaml $tokenEnv | nindent 2 }}
 
 secretEnv:
   create: true
@@ -110,6 +126,11 @@ supersetNode:
       # note: avoid double rendering of helmfile + helm
       image: "{{`{{ .Values.initImage.repository }}:{{ .Values.initImage.tag }}`}}"
       imagePullPolicy: "{{`{{ .Values.initImage.pullPolicy }}`}}"
+      env:
+        {{- range $name, $value := $tokenEnv }}
+        - name: {{ $name }}
+          value: {{ $value | quote }}
+        {{- end }}
       envFrom:
         - secretRef:
             name: superset-env

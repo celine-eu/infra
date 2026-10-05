@@ -12,9 +12,31 @@ oidc:
   includeClientIdAsAudience: false
   allowedAudiences: ""
 
+{{- $qdrantApiKey := .Environment.Values | dig "qdrant" "api_key" "" }}
+
 extraEnv:
+  # Token verification. The issuer is the realm oauth2-proxy signs users in with (Keycloak's
+  # KC_HOSTNAME fixes every token's `iss` to it); the key set comes from CELINE_OIDC_JWKS_URI,
+  # set by celine-services, or from the issuer's discovery on images that do not read it.
+  # The audience is the edge client user tokens are issued to. Header trust is off: every
+  # caller presents a verified token (refused at startup outside CELINE_ENV=dev anyway).
+  - name: OAUTH2_ISSUER
+    value: {{ printf "https://keycloak.%s/realms/%s" .Environment.Values.domain (.Environment.Values | dig "keycloak" "realm" "celine") | quote }}
+  - name: OAUTH2_AUDIENCE
+    value: {{ .Environment.Values | dig "auth_setup" "clientID" "oauth2_proxy" | quote }}
+  - name: OAUTH2_TRUST_HEADERS
+    value: "false"
   - name: QDRANT_URL
     value: http://qdrant:6333
+  {{- if $qdrantApiKey }}
+  # Qdrant's API key (`qdrant.api_key`, the same value the qdrant release enforces).
+  # Required by the assistant outside CELINE_ENV=dev.
+  - name: QDRANT_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: ai-assistant-secrets
+        key: QDRANT_API_KEY
+  {{- end }}
   {{- $llm := .Environment.Values | dig "ai_assistant" "llm" dict }}
   # Where members' messages and the data the tools fetch for them are sent. No default:
   # the assistant refuses to start without a base URL and the two models.
@@ -66,11 +88,16 @@ extraEnv:
   - name: FLEXIBILITY_API_URL
     value: "http://flexibility-api:8017"
 
-{{- with $kb | dig "git_token" "" }}
+{{- if or ($kb | dig "git_token" "") $qdrantApiKey }}
 
-# A token for private knowledge sources: keep it out of the Deployment spec.
+# Keep these out of the Deployment spec: a token for private knowledge sources, Qdrant's key.
 extraSecrets:
+  {{- with $kb | dig "git_token" "" }}
   KB_GIT_TOKEN: {{ . | quote }}
+  {{- end }}
+  {{- with $qdrantApiKey }}
+  QDRANT_API_KEY: {{ . | quote }}
+  {{- end }}
 {{- end }}
 
 {{- with .Environment.Values | dig "ai_assistant" "resources" nil }}

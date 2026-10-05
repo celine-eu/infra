@@ -1,7 +1,16 @@
 {{- $keycloakPublic := printf "https://keycloak.%s/realms/%s" .Values.domain (.Values.keycloak.realm | default "celine") }}
+{{- /* The posture signal, CELINE_ENV: the environment's name unless `celine_env` says
+       otherwise. Only `dev` relaxes a service, and only the dev environment may say so. */}}
+{{- $celineEnv := .Values | dig "celine_env" .Environment.Name | toString }}
+{{- if and (ne .Environment.Name "dev") (eq ($celineEnv | trim | lower) "dev") }}
+{{- fail (printf "celine_env is dev in environment %s: only the dev environment may relax the services" .Environment.Name) }}
+{{- end }}
 
 image:
   pullPolicy: IfNotPresent
+
+# CELINE_ENV on every service (celine-services.postureEnv).
+celineEnv: {{ $celineEnv | quote }}
 
 oidc:
   baseUrl: {{$keycloakPublic}}

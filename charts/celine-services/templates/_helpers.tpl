@@ -53,6 +53,21 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 
 
 {{/* ----------------------------------------------------------------------------
+  Posture env var — CELINE_ENV (celine-sdk `posture`)
+  Only the value `dev` relaxes a service; unset or anything else is hardened.
+  Rendered when .Values.celineEnv is set (the helmfile defaults set it per
+  environment, and refuse `dev` outside the dev environment).
+----------------------------------------------------------------------------- */}}
+
+{{- define "celine-services.postureEnv" -}}
+{{- with .Values.celineEnv -}}
+- name: CELINE_ENV
+  value: {{ . | quote }}
+{{- end }}
+{{- end }}
+
+
+{{/* ----------------------------------------------------------------------------
   OIDC env vars — CELINE_OIDC_* (celine-sdk OidcSettings)
   Global defaults come from .Values.oidc.*
   Per-service overrides (clientId, clientSecret, audience) from
@@ -214,6 +229,7 @@ initContainers:
       capabilities:
         drop: [ALL]
     env:
+      {{- include "celine-services.postureEnv" . | nindent 6 }}
       {{- include "celine-services.postgresEnv" . | nindent 6 }}
       {{- include "celine-services.caEnv" . | nindent 6 }}
       {{- with .Values.migrate.extraEnv }}
@@ -460,6 +476,7 @@ spec:
           env:
             - name: LOG_LEVEL
               value: {{ .Values.logLevel | default "INFO" | quote }}
+            {{- include "celine-services.postureEnv" . | nindent 12 }}
             {{- include "celine-services.oidcEnv" . | nindent 12 }}
             {{- include "celine-services.policiesEnv" . | nindent 12 }}
             {{- include "celine-services.postgresEnv" . | nindent 12 }}

@@ -1,3 +1,4 @@
+{{- $clickTrackingSecret := .Environment.Values | dig "nudging" "click_tracking_secret" "" }}
 image:
   tag: {{ .Environment.Values.nudging.image_tag | default "latest" | quote }}
 
@@ -12,6 +13,19 @@ extraEnv:
     value: {{ .Environment.Values | dig "nudging" "vapid_private_key" "" | quote }}
   - name: VAPID_SUBJECT
     value: {{ .Environment.Values | dig "nudging" "vapid_subject" "" | quote }}
+  {{- if $clickTrackingSecret }}
+  # The HMAC key of tracked notification links; required outside CELINE_ENV=dev from the
+  # next nudging release. Without it nudging signs with VAPID_PRIVATE_KEY, so setting it
+  # invalidates the tracked links already sent.
+  - name: CLICK_TRACKING_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: nudging-secrets
+        key: CLICK_TRACKING_SECRET
+
+extraSecrets:
+  CLICK_TRACKING_SECRET: {{ $clickTrackingSecret | quote }}
+  {{- end }}
 
 {{- with .Environment.Values | dig "nudging" "resources" nil }}
 resources:

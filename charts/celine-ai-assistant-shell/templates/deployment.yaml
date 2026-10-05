@@ -45,6 +45,7 @@ spec:
           env:
             - name: LOG_LEVEL
               value: {{ .Values.logLevel | default "INFO" | quote }}
+            {{- include "celine-services.postureEnv" . | nindent 12 }}
             {{- include "celine-services.postgresEnv" . | nindent 12 }}
             {{- include "celine-services.s3Env" . | nindent 12 }}
             {{- include "celine-services.caEnv" . | nindent 12 }}
