@@ -215,6 +215,28 @@ kubectl -n celine-<env> exec deploy/onboarding -- \
 
 ---
 
+## ROI calculator
+
+The ROI calculator is public by design: `roi.<domain>` needs no sign-in and the API behind it
+takes no token. `celine-frontend-roi` routes only the calculator's API paths to roi
+(`ingress.apiPaths`); any other `/api` path - `/api/v1/estimates`, the stored calculator
+inputs, readable only with the realm role `platform-admin` - never reaches roi through the
+public host. What one caller can cost is bounded per client address twice: at the edge, on
+the API Ingress only, and inside roi.
+
+| Value | Effect |
+|---|---|
+| `roi.forwarded_allow_ips` | the ingress controller's pod address range, uvicorn's `FORWARDED_ALLOW_IPS`. roi's rate limits and the client address it stores use the address it resolves. Unset (or `REQUIRED-ingress-pod-cidr`), every visitor shares the ingress's address and one budget. `*` stops the render |
+| `roi.rate_limit_calculators_per_minute`, `roi.rate_limit_feedback_per_minute` | roi's per-address limits; roi answers 429 with `Retry-After`. Default 30, 5 |
+| `roi.estimates_max_writes_per_minute` | stored estimates per minute for the whole service; above it results are served and not stored. Default 60 |
+| `roi.client_ip_retention_days` | age after which a stored client address is cleared (estimates and feedback). Default 30 |
+| `frontend_roi.edge_limit_rps`, `frontend_roi.edge_limit_connections` | ingress-nginx `limit-rps` / `limit-connections` on the API paths, per client address. Default 2, 10. They assume the controller sees the real client address |
+
+The roi settings other than `forwarded_allow_ips` are read by roi releases after v1.10.3; an
+older image ignores them.
+
+---
+
 ## Legal host
 
 The deployment's legal documents (privacy notices, terms of use, data-sharing notices) as a

@@ -3,7 +3,8 @@ name: celine-roi
 description: >
   CELINE ROI API (FastAPI).
   PV/CER financial analysis engine with Postgres persistence.
-  Deployed behind oauth2-proxy; JWT forwarded via X-Auth-Request-Access-Token.
+  Public by design behind celine-frontend-roi's ingress; feedback and stored
+  estimates verify a bearer token.
 type: application
 version: 0.1.0
 appVersion: "latest"

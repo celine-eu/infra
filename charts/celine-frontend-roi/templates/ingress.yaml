@@ -22,13 +22,6 @@ spec:
     - host: {{ .Values.ingress.host }}
       http:
         paths:
-          - path: /api
-            pathType: Prefix
-            backend:
-              service:
-                name: {{ .Values.ingress.roiBackend.service }}
-                port:
-                  number: {{ .Values.ingress.roiBackend.port }}
           {{- if .Values.ingress.auth.enabled }}
           - path: /oauth2
             pathType: Prefix
@@ -45,6 +38,53 @@ spec:
                 name: {{ include "celine-services.fullname" . }}
                 port:
                   number: {{ .Values.service.port }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host }}
+      secretName: {{ .Values.ingress.tls.secretName | default (printf "%s-tls" (include "celine-services.fullname" .)) }}
+  {{- end }}
+{{- end }}
+{{- if .Values.ingress.enabled }}
+{{- /*
+  The ROI API, path by path. Only the routes the calculator calls reach roi
+  (`ingress.apiPaths`); any other /api path - `/api/v1/estimates` among them, which only
+  a platform administrator may read - matches `/` and gets the frontend's 404. Its own
+  Ingress so the edge rate limit (`ingress.apiAnnotations`) applies to API calls and
+  not to the page's static assets.
+*/}}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "celine-services.fullname" . }}-api
+  labels:
+    {{- include "celine-services.labels" . | nindent 4 }}
+  annotations:
+    cert-manager.io/issuer: {{ .Values.ingress.issuer | default "celine-tls" }}
+    {{- if .Values.ingress.auth.enabled }}
+    nginx.ingress.kubernetes.io/auth-url: "https://sso.{{ .Values.ingress.domain }}/oauth2/auth"
+    nginx.ingress.kubernetes.io/auth-signin: "https://sso.{{ .Values.ingress.domain }}/oauth2/start?rd=$scheme://$host$request_uri"
+    nginx.ingress.kubernetes.io/auth-response-headers: "Authorization, X-Auth-Request-Email, X-Auth-Request-User, X-Auth-Request-Access-Token"
+    {{- end }}
+    {{- with .Values.ingress.apiAnnotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          {{- range .Values.ingress.apiPaths }}
+          - path: {{ . }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $.Values.ingress.roiBackend.service }}
+                port:
+                  number: {{ $.Values.ingress.roiBackend.port }}
+          {{- end }}
   {{- if .Values.ingress.tls.enabled }}
   tls:
     - hosts:

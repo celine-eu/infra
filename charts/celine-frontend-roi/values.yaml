@@ -25,6 +25,23 @@ ingress:
     service: roi
     port: 8000
 
+  # The roi routes the calculator calls, as path prefixes. Any other /api path never
+  # reaches roi: stored estimates (/api/v1/estimates) are for platform administrators,
+  # through the Service, not the public host.
+  apiPaths:
+    - /api/v1/production
+    - /api/v1/energy
+    - /api/v1/incentives
+    - /api/v1/finance
+    - /api/v1/validate
+    - /api/v1/scenario
+    - /api/v1/capex-estimate
+    - /api/v1/compare
+    - /api/v1/feedback
+  # Annotations of the API Ingress only, e.g. the edge rate limit
+  # (nginx.ingress.kubernetes.io/limit-rps, limit-connections).
+  apiAnnotations: {}
+
   auth:
     enabled: true
   tls:

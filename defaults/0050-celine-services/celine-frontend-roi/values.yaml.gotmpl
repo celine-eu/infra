@@ -1,10 +1,22 @@
 # defaults/0050-celine-services/celine-frontend-roi/values.yaml.gotmpl
+#
+# The ROI calculator is public by design: no sign-in, the API behind it takes no token.
+# What an anonymous caller can cost is bounded twice - here at the edge, per client
+# address, on the API paths only, and again inside roi (see celine-roi).
+#
+#   frontend_roi:
+#     edge_limit_rps: 2            # requests/s per client address on the API (burst x5)
+#     edge_limit_connections: 10   # concurrent connections per client address on the API
+{{- $f := .Environment.Values | dig "frontend_roi" dict }}
 
 image:
-  tag: {{ .Environment.Values.frontend_roi.image_tag | default "latest" | quote }}
+  tag: {{ $f | dig "image_tag" "latest" | quote }}
 
 ingress:
   host: roi.{{ .Environment.Values.domain }}
   domain: {{ .Environment.Values.domain }}
   auth:
     enabled: false
+  apiAnnotations:
+    nginx.ingress.kubernetes.io/limit-rps: {{ $f | dig "edge_limit_rps" 2 | toString | quote }}
+    nginx.ingress.kubernetes.io/limit-connections: {{ $f | dig "edge_limit_connections" 10 | toString | quote }}

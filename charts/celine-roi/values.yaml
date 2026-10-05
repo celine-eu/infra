@@ -1,8 +1,10 @@
 ## ----------------------------------------------------------------------------
 ## celine-roi — values.yaml
 ##
-## FastAPI stateless calculation engine for PV/CER financial analysis.
-## No database. Auth delegated to oauth2-proxy at ingress level.
+## FastAPI calculation engine for PV/CER financial analysis. Public by design: the
+## calculators take no token and are reached through celine-frontend-roi's ingress, which
+## routes only the calculator's API paths here. Stores estimates and feedback in Postgres;
+## stored estimates are readable only with the realm role platform-admin.
 ## ----------------------------------------------------------------------------
 
 fullnameOverride: roi
@@ -19,7 +21,7 @@ service:
   port: 8000
 
 # --------------------------------------------------------------------------
-# Ingress — disabled, accessed via celine-frontend-roi ingress proxy
+# Ingress — disabled, reached through celine-frontend-roi's ingress (no sign-in)
 # --------------------------------------------------------------------------
 ingress:
   enabled: false
@@ -34,7 +36,7 @@ ingress:
   annotations: {}
 
 # --------------------------------------------------------------------------
-# OIDC — not used by the app itself, auth handled by oauth2-proxy upstream
+# OIDC — verifies the tokens of the feedback and estimates routes
 # --------------------------------------------------------------------------
 oidc:
   baseUrl: "http://keycloak/realms/celine"
@@ -49,13 +51,13 @@ oidc:
     clientSecret: ""
 
 # --------------------------------------------------------------------------
-# Postgres — estimates persistence (asyncpg)
+# Postgres — estimates and feedback (asyncpg); DATABASE_URL from this secret
 # --------------------------------------------------------------------------
 postgres:
   existingSecret: "postgis1-roi-connection-string"
 
 # --------------------------------------------------------------------------
-# Alembic migration — disabled (DDL applied manually via sql/init.sql)
+# Alembic migration — `alembic upgrade head` in an init container
 # --------------------------------------------------------------------------
 migrate:
   enabled: true

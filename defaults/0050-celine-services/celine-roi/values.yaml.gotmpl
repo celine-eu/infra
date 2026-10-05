@@ -1,5 +1,33 @@
+# defaults/0050-celine-services/celine-roi/values.yaml.gotmpl
+#
+# roi is public by design (frontend-roi routes the calculator's API paths to it without
+# sign-in). It bounds what one caller can cost per client address - the peer uvicorn
+# resolves, which behind the ingress is the forwarded client only for peers listed in
+# FORWARDED_ALLOW_IPS.
+#
+#   roi:
+#     forwarded_allow_ips: ""   # the ingress controller's pod address range. Unset, every
+#                               # visitor shares the ingress's address and one budget.
+#                               # Never "*": a caller reaching the pod would pick its own.
+#     # optional, roi's defaults in brackets:
+#     rate_limit_calculators_per_minute: 30
+#     rate_limit_feedback_per_minute: 5
+#     estimates_max_writes_per_minute: 60
+#     client_ip_retention_days: 30
+{{- $roi := .Environment.Values | dig "roi" dict }}
+{{- $ips := $roi | dig "forwarded_allow_ips" "" | toString | trim }}
+{{- if eq $ips "REQUIRED-ingress-pod-cidr" }}{{ $ips = "" }}{{ end }}
+{{- if contains "*" $ips }}
+{{- fail "roi.forwarded_allow_ips must not contain \"*\": any caller reaching the port would choose its own address" }}
+{{- end }}
+{{- $settings := dict
+  "rate_limit_calculators_per_minute" "RATE_LIMIT_CALCULATORS_PER_MINUTE"
+  "rate_limit_feedback_per_minute" "RATE_LIMIT_FEEDBACK_PER_MINUTE"
+  "estimates_max_writes_per_minute" "ESTIMATES_MAX_WRITES_PER_MINUTE"
+  "client_ip_retention_days" "CLIENT_IP_RETENTION_DAYS" }}
+
 image:
-  tag: {{ .Environment.Values.roi.image_tag | default "latest" | quote }}
+  tag: {{ $roi | dig "image_tag" "latest" | quote }}
 
 healthCheck:
   path: /docs
@@ -9,8 +37,18 @@ extraEnv:
     value: "/app/config"
   - name: CORS_ORIGINS
     value: '["https://roi.{{ .Values.domain }}"]'
+  {{- if $ips }}
+  - name: FORWARDED_ALLOW_IPS
+    value: {{ $ips | nospace | quote }}
+  {{- end }}
+  {{- range $key, $name := $settings }}
+  {{- with $roi | dig $key nil }}
+  - name: {{ $name }}
+    value: {{ . | toString | quote }}
+  {{- end }}
+  {{- end }}
 
-{{- with .Environment.Values | dig "roi" "resources" nil }}
+{{- with $roi | dig "resources" nil }}
 resources:
   {{- toYaml . | nindent 2 }}
 {{- end }}
