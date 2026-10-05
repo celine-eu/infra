@@ -52,7 +52,8 @@ spec:
   (`ingress.apiPaths`); any other /api path - `/api/v1/estimates` among them, which only
   a platform administrator may read - matches `/` and gets the frontend's 404. Its own
   Ingress so the edge rate limit (`ingress.apiAnnotations`) applies to API calls and
-  not to the page's static assets.
+  not to the page's static assets, and so it keeps an enforced Content-Security-Policy
+  (`securityHeaders.apiCsp`) while the page's policy is the app's own.
 */}}
 ---
 apiVersion: networking.k8s.io/v1
@@ -63,7 +64,7 @@ metadata:
     {{- include "celine-services.labels" . | nindent 4 }}
   annotations:
     cert-manager.io/issuer: {{ .Values.ingress.issuer | default "celine-tls" }}
-    {{- with include "celine-services.securityHeaders.annotation" . }}{{ . | nindent 4 }}{{ end }}
+    {{- with include "celine-services.securityHeaders.apiAnnotation" . }}{{ . | nindent 4 }}{{ end }}
     {{- if .Values.ingress.auth.enabled }}
     nginx.ingress.kubernetes.io/auth-url: "https://sso.{{ .Values.ingress.domain }}/oauth2/auth"
     nginx.ingress.kubernetes.io/auth-signin: "https://sso.{{ .Values.ingress.domain }}/oauth2/start?rd=$scheme://$host$request_uri"

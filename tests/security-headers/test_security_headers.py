@@ -8,6 +8,11 @@
   Content-Security-Policy whose origins come from `domain`.
 - An Ingress whose backend sets its own headers (the assistant, community and
   onboarding APIs) carries no annotation, so the controller does not replace them.
+- The SvelteKit frontends send their own Content-Security-Policy, with a per-request
+  nonce for the inline bootstrap: the controller would replace it, so their ConfigMap
+  carries no enforced policy - webapp, assistant, community and onboarding none at all,
+  grid and roi a Report-Only trial of the other directives, without script-src or
+  default-src. No rendered policy allows 'unsafe-inline' scripts.
 - `security_headers.enabled: false` (envs/dev) renders neither; any other environment
   refuses it. `security_headers.csp.<release>` switches a host to Report-Only and
   overrides directives.
@@ -50,6 +55,17 @@ RELEASES = {
     "legal": set(),
     "api-gateway": {"api-gateway-own-headers"},
 }
+# releases whose app sends its own Content-Security-Policy -> the ingress's Report-Only trial
+SENT_BY_APP = {
+    "frontend-webapp": False,
+    "frontend-assistant": False,
+    "frontend-community": False,
+    "frontend-onboarding": False,
+    "frontend-grid": True,
+    "frontend-roi": True,
+}
+# Ingress -> the ConfigMap of its own, for an API Ingress whose policy is not the page's
+OWN_CONFIGMAP = {"frontend-roi-api": "frontend-roi-api-security-headers"}
 CONFIGMAP = {r: f"{'legal' if r == 'legal' else r}-security-headers" for r in RELEASES}
 
 # ingress-nginx internal/ingress/annotations/customheaders: what a header value may hold
@@ -124,7 +140,38 @@ def test_every_public_host_gets_its_headers_configmap(release, staging):
     assert data["X-Frame-Options"] == "DENY"
     assert "camera=" in data["Permissions-Policy"] and "microphone=()" in data["Permissions-Policy"]
     assert data["Strict-Transport-Security"].startswith("max-age=31536000")
-    assert csp_of(data)["frame-ancestors"] == "'none'"
+    if release not in SENT_BY_APP:
+        assert csp_of(data)["frame-ancestors"] == "'none'"
+
+
+@pytest.mark.parametrize("release", SENT_BY_APP)
+def test_a_host_whose_app_sends_its_policy_gets_no_enforced_one(release, staging):
+    data = of_kind(staging, "ConfigMap")[CONFIGMAP[release]]["data"]
+    assert "Content-Security-Policy" not in data
+    if SENT_BY_APP[release]:
+        csp = csp_of(data)
+        assert "script-src" not in csp and "default-src" not in csp
+        assert csp["frame-ancestors"] == "'none'"
+    else:
+        assert "Content-Security-Policy-Report-Only" not in data
+
+
+@pytest.mark.parametrize("ingress", OWN_CONFIGMAP)
+def test_an_api_ingress_beside_an_app_sent_policy_keeps_an_enforced_one(ingress, staging):
+    data = of_kind(staging, "ConfigMap")[OWN_CONFIGMAP[ingress]]["data"]
+    assert "Content-Security-Policy-Report-Only" not in data
+    assert csp_of(data) == {"default-src": "'none'", "frame-ancestors": "'none'"}
+    assert data["X-Frame-Options"] == "DENY" and data["X-Content-Type-Options"] == "nosniff"
+    assert data["Strict-Transport-Security"].startswith("max-age=31536000")
+
+
+@pytest.mark.parametrize("release", RELEASES)
+def test_no_policy_allows_inline_scripts(release, staging):
+    data = of_kind(staging, "ConfigMap")[CONFIGMAP[release]]["data"]
+    if "Content-Security-Policy" in data or "Content-Security-Policy-Report-Only" in data:
+        csp = csp_of(data)
+        for name in ("script-src", "script-src-elem", "default-src"):
+            assert "'unsafe-inline'" not in csp.get(name, ""), (release, name)
 
 
 @pytest.mark.parametrize("release", RELEASES)
@@ -146,7 +193,8 @@ def test_every_ingress_of_the_host_names_the_configmap_except_self_managed_backe
         if name in RELEASES[release]:
             assert annotation is None, name
         elif name.startswith(CONFIGMAP[release].removesuffix("-security-headers")):
-            assert annotation == f"celine-staging/{cm['metadata']['name']}", name
+            expected = OWN_CONFIGMAP.get(name, cm["metadata"]["name"])
+            assert annotation == f"celine-staging/{expected}", name
 
 
 def test_the_api_gateway_keeps_every_route_across_its_two_ingresses(staging):
@@ -158,7 +206,7 @@ def test_the_api_gateway_keeps_every_route_across_its_two_ingresses(staging):
 
 
 def test_csp_origins_come_from_the_domain(staging):
-    data = of_kind(staging, "ConfigMap")["frontend-onboarding-security-headers"]["data"]
+    data = of_kind(staging, "ConfigMap")["frontend-grid-security-headers"]["data"]
     assert csp_of(data)["form-action"] == f"'self' https://sso.{DOMAIN} https://keycloak.{DOMAIN}"
     assert "{{" not in yaml.safe_dump([d for d in staging if d.get("kind") == "ConfigMap"])
 
@@ -198,5 +246,20 @@ def test_a_host_can_report_only_and_override_directives():
     assert csp["img-src"] == f"'self' https://img.legal.{DOMAIN}"
     assert "form-action" not in csp
     assert csp["default-src"] == "'none'"  # the chart's other directives stay
-    other = of_kind(docs, "ConfigMap")["frontend-onboarding-security-headers"]["data"]
+    other = of_kind(docs, "ConfigMap")["api-gateway-security-headers"]["data"]
     assert "Content-Security-Policy" in other  # the other hosts keep enforcing
+
+
+@pytest.mark.parametrize("override, message", [
+    ("    frontend-webapp:\n      directives:\n        img-src: \"'self'\"\n",
+     "only a Report-Only one may be set here"),
+    ("    frontend-grid:\n      report_only: false\n",
+     "only a Report-Only one may be set here"),
+    ("    frontend-roi:\n      directives:\n        script-src: \"'self' 'unsafe-inline'\"\n",
+     "may not set script-src"),
+])
+def test_a_host_whose_app_sends_its_policy_refuses_one_that_would_replace_or_report_it(override, message):
+    result = render("staging", f"domain: {DOMAIN}\nsecurity_headers:\n  csp:\n" + override,
+                    drop_security_headers=True)
+    assert result.returncode != 0
+    assert message in result.stderr

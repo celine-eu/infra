@@ -438,9 +438,20 @@ spec:
     hsts               Strict-Transport-Security when the Ingress terminates TLS
                        (ingress.tls.enabled); "" leaves it out
     csp.reportOnly     true sends Content-Security-Policy-Report-Only instead
+    csp.sentByApp      true: the application sends its own Content-Security-Policy
+                       (a SvelteKit app, with a per-request nonce in script-src). The
+                       controller would replace it with an enforced policy of the
+                       same name, so the ConfigMap carries none; it may still carry a
+                       Report-Only policy, without script-src or default-src (the app
+                       owns scripts). Anything else stops the render.
     csp.directives     directive -> sources; each value goes through `tpl`, so
                        "https://keycloak.{{ .Values.ingress.domain }}" works. true
                        renders a bare directive, "" / false / null leave it out.
+    apiCsp             { reportOnly, directives }: the policy of the host's own API
+                       Ingress, when it has one that the controller serves headers on
+                       (`apiAnnotation`); a second ConfigMap `<name>-api-security-headers`
+                       with the same other headers. Unset: the API Ingress names the
+                       host's ConfigMap.
 ----------------------------------------------------------------------------- */}}
 
 {{- define "celine-services.securityHeaders.name" -}}
@@ -458,11 +469,26 @@ nginx.ingress.kubernetes.io/custom-headers: {{ printf "%s/%s" .Release.Namespace
 {{- end }}
 {{- end }}
 
-{{/* The Content-Security-Policy value: the directives, sorted, joined by "; ". */}}
+{{/* The annotation for the host's API Ingress: its own ConfigMap when apiCsp is set. */}}
+{{- define "celine-services.securityHeaders.apiAnnotation" -}}
+{{- if include "celine-services.securityHeaders.enabled" . -}}
+{{- if (.Values.securityHeaders | default dict).apiCsp -}}
+nginx.ingress.kubernetes.io/custom-headers: {{ printf "%s/%s" .Release.Namespace (include "celine-services.securityHeaders.apiName" .) | quote }}
+{{- else -}}
+{{ include "celine-services.securityHeaders.annotation" . }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{- define "celine-services.securityHeaders.apiName" -}}
+{{- printf "%s-api-security-headers" (include "celine-services.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{/* The Content-Security-Policy value of (dict "root" . "csp" <csp>): the directives, sorted, joined by "; ". */}}
 {{- define "celine-services.securityHeaders.csp" -}}
-{{- $root := . }}
+{{- $root := .root }}
 {{- $out := list }}
-{{- range $name, $value := ((.Values.securityHeaders | default dict).csp | default dict).directives }}
+{{- range $name, $value := (.csp | default dict).directives }}
 {{- if kindIs "bool" $value }}
 {{- if $value }}{{ $out = append $out $name }}{{ end }}
 {{- else if $value }}
@@ -474,8 +500,15 @@ nginx.ingress.kubernetes.io/custom-headers: {{ printf "%s/%s" .Release.Namespace
 
 {{/* name -> value of every header, as YAML; values checked against what the controller accepts. */}}
 {{- define "celine-services.securityHeaders.data" -}}
-{{- $sh := .Values.securityHeaders | default dict }}
-{{- $tls := dig "ingress" "tls" "enabled" false (.Values | toYaml | fromYaml) }}
+{{- include "celine-services.securityHeaders.dataWith" (dict "root" . "csp" ((.Values.securityHeaders | default dict).csp | default dict)) }}
+{{- end }}
+
+{{/* The same, for (dict "root" . "csp" <csp>): the host's headers with that policy. */}}
+{{- define "celine-services.securityHeaders.dataWith" -}}
+{{- $root := .root }}
+{{- $csp := .csp | default dict }}
+{{- $sh := $root.Values.securityHeaders | default dict }}
+{{- $tls := dig "ingress" "tls" "enabled" false ($root.Values | toYaml | fromYaml) }}
 {{- $headers := dict "X-Content-Type-Options" "nosniff" }}
 {{- $_ := set $headers "Referrer-Policy" (hasKey $sh "referrerPolicy" | ternary $sh.referrerPolicy "strict-origin-when-cross-origin") }}
 {{- $_ := set $headers "X-Frame-Options" (hasKey $sh "frameOptions" | ternary $sh.frameOptions "DENY") }}
@@ -483,8 +516,18 @@ nginx.ingress.kubernetes.io/custom-headers: {{ printf "%s/%s" .Release.Namespace
 {{- if $tls }}
 {{- $_ := set $headers "Strict-Transport-Security" (hasKey $sh "hsts" | ternary $sh.hsts "max-age=31536000; includeSubDomains") }}
 {{- end }}
-{{- with include "celine-services.securityHeaders.csp" . }}
-{{- $_ := set $headers (($sh.csp | default dict).reportOnly | ternary "Content-Security-Policy-Report-Only" "Content-Security-Policy") . }}
+{{- with include "celine-services.securityHeaders.csp" (dict "root" $root "csp" $csp) }}
+{{- if $csp.sentByApp }}
+{{- if not $csp.reportOnly }}
+{{- fail (printf "securityHeaders: %s sends its own Content-Security-Policy (csp.sentByApp); an enforced policy from the controller would replace it, so only a Report-Only one may be set here" (include "celine-services.fullname" $root)) }}
+{{- end }}
+{{- range $name := list "script-src" "default-src" }}
+{{- if hasKey ($csp.directives | default dict) $name }}{{ if index $csp.directives $name }}
+{{- fail (printf "securityHeaders: %s sends its own Content-Security-Policy (csp.sentByApp) and owns its scripts; its Report-Only policy may not set %s" (include "celine-services.fullname" $root) $name) }}
+{{- end }}{{ end }}
+{{- end }}
+{{- end }}
+{{- $_ := set $headers ($csp.reportOnly | ternary "Content-Security-Policy-Report-Only" "Content-Security-Policy") . }}
 {{- end }}
 {{- range $name, $value := $headers }}
 {{- if $value }}
@@ -507,6 +550,17 @@ metadata:
     {{- include "celine-services.labels" . | nindent 4 }}
 data:
   {{- include "celine-services.securityHeaders.data" . | nindent 2 }}
+{{- with (.Values.securityHeaders | default dict).apiCsp }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "celine-services.securityHeaders.apiName" $ }}
+  labels:
+    {{- include "celine-services.labels" $ | nindent 4 }}
+data:
+  {{- include "celine-services.securityHeaders.dataWith" (dict "root" $ "csp" .) | nindent 2 }}
+{{- end }}
 {{- end }}
 {{- end }}
 

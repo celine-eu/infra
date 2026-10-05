@@ -282,18 +282,31 @@ stay as they are.
 | `X-Frame-Options` | `DENY` |
 | `Permissions-Policy` | no camera, microphone, geolocation, payment or USB; the onboarding UI keeps the camera for document capture |
 | `Strict-Transport-Security` | `max-age=31536000; includeSubDomains`, where the Ingress terminates TLS (`ingress.tls.enabled`; the gateway's `tls.enabled`) |
-| `Content-Security-Policy` | per host, in the chart's `securityHeaders.csp`; origins of the platform come from `domain` (`sso.<domain>`, `keycloak.<domain>`) |
+| `Content-Security-Policy` | per host, in the chart's `securityHeaders.csp`; origins of the platform come from `domain` (`sso.<domain>`, `keycloak.<domain>`). Not on the SvelteKit frontends, which send their own (below) |
 
 An Ingress whose backend sets its own headers carries no annotation, because the controller
 would replace them: the assistant API (on the gateway, on the assistant host and under
 `/api/assistant` of the webapp host), the community API and the onboarding API.
 
+The SvelteKit frontends send their own Content-Security-Policy (`kit.csp` in each app's
+`svelte.config.js`, celine-frontend and onboarding `ui/`): every page is rendered on request
+and its inline scripts - SvelteKit's bootstrap, the theme script - carry a fresh nonce, so no
+host allows inline scripts. A static ConfigMap cannot carry a per-request nonce, and the
+controller replaces a header of the same name, so these charts set `csp.sentByApp: true` and
+their ConfigMap holds no enforced policy; the render stops if an environment gives them one.
+Grid and roi keep their Report-Only trial of the other directives here, without `script-src`
+or `default-src`. An API Ingress of its own on such a host keeps an enforced policy from the controller
+(`securityHeaders.apiCsp`, ConfigMap `<release>-api-security-headers`): roi's calculator API
+allows nothing (`default-src 'none'`). Paths that share the page's Ingress - `/oauth2` on every
+frontend host, `/api` on webapp and grid - get the other headers but no policy. Deploy the frontend images that send the policy before this chart change,
+or the hosts are briefly without one.
+
 | Host | Policy | Allows besides the host itself |
 |---|---|---|
-| webapp, assistant, community | enforced | inline scripts and styles (SvelteKit's bootstrap), `data:`/`blob:` images; community: OpenStreetMap tiles |
-| onboarding | enforced | inline scripts and styles, `data:`/`blob:` images |
-| grid | Report-Only | inline scripts and styles, a `blob:` worker, the CARTO and ArcGIS map hosts |
-| roi | Report-Only | inline scripts and styles, OpenStreetMap tiles, Nominatim, the static map image |
+| webapp, assistant, community | enforced, sent by the app | scripts by nonce, inline styles, `data:`/`blob:` images; community: OpenStreetMap tiles |
+| onboarding | enforced, sent by the app | scripts by nonce, inline styles, `data:`/`blob:` images |
+| grid | scripts enforced by the app (nonce, a `blob:` worker); the rest Report-Only here | inline styles, the CARTO and ArcGIS map hosts |
+| roi | scripts enforced by the app (nonce); the rest Report-Only here | inline styles, OpenStreetMap tiles, Nominatim, the static map image |
 | legal | enforced | inline styles only; no script |
 | api gateway | enforced | nothing (`default-src 'none'`) |
 

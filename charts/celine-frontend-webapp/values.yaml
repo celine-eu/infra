@@ -45,19 +45,11 @@ securityHeaders:
   enabled: true
   referrerPolicy: strict-origin-when-cross-origin
   csp:
+    # The app sends its own Content-Security-Policy (kit.csp in its svelte.config.js), with a
+    # per-request nonce for SvelteKit's inline bootstrap: no 'unsafe-inline' in script-src.
+    # The controller would replace it, so this ConfigMap carries none (README "Security headers").
+    sentByApp: true
     reportOnly: false
-    directives:
-      default-src: "'self'"
-      script-src: "'self' 'unsafe-inline'"
-      style-src: "'self' 'unsafe-inline'"
-      img-src: "'self' data: blob:"
-      font-src: "'self'"
-      connect-src: "'self'"
-      worker-src: "'self'"
-      object-src: "'none'"
-      base-uri: "'self'"
-      form-action: "'self' https://sso.{{ .Values.ingress.domain }} https://keycloak.{{ .Values.ingress.domain }}"
-      frame-ancestors: "'none'"
 
 healthCheck:
   enabled: true

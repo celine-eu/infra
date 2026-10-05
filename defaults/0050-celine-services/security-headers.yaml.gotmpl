@@ -10,6 +10,10 @@
         <release>:                # e.g. frontend-webapp, legal, api-gateway
           report_only: false      # true: Content-Security-Policy-Report-Only
           directives: {}          # merged over the chart's; null drops a directive
+
+  A host whose app sends its own Content-Security-Policy (chart `csp.sentByApp`: the
+  SvelteKit frontends, nonce in script-src) takes only a Report-Only policy here, without
+  script-src or default-src; an enforced one stops the render.
 */}}
 {{- $sh := .Environment.Values | dig "security_headers" (dict) | default (dict) }}
 {{- $on := $sh | dig "enabled" true }}
@@ -24,7 +28,7 @@ securityHeaders:
     {{- if hasKey $app "report_only" }}
     reportOnly: {{ $app.report_only }}
     {{- end }}
-    {{- with $app.directives }}
+    {{- with $app | dig "directives" (dict) }}
     directives:
       {{- toYaml . | nindent 6 }}
     {{- end }}
