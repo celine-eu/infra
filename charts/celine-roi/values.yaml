@@ -67,7 +67,7 @@ migrate:
 # --------------------------------------------------------------------------
 healthCheck:
   enabled: true
-  path: /docs
+  path: /health
   initialDelaySeconds: 10
   periodSeconds: 30
   failureThreshold: 3

@@ -30,7 +30,7 @@ image:
   tag: {{ $roi | dig "image_tag" "latest" | quote }}
 
 healthCheck:
-  path: /docs
+  path: /health
 
 extraEnv:
   - name: CELINE_CONFIG_DIR
