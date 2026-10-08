@@ -47,6 +47,13 @@ OAUTH2_PROXY = "oauth2_proxy"
 
 def render(helmfile: str, release: str, override: str | None = None) -> list[dict]:
     """`helmfile template` one release of `helmfile.d/<helmfile>` over the dev values only."""
+    result = template(helmfile, release, override)
+    assert result.returncode == 0, result.stderr
+    return [doc for doc in yaml.safe_load_all(result.stdout) if doc]
+
+
+def template(helmfile: str, release: str, override: str | None = None) -> subprocess.CompletedProcess:
+    """The `helmfile template` run behind `render`, for a test that expects the render to stop."""
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
         source = (REPO / "helmfile.d" / helmfile).read_text()
@@ -66,8 +73,7 @@ def render(helmfile: str, release: str, override: str | None = None) -> list[dic
              "-l", f"name={release}", "--skip-tests"],
             capture_output=True, text=True, env=env, timeout=600,
         )
-    assert result.returncode == 0, result.stderr
-    return [doc for doc in yaml.safe_load_all(result.stdout) if doc]
+    return result
 
 
 def realm_of(docs: list[dict]) -> dict:
@@ -169,6 +175,31 @@ def test_the_admin_uis_admit_platform_admins_only(helmfile, release):
         query = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
         # keycloak-oidc names a realm role `role:<name>`; `admins` would be a group
         assert query["allowed_groups"] == [f"role:{PLATFORM_ADMIN}"], url
+
+
+ADMIN_UIS = [("0030-apps.yaml.gotmpl", "marquez"), ("0040-pipelines.yaml.gotmpl", "prefect-server")]
+
+
+@pytest.mark.parametrize("helmfile,release", ADMIN_UIS)
+@pytest.mark.parametrize("role", ["ops-admin", "celine-cli:operator"])
+def test_the_admin_role_is_the_environments_choice(helmfile, release, role):
+    # auth_setup.adminRole; a client role is `<client>:<role>`, which keycloak-oidc names
+    # `role:<client>:<role>`
+    urls = ingress_auth_urls(render(helmfile, release, f"auth_setup:\n  adminRole: {role!r}\n"))
+    assert urls, f"{release}: no ingress behind oauth2-proxy"
+    for url in urls:
+        query = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
+        assert query["allowed_groups"] == [f"role:{role}"], url
+
+
+@pytest.mark.parametrize("helmfile,release", ADMIN_UIS)
+@pytest.mark.parametrize("role", ["", "admins,viewers", "platform-admin&allowed_emails=x", "a:b:c"])
+def test_a_malformed_admin_role_stops_the_render(helmfile, release, role):
+    # an empty role would gate on `role:` and admit nobody; a list or a second query
+    # parameter would widen the gate behind a value that reads like one role
+    result = template(helmfile, release, f"auth_setup:\n  adminRole: {role!r}\n")
+    assert result.returncode != 0
+    assert "auth_setup.adminRole" in result.stderr
 
 
 def test_the_broker_has_no_superuser():

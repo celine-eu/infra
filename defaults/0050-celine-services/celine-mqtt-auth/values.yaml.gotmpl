@@ -8,6 +8,9 @@ extraEnv:
 
 oidc:
   service:
+    # CELINE_OIDC_AUDIENCE: the audience every MQTT client token must carry. celine-policies
+    # >= 1.7.0 enforces it; only a token requested with the `mqtt` scope carries `svc-mqtt`.
+    audience: {{ .Environment.Values | dig "mqtt_auth" "audience" "svc-mqtt" | quote }}
     clientSecret: {{ .Environment.Values | dig "mqtt_auth" "client_secret" "svc-mqtt-auth" | quote }}
 
 {{- with .Environment.Values | dig "mqtt_auth" "resources" nil }}

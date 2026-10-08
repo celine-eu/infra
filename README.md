@@ -422,7 +422,9 @@ groups (`admins` > `managers` > `editors` > `viewers`) reach a token only inside
 `organization.<alias>.groups` and count only in that organisation. There are no realm groups and
 no realm roles `admin`/`manager`/`editor`/`viewer`, and no top-level `groups` claim. The Prefect
 and Marquez ingresses admit `allowed_groups=role:platform-admin` only (oauth2-proxy's
-`keycloak-oidc` provider names realm roles `role:<name>`). The MQTT broker has no superuser
+`keycloak-oidc` provider names realm roles `role:<name>`, client roles `role:<client>:<name>`).
+`auth_setup.adminRole` names a different role for both gates, `<client>:<role>` for a client
+role; an empty value, a list or anything else stops the render. The MQTT broker has no superuser
 (`goAuth.disableSuperuser`).
 
 `task keycloak:bootstrap:check:<env>` reports drift (exit 1). Do not run `bootstrap` by hand while

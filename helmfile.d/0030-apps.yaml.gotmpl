@@ -31,6 +31,7 @@ releases:
     namespace: celine-{{ .Environment.Name }}
     chart: superset/superset
     version: 0.15.0
+    installed: {{ .Environment.Values | dig "superset" "enabled" true }}
     createNamespace: true
     missingFileHandler: Warn
     values:
