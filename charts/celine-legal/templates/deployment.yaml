@@ -77,6 +77,15 @@ spec:
             readOnlyRootFilesystem: true
             capabilities:
               drop: [ALL]
+          {{- if .Values.preview.token }}
+          # Opens /preview/<token>/ (the drafts of a --preview build) to whoever holds the link.
+          env:
+            - name: LEGAL_PREVIEW_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "celine-services.fullname" . }}-preview
+                  key: token
+          {{- end }}
           volumeMounts:
             - name: tmp
               mountPath: /tmp

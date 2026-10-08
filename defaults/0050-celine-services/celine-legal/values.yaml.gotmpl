@@ -9,6 +9,8 @@
 #     ui_image: ghcr.io/celine-eu/celine-legal-ui   # the UI image (generic)
 #     ui_image_tag: latest
 #     host: legal.<domain>    # the public host
+#     preview_token: ""       # secret: opens /preview/<token>/ (drafts for review) when the
+#                             # image was built with PREVIEW=true; empty serves no preview
 #     base_url: ""            # where applications find the legal host; default https://<host>
 #                             # when enabled. Set it alone to use a legal host served elsewhere.
 #     resources: {}
@@ -26,6 +28,9 @@ ui:
   image:
     repository: {{ $legal | dig "ui_image" "ghcr.io/celine-eu/celine-legal-ui" | quote }}
     tag: {{ $legal | dig "ui_image_tag" "latest" | quote }}
+
+preview:
+  token: {{ $legal | dig "preview_token" "" | quote }}
 
 ingress:
   host: {{ $legal | dig "host" (printf "legal.%s" .Environment.Values.domain) }}

@@ -34,6 +34,11 @@ image:
 api:
   port: 8080
 
+# The drafts of a `--preview` build are served only under /preview/<token>/. Empty: no
+# preview. Set: at least 32 characters; rotating it revokes every link already shared.
+preview:
+  token: ""
+
 ui:
   image:
     repository: ghcr.io/celine-eu/celine-legal-ui
