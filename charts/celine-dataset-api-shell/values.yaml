@@ -8,8 +8,8 @@
 ##   - Export OpenLineage datasets from Marquez
 ##
 ## Usage after deploy:
-##   # Import a catalogue file (authenticates as svc-dataset-api with the
-##   # CELINE_OIDC_* credentials below; the route requires dataset.admin)
+##   # Import a catalogue file (authenticates with the CELINE_OIDC_*
+##   # credentials below; the route requires dataset.admin)
 ##   kubectl exec -it <pod> -- \
 ##     dataset-cli import catalogue \
 ##       -i /tmp/catalogue.yaml \
@@ -60,18 +60,28 @@ datasetApi:
 
 # --------------------------------------------------------------------------
 # OIDC client for `import catalogue`: POST /admin/catalogue requires the
-# dataset.admin scope, which svc-dataset-api holds. The CLI fetches a
-# client-credentials token with these; the secret is the one the dataset-api
-# release already renders (`<fullname>-secrets`).
+# dataset.admin scope and aud=svc-dataset-api. The CLI fetches a
+# client-credentials token with these.
+#
+# Use the admin CLI client (celine-cli), not the service account
+# (svc-dataset-api): Keycloak won't add a client's own id to the audience of
+# its self-issued token, so dataset-api rejects svc-dataset-api's token with
+# "Audience doesn't match".
 # --------------------------------------------------------------------------
 # CELINE_ENV; the helmfile sets it from the environment (celine_env).
 celineEnv: ""
 
 oidc:
   baseUrl: "http://keycloak/realms/celine"
-  clientId: "svc-dataset-api"
-  existingSecret: "dataset-api-secrets"
-  secretKey: "CELINE_OIDC_CLIENT_SECRET"
+  clientId: "celine-cli"
+
+  # Option A: read the secret from an existing Kubernetes secret.
+  existingSecret: ""
+  secretKey: ""
+
+  # Option B: plain value — used when the secret comes from sops env values
+  # (e.g. .Environment.Values.auth_setup.clientCLISecret). Set in gotmpl.
+  clientSecretValue: ""
 
 # --------------------------------------------------------------------------
 # Extra environment variables (plain value or secretKeyRef)

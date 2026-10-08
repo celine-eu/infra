@@ -53,14 +53,19 @@ tasks:
       - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/platform-admin -v {{.CLI_ARGS}}
 
   test:keycloak-access:
-    desc: "Render Keycloak, policies-shell and provisioning and check who reaches Keycloak through which door: the public host serves the platform realm only, the admin console is on the port-forward, administrators use the Service"
+    desc: "Render Keycloak, policies-shell and provisioning and check who reaches Keycloak through which door: the public host serves the platform realm only, the admin console is on the port-forward (and master's Frontend URL follows it), administrators use the Service"
     cmds:
-      - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/keycloak-access -v {{.CLI_ARGS}}
+      - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml --with httpx pytest -p no:cacheprovider tests/keycloak-access -v {{.CLI_ARGS}}
 
   test:security-headers:
     desc: "Render the public hosts (frontends, legal host, API gateway) and check their security headers: on by default, off in dev only, Report-Only and directive overrides per host, values the controller accepts"
     cmds:
       - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/security-headers -v {{.CLI_ARGS}}
+
+  test:frontend-roi:
+    desc: "Render the ROI host and check the page and calculator are public, the feedback paths need an existing SSO session (401, no redirect) and keep the API's limits and policy"
+    cmds:
+      - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/frontend-roi -v {{.CLI_ARGS}}
 
   set-context:
     desc: Set kubectl default namespace to celine
@@ -178,13 +183,17 @@ tasks:
         fi
         PORT=${URL##*:}
         # The console signs in to master through master's own URL, so master's Frontend URL
-        # must be this URL too (README, "Keycloak admin access"). Read through the API
-        # server's service proxy: no forward needed yet.
+        # must be this URL too; the policies-shell bootstrap sets it on every start (README,
+        # "Keycloak admin access"). Read through the API server's service proxy: no forward
+        # needed yet.
         ISS=$(kubectl get --raw "/api/v1/namespaces/$NS/services/{{ .STATEFULSET }}-http:http/proxy/realms/master/.well-known/openid-configuration" 2>/dev/null \
           | sed -n 's/.*"issuer":"\([^"]*\)".*/\1/p')
         if [ "$ISS" != "$URL/realms/master" ]; then
           echo "WARNING: master's issuer is '${ISS:-unknown}', not $URL/realms/master: the console will not sign in"
-          echo "until master's Frontend URL is set to $URL (one-time, README 'Keycloak admin access')."
+          echo "until master's Frontend URL is $URL. The policies-shell bootstrap sets it on every start:"
+          echo "  kubectl rollout restart -n $NS deployment/policies-shell"
+          echo "  kubectl logs -n $NS deployment/policies-shell -c bootstrap | grep 'master frontendUrl'"
+          echo "(by hand: README 'Keycloak admin access')."
         fi
         echo "Admin console: $URL/admin/master/console/   (namespace $NS, Ctrl-C to stop)"
         kubectl port-forward -n "$NS" svc/{{ .STATEFULSET }}-http "$PORT:http"

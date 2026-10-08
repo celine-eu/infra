@@ -95,6 +95,53 @@ spec:
       secretName: {{ .Values.ingress.tls.secretName | default (printf "%s-tls" (include "celine-services.fullname" .)) }}
   {{- end }}
 {{- end }}
+{{- if and .Values.ingress.enabled .Values.ingress.authPaths }}
+{{- /*
+  The roi routes for visitors who already hold an SSO session (`ingress.authPaths`, the
+  feedback form). auth-url turns the oauth2-proxy session cookie (domain-wide, so this
+  host receives it) or a bearer token into the user's token, which roi verifies itself:
+  auth-response-headers replaces whatever the client sent in those headers. No
+  auth-signin, and no /oauth2 route on this host: nobody is asked to sign in here, a
+  request without a session gets a plain 401. Same rate limit and API policy as the
+  calculator.
+*/}}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "celine-services.fullname" . }}-api-auth
+  labels:
+    {{- include "celine-services.labels" . | nindent 4 }}
+  annotations:
+    cert-manager.io/issuer: {{ .Values.ingress.issuer | default "celine-tls" }}
+    {{- with include "celine-services.securityHeaders.apiAnnotation" . }}{{ . | nindent 4 }}{{ end }}
+    nginx.ingress.kubernetes.io/auth-url: "https://sso.{{ .Values.ingress.domain }}/oauth2/auth"
+    nginx.ingress.kubernetes.io/auth-response-headers: "Authorization, X-Auth-Request-Email, X-Auth-Request-User, X-Auth-Request-Access-Token"
+    {{- with .Values.ingress.apiAnnotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          {{- range .Values.ingress.authPaths }}
+          - path: {{ . }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $.Values.ingress.roiBackend.service }}
+                port:
+                  number: {{ $.Values.ingress.roiBackend.port }}
+          {{- end }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host }}
+      secretName: {{ .Values.ingress.tls.secretName | default (printf "%s-tls" (include "celine-services.fullname" .)) }}
+  {{- end }}
+{{- end }}
 {{- if and .Values.ingress.enabled .Values.ingress.auth.enabled }}
 ---
 apiVersion: networking.k8s.io/v1

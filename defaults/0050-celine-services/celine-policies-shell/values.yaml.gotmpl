@@ -137,6 +137,10 @@ bootstrap:
   bruteForceEnabled: {{ if hasKey $bruteForce "enabled" }}{{ $bruteForce.enabled | toString | quote }}{{ else }}""{{ end }}
   # Rendered only when keycloak.admin_mfa is set: unset, bootstrap turns it on unless dev.
   adminMfaRequired: {{ $adminMfaRequired | quote }}
+  # The admin console's port-forward URL, derived exactly as defaults/0020-auth/keycloak
+  # derives KC_HOSTNAME_ADMIN, so the two never disagree: master's Frontend URL must be it, or
+  # the console never signs in to master (README, "Keycloak admin access").
+  masterFrontendUrl: {{ printf "http://localhost:%d" (.Environment.Values | dig "keycloak" "admin_forward_port" 18080 | int) | quote }}
   overlay:
     {{- with .Environment.Values | dig "keycloak" "platform" (dict) }}
     {{- toYaml . | nindent 4 }}

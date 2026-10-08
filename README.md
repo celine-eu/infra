@@ -222,7 +222,13 @@ takes no token. `celine-frontend-roi` routes only the calculator's API paths to 
 (`ingress.apiPaths`); any other `/api` path - `/api/v1/estimates`, the stored calculator
 inputs, readable only with the realm role `platform-admin` - never reaches roi through the
 public host. What one caller can cost is bounded per client address twice: at the edge, on
-the API Ingress only, and inside roi.
+the API Ingresses only, and inside roi.
+
+The feedback form (`ingress.authPaths`, `/api/v1/feedback` and below) is the one exception:
+it is for visitors who already hold an SSO session, e.g. from the webapp. Those paths pass
+oauth2-proxy's auth check (`auth-url`, no `auth-signin`), which hands roi the user's token;
+without a session the request gets a plain 401 and no redirect, so nobody is asked to sign in
+on `roi.<domain>`. roi verifies the token against the audience `oauth2_proxy`.
 
 | Value | Effect |
 |---|---|
@@ -461,21 +467,42 @@ exact URL. localhost is a secure context, so plain http needs no certificate. `K
 stays the public URL: every realm's issuer, and every token minted inside the cluster, is
 unchanged.
 
-**One-time, per Keycloak: master's Frontend URL.** The console signs in to master through
+**Master's Frontend URL is set on every deploy.** The console signs in to master through
 master's own URL, and `KC_HOSTNAME_ADMIN` does not change that (measured on Keycloak 26.6.0 and
 26.7.3: without it the console calls the public host for master and never shows a login). So
-master's Frontend URL must be the same localhost URL. `task keycloak:forward` warns while it is
-not. With the forward running, as the bootstrap client (its secret is
-`policies_shell.bootstrap.client_secret`; `read -rs` keeps it out of the shell history):
+master's Frontend URL (its realm attribute `frontendUrl`) must be the same localhost URL. The
+`policies-shell` pod's `bootstrap` init container sets it on every start, after `keycloak
+bootstrap`:
+
+- the URL is `http://localhost:<keycloak.admin_forward_port>`, derived like `KC_HOSTNAME_ADMIN`,
+  so the two cannot disagree (chart value `bootstrap.masterFrontendUrl`; empty leaves master
+  alone);
+- it signs in as the bootstrap client through `keycloak.internal_url`, reads master, merges
+  `frontendUrl` into the attributes it read (a `PUT` replaces the whole map) and writes only
+  when the value differs, then checks master's issuer. It never prints the secret or the token;
+- without `policies_shell.bootstrap.client_secret` (allowed in `dev` only) it logs that it left
+  master alone;
+- a failure fails the pod, like any other bootstrap step. Its output is in the init container's
+  log (`master frontendUrl: ...`) and in the stored record as `frontend-url.txt`.
+
+`task keycloak:forward` warns while master's issuer is not the forwarded URL. The first fix is
+to run the step again: `kubectl rollout restart deployment/policies-shell`, then
+`kubectl logs deployment/policies-shell -c bootstrap | grep 'master frontendUrl'`. If the shell
+cannot run, set it by hand with the forward running, as the bootstrap client (its secret is
+`policies_shell.bootstrap.client_secret`; `read -rs` keeps it out of the shell history; needs
+`jq`):
 
 ```bash
 U=http://localhost:18080
 read -rs S
 T=$(curl -s -d grant_type=client_credentials -d client_id=svc-celine-policies-bootstrap \
       --data-urlencode client_secret="$S" "$U/realms/master/protocol/openid-connect/token" \
-    | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p')
-curl -s -X PUT -H "Authorization: Bearer $T" -H 'Content-Type: application/json' \
-  -d "{\"attributes\":{\"frontendUrl\":\"$U\"}}" "$U/admin/realms/master"
+    | jq -r .access_token)
+# merge into master's attributes: a PUT with frontendUrl alone would drop the others
+curl -s -H "Authorization: Bearer $T" "$U/admin/realms/master" \
+  | jq --arg u "$U" '{attributes: ((.attributes // {}) + {frontendUrl: $u})}' \
+  | curl -s -X PUT -H "Authorization: Bearer $T" -H 'Content-Type: application/json' \
+      -d @- "$U/admin/realms/master"
 unset S T
 ```
 

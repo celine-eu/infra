@@ -16,9 +16,10 @@
 ##   # Is the realm's platform level what platform.yaml declares? (exits 1 on drift)
 ##   kubectl exec -it <pod> -- celine-policies keycloak bootstrap --check
 ##
-## On every start, two init containers run `keycloak bootstrap` (plan, apply, check) before
-## the shell's `sync`, and store the run (see `bootstrap` below). A failed bootstrap or sync
-## fails the pod. Do not run `bootstrap` by hand while a pod is starting.
+## On every start, before the shell's `sync`, two init containers run `keycloak bootstrap`
+## (plan, apply, check), set master's Frontend URL (`bootstrap.masterFrontendUrl`) and store
+## the run (see `bootstrap` below). A failed bootstrap or sync fails the pod. Do not run
+## `bootstrap` by hand while a pod is starting.
 ## ----------------------------------------------------------------------------
 
 image:
@@ -85,6 +86,11 @@ bootstrap:
   # second factor. Empty: not set, and bootstrap turns it on unless keycloak.env is dev.
   # Turning either switch off on a realm that has it needs allowDestructive.
   adminMfaRequired: ""
+  # Master's realm attribute frontendUrl, converged after bootstrap as the bootstrap client
+  # (keycloak.bootstrapClient; without its secret, left alone). The admin console reached
+  # through a port-forward signs in to master through this URL, so it must equal Keycloak's
+  # KC_HOSTNAME_ADMIN. Empty: master is left alone.
+  masterFrontendUrl: ""
   waitRetries: 20
   waitDelaySeconds: 15
   # An overlay on platform.yaml (realm_settings.supportedLocales and platform_admin.users,

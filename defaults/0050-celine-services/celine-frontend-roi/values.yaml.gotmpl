@@ -1,6 +1,8 @@
 # defaults/0050-celine-services/celine-frontend-roi/values.yaml.gotmpl
 #
 # The ROI calculator is public by design: no sign-in, the API behind it takes no token.
+# Only the feedback paths (ingress.authPaths, chart default) need an existing SSO session:
+# without one they answer 401, never a redirect to sign in.
 # What an anonymous caller can cost is bounded twice - here at the edge, per client
 # address, on the API paths only, and again inside roi (see celine-roi).
 #
