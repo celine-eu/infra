@@ -66,6 +66,24 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 {{- end }}
 
+{{/* ----------------------------------------------------------------------------
+  Access-audit pseudonym key — CELINE_AUDIT_PSEUDONYM_KEY (celine-sdk `audit`)
+  The HMAC key `pseudonymise` uses for person ids in the access audit; without
+  it the SDK falls back to unkeyed SHA-256. One key per environment, so a
+  person's pseudonym is the same in every service. From the release's Secret
+  (celine-services.secret), only when .Values.audit.pseudonymKey is set.
+----------------------------------------------------------------------------- */}}
+
+{{- define "celine-services.auditEnv" -}}
+{{- if (.Values.audit | default dict).pseudonymKey -}}
+- name: CELINE_AUDIT_PSEUDONYM_KEY
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "celine-services.secretName" . }}
+      key: CELINE_AUDIT_PSEUDONYM_KEY
+{{- end }}
+{{- end }}
+
 
 {{/* ----------------------------------------------------------------------------
   OIDC env vars — CELINE_OIDC_* (celine-sdk OidcSettings)
@@ -279,6 +297,9 @@ type: Opaque
 stringData:
   {{- if not (.Values.oidc.service | dig "passthrough" false) }}
   CELINE_OIDC_CLIENT_SECRET: {{ .Values.oidc.service.clientSecret | quote }}
+  {{- end }}
+  {{- with (.Values.audit | default dict).pseudonymKey }}
+  CELINE_AUDIT_PSEUDONYM_KEY: {{ . | quote }}
   {{- end }}
   {{- with .Values.extraSecrets }}
   {{- toYaml . | nindent 2 }}
@@ -620,6 +641,7 @@ spec:
             - name: LOG_LEVEL
               value: {{ .Values.logLevel | default "INFO" | quote }}
             {{- include "celine-services.postureEnv" . | nindent 12 }}
+            {{- include "celine-services.auditEnv" . | nindent 12 }}
             {{- include "celine-services.oidcEnv" . | nindent 12 }}
             {{- include "celine-services.policiesEnv" . | nindent 12 }}
             {{- include "celine-services.postgresEnv" . | nindent 12 }}

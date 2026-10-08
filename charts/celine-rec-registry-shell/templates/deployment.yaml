@@ -36,6 +36,14 @@ spec:
               tail -f /dev/null
           env:
             # ----------------------------------------------------------------
+            # Posture signal (celine-sdk `posture`): only `dev` relaxes the CLI.
+            # From `celineEnv` in defaults/0050-celine-services/values.yaml.gotmpl.
+            # ----------------------------------------------------------------
+            {{- with .Values.celineEnv }}
+            - name: CELINE_ENV
+              value: {{ . | quote }}
+            {{- end }}
+            # ----------------------------------------------------------------
             # rec-registry CLI auth (envvar= names from main.py / CLISettings)
             # ----------------------------------------------------------------
             - name: REGISTRY_AUTH_URL

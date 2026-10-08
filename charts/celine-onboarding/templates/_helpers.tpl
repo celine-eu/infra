@@ -15,8 +15,8 @@
 {{- if not $ips }}
 {{- fail "onboarding.forwardedAllowIps is required: the ingress controller's pod address range (onboarding README, \"Security\")" }}
 {{- end }}
-{{- if or (eq $ips "*") (has "*" (splitList "," ($ips | nospace))) }}
-{{- fail "onboarding.forwardedAllowIps must not be \"*\": any caller reaching the port would choose its own address" }}
+{{- if or (eq $ips "*") (has "*" (splitList "," ($ips | nospace))) (regexMatch "/0(,|$)" ($ips | nospace)) }}
+{{- fail "onboarding.forwardedAllowIps must not be \"*\" or a /0 network: any caller reaching the port would choose its own address" }}
 {{- end }}
 {{- if not (regexMatch "^[0-9a-fA-F:.,/ ]+$" $ips) }}
 {{- fail (printf "onboarding.forwardedAllowIps must be addresses or CIDR ranges, comma-separated (got %q)" $ips) }}

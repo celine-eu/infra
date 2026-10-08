@@ -25,14 +25,14 @@ data:
     skip_jwt_bearer_tokens = true
     insecure_oidc_allow_unverified_email = true
 
+    # The session cookie is never read by page scripts: HttpOnly in every environment.
+    cookie_httponly = true
     {{ if .Values.secure -}}
     cookie_secure = true
     ssl_insecure_skip_verify = false
-    cookie_httponly = false
     {{ else }}
     cookie_secure = false
     ssl_insecure_skip_verify = true
-    cookie_httponly = true
     {{ end -}}
     cookie_samesite = "lax"
     session_store_type = "redis"

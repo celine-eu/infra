@@ -100,9 +100,11 @@ healthCheck:
 
 onboarding:
   # Where uvicorn accepts X-Forwarded-For from: the ingress controller's pod
-  # address range. REQUIRED, and never "*" — every rate limit, consent evidence
-  # IP and audit row is the address uvicorn resolves (onboarding README,
-  # "Security"). The chart refuses to render without it.
+  # address range. REQUIRED, and never "*" or a /0 — every rate limit, consent
+  # evidence IP and audit row is the address uvicorn resolves (onboarding README,
+  # "Security"). The chart refuses to render without it; the helmfile defaults
+  # supply 0.0.0.0 (no peer has it: no proxy trusted) until an environment sets
+  # the range.
   forwardedAllowIps: ""
 
   # Fernet key for the personal data at rest. REQUIRED; no default, because a

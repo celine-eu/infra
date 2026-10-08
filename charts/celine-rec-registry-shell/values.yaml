@@ -29,6 +29,9 @@ fullnameOverride: "rec-registry-shell"
 # OIDC credentials — admin-level client from the auth-setup chart.
 # Maps to CELINE_OIDC_* environment variables.
 # --------------------------------------------------------------------------
+# CELINE_ENV; the helmfile sets it from the environment (celine_env).
+celineEnv: ""
+
 oidc:
   # Base URL of the Keycloak realm reachable from within the cluster.
   # Overridden by defaults/0050-celine-services/values.yaml.gotmpl.

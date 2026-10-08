@@ -192,7 +192,7 @@ peer.
 | Value | Effect |
 |---|---|
 | `onboarding.enabled` | installs both releases, the database and `ONBOARDING_URL` |
-| `onboarding.forwarded_allow_ips` | **required**: the ingress controller's pod address range, uvicorn's `FORWARDED_ALLOW_IPS`. Rate limits, consent evidence and audit rows use the address it resolves. The chart refuses `*` |
+| `onboarding.forwarded_allow_ips` | the ingress controller's pod address range, uvicorn's `FORWARDED_ALLOW_IPS`. Rate limits, consent evidence and audit rows use the address it resolves. Default `0.0.0.0`, an address no peer has: no proxy is trusted and every caller shares the ingress's address, so set the range per environment. The chart refuses `*` and a `/0` network |
 | `onboarding.encryption_key` | **required**, secret: the Fernet key for personal data at rest. Losing it loses the data |
 | `postgres_db.onboarding` | **required**, secret: the database role's password. It goes into a connection URI unescaped, so use a URL-safe value |
 | `onboarding.client_secret`, `onboarding.cli_client_secret` | secret: `svc-onboarding` and `svc-onboarding-cli`, the same keys `policies-shell` syncs to the realm |
@@ -239,7 +239,8 @@ older image ignores them.
 
 ## Environment signal and token verification
 
-Every celine service, the operator shell of the assistant, the pipelines and Superset get
+Every celine service, the operator shells (assistant, dataset-api, rec-registry), the
+pipelines and Superset get
 `CELINE_ENV`, the environment's name. Only `dev` relaxes anything; any other value, unset
 included, is hardened, and a hardened service refuses to start with a development value
 (default database password, client secret equal to the client id, missing issuer or key).
@@ -250,6 +251,8 @@ Images before the celine-sdk release that carries `posture` ignore the variable.
 | `celine_env` | overrides `CELINE_ENV`. Default: the helmfile environment's name. `dev` outside the environment `dev` stops the render |
 | `qdrant.api_key` | secret: the key Qdrant enforces (`apiKey`) and the assistant sends (`QDRANT_API_KEY`, through `ai-assistant-secrets`). Required by the assistant outside dev. Unset: neither is rendered. Sync `ai-assistant` and `ai-assistant-shell` before `qdrant` |
 | `nudging.click_tracking_secret` | secret: `CLICK_TRACKING_SECRET`, the HMAC key of tracked notification links, through `nudging-secrets`. Required by nudging outside dev from the release that carries `posture`. Older images sign with `VAPID_PRIVATE_KEY` when it is unset, so setting it invalidates the links already sent |
+| `celine_audit.pseudonym_key` | secret: `CELINE_AUDIT_PSEUDONYM_KEY`, the HMAC key the celine-sdk access audit pseudonymises person ids with, through each service's `<release>-secrets`. One random key per environment (`openssl rand -hex 32`), so a person has the same pseudonym in every service; changing it changes every pseudonym. Unset: not rendered, and the SDK falls back to unkeyed SHA-256 |
+| `mosquitto.go_auth_log_level` | mosquitto-go-auth's `auth_opt_log_level`, default `info`. `debug` writes whole bearer tokens to the broker log, so it stops the render outside the environment `dev` |
 
 Derived, not set:
 

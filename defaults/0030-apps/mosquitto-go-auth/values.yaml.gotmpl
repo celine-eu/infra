@@ -25,8 +25,13 @@ listeners:
   websocket:
     port: 1884
 
+{{- /* go-auth at debug writes whole bearer tokens to the broker log: dev only. */}}
+{{- $goAuthLog := .Environment.Values | dig "mosquitto" "go_auth_log_level" "info" | toString | lower }}
+{{- if and (ne .Environment.Name "dev") (eq $goAuthLog "debug") }}
+{{- fail (printf "mosquitto.go_auth_log_level is debug in environment %s: go-auth then logs whole JWTs; only the dev environment may" .Environment.Name) }}
+{{- end }}
 goAuth:
-  logLevel: info
+  logLevel: {{ $goAuthLog }}
   logDest: stdout
   # There is no MQTT superuser (celine-policies REQ-0014): mqtt-auth's /superuser always
   # answers 403, and this stops the broker asking. Every client gets only its ACL.

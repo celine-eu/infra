@@ -1,5 +1,7 @@
 domain: {{ .Values.domain }}
 issuer: {{ .Values.tls_setup.issuer | default "celine-tls" }}
 
+# TLS on api.<domain> in every environment, like every other service ingress (the issuer
+# is self-signed in dev, ACME elsewhere).
 tls:
-  enabled: {{ .Values.tls_setup.self_signed | default false }}
+  enabled: true

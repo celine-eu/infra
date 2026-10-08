@@ -12,6 +12,12 @@ image:
 # CELINE_ENV on every service (celine-services.postureEnv).
 celineEnv: {{ $celineEnv | quote }}
 
+# CELINE_AUDIT_PSEUDONYM_KEY on every service (celine-services.auditEnv), from the
+# secret `celine_audit.pseudonym_key`: one random key per environment
+# (`openssl rand -hex 32`). Changing it changes every pseudonym in the audit.
+audit:
+  pseudonymKey: {{ .Values | dig "celine_audit" "pseudonym_key" "" | quote }}
+
 oidc:
   baseUrl: {{$keycloakPublic}}
   jwksUri: {{$keycloakPublic}}/protocol/openid-connect/certs

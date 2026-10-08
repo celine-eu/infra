@@ -36,6 +36,14 @@ spec:
               tail -f /dev/null
           env:
             # ----------------------------------------------------------------
+            # Posture signal (celine-sdk `posture`): only `dev` relaxes the CLI.
+            # From `celineEnv` in defaults/0050-celine-services/values.yaml.gotmpl.
+            # ----------------------------------------------------------------
+            {{- with .Values.celineEnv }}
+            - name: CELINE_ENV
+              value: {{ . | quote }}
+            {{- end }}
+            # ----------------------------------------------------------------
             # PostgreSQL connection (used by `dataset-cli export postgres`)
             # ----------------------------------------------------------------
             - name: DATABASE_URL

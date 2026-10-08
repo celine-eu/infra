@@ -64,6 +64,9 @@ datasetApi:
 # client-credentials token with these; the secret is the one the dataset-api
 # release already renders (`<fullname>-secrets`).
 # --------------------------------------------------------------------------
+# CELINE_ENV; the helmfile sets it from the environment (celine_env).
+celineEnv: ""
+
 oidc:
   baseUrl: "http://keycloak/realms/celine"
   clientId: "svc-dataset-api"

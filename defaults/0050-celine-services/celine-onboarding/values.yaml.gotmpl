@@ -7,7 +7,9 @@
 #     enabled: false
 #     image_tag: latest
 #     host: onboarding.<domain>          # also the UI's (celine-frontend-onboarding)
-#     forwarded_allow_ips: ""            # REQUIRED: the ingress controller's pod range; never "*"
+#     forwarded_allow_ips: 0.0.0.0       # the ingress controller's pod range (set it in secrets.yaml).
+#                                        # The default trusts no proxy (no peer is 0.0.0.0): every
+#                                        # caller shares the ingress's address. Never "*" or a /0.
 #     encryption_key: ""                 # REQUIRED, secret: a Fernet key
 #     client_secret: svc-onboarding      # secret; the same key policies-shell syncs to the realm
 #     cli_client_secret: svc-onboarding-cli   # secret; likewise
@@ -28,6 +30,9 @@
 # postgres-db reads only when onboarding is enabled.
 {{- $o := .Environment.Values | dig "onboarding" (dict) | default (dict) }}
 {{- $host := $o | dig "host" (printf "onboarding.%s" .Values.domain) }}
+{{- /* Unset or empty: 0.0.0.0, which no peer is, so no proxy is trusted. The chart
+       refuses "*" and /0 (celine-onboarding.validate). */}}
+{{- $ips := $o | dig "forwarded_allow_ips" "" | toString | trim | default "0.0.0.0" }}
 
 # SMTP: the environment's shared `smtp` block, unless `onboarding.smtp.host` is
 # set, in which case `onboarding.smtp` is the provider as a whole. The sender
@@ -55,7 +60,7 @@ healthCheck:
   path: /api/health
 
 onboarding:
-  forwardedAllowIps: {{ $o | dig "forwarded_allow_ips" "" | quote }}
+  forwardedAllowIps: {{ $ips | quote }}
   encryptionKey: {{ $o | dig "encryption_key" "" | quote }}
   dataspaceEnabled: {{ $o | dig "dataspace_enabled" false }}
   cliClientSecret: {{ $o | dig "cli_client_secret" "svc-onboarding-cli" | quote }}
