@@ -2,58 +2,56 @@
 ## celine-legal — values.yaml
 ##
 ## The legal host: every legal document a deployment publishes (privacy notices, terms
-## of use, data-sharing notices, …). People read `/<slot>/<community>` (e.g.
-## `/terms/example-rec`); the landing page shows the platform's documents only, and no page
-## lists one community's documents beside another's. Applications keep linking
-## `<community>/<slot>/` (redirected) and reading `<community>/current.json` and
-## `<community>/history.json` for the versions they record.
+## of use, data-sharing notices, …), from the generic image `ghcr.io/celine-eu/celine-legal`
+## and the deployment's own data (`data.files`, mounted at /data).
 ##
-## One pod, two containers:
-## - **api** (`image`, no default repository: the content is the deployment's, not the
-##   platform's): the API with the deployment's built site in it, listening on `api.port`
-##   (8080). It decides which community a request is for and serves the files applications
-##   read. Not exposed outside the pod.
-## - **ui** (`ui.image`, generic): every page, listening on `service.port` (3000), passing the
-##   API's own paths through to it on localhost. The Service and the Ingress reach it only.
+## One host, two sites that never meet:
+## - the root serves the published releases only (the frozen editions in the data). This is
+##   what applications link (`LEGAL_BASE_URL`) and record acceptances against. A document
+##   with nothing published answers "not yet available".
+## - with `draft.enabled`, `/draft/<draft.revision>/` serves the data as it is now, for the
+##   parties to review: every page marked not valid. The link is the access; nothing else
+##   links it.
 ##
-## **The image contract:** both run as a non-root user with a read-only root filesystem;
-## `/tmp` is the only writable path (an emptyDir). Both answer `/healthz`.
+## The image runs as a non-root user with a read-only root filesystem, lays everything out
+## once at startup (the pod restarts when the data changes), and answers /healthz.
 ##
-## The host is public on purpose, without oauth2-proxy: a privacy notice or terms of use
-## must be readable before anyone signs in.
+## Public on purpose, without oauth2-proxy: a privacy notice or terms of use must be readable
+## before anyone signs in.
 ## ----------------------------------------------------------------------------
 
 fullnameOverride: legal
 
-# The API, with the deployment's built site in it.
 image:
-  repository: ""        # required when the release is installed
-  tag: "latest"
+  repository: ghcr.io/celine-eu/celine-legal
+  tag: ""                 # required: a released version, vX.Y.Z
   pullPolicy: IfNotPresent
 
-api:
-  port: 8080
+# The deployment's legal data: path under /data -> text (register.yaml, parties.yaml, the
+# identities, the offers, editions/…). Provided by the deployment's private values.
+data:
+  files: {}
 
-# The drafts of a `--preview` build are served only under /preview/<token>/. Empty: no
-# preview. Set: at least 32 characters; rotating it revokes every link already shared.
-preview:
-  token: ""
+# The draft for review, at /draft/<revision>/: the full 40-hex commit of the data.
+draft:
+  enabled: false
+  revision: ""
 
-ui:
-  image:
-    repository: ghcr.io/celine-eu/celine-legal-ui
-    tag: "latest"
-    pullPolicy: IfNotPresent
-  resources: {}
+# Pins the stable site to a release (vX.Y.Z): the pod does not start unless it is the newest
+# the data has published. Empty: whatever is published.
+release: ""
+
+# The optional features the texts describe, name -> true/false (LEGAL_FEATURE_<NAME>).
+# Empty: the data's own declarations.
+features: {}
 
 imagePullSecrets: []
 
 replicaCount: 1
 
-# The UI's port: what the Service and the Ingress reach.
 service:
   type: ClusterIP
-  port: 3000
+  port: 8080
 
 ingress:
   enabled: true
@@ -65,9 +63,8 @@ ingress:
   annotations: {}
 
 # Response headers ingress-nginx adds on this host (custom-headers; README "Security
-# headers"). Off only in the dev environment. The site is static: no script, one inline
-# <style> block and an inline style attribute (celine-legal's page templates), no fetch,
-# no font or image from elsewhere.
+# headers"). Off only in the dev environment. The pages carry no script, one inline <style>
+# block (celine-legal's page templates), no fetch, no font or image from elsewhere.
 securityHeaders:
   enabled: true
   referrerPolicy: strict-origin-when-cross-origin
@@ -86,9 +83,8 @@ podSecurityContext:
 
 healthCheck:
   enabled: true
-  path: /healthz          # the UI's; the API's own probe is always /healthz
 
-resources: {}           # the API container's
+resources: {}
 nodeSelector: {}
 tolerations: []
 affinity: {}

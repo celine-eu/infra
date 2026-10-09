@@ -1,3 +1,7 @@
+{{- if and .Values.draft.enabled (not (regexMatch "^[0-9a-f]{40}$" (.Values.draft.revision | default ""))) }}
+{{- fail "draft.enabled: draft.revision must be the full 40-hex commit of the deployment's legal data" }}
+{{- end }}
+{{- $features := .Values.features | default dict }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -13,97 +17,68 @@ spec:
     metadata:
       labels:
         {{- include "celine-services.selectorLabels" . | nindent 8 }}
-      {{- with .Values.podAnnotations }}
       annotations:
+        # A change to the data, the draft or the features restarts the pod: the host lays
+        # everything out once, at startup.
+        checksum/data: {{ toJson (list .Values.data.files .Values.draft .Values.release $features) | sha256sum }}
+        {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- end }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
         runAsUser: {{ .Values.podSecurityContext.runAsUser | default 1000 }}
       containers:
-        # The UI is the public face: every page, and the API's own paths passed through to
-        # the API beside it (localhost, the same network namespace). The Service and the
-        # Ingress reach the UI only.
-        - name: ui
-          image: "{{ .Values.ui.image.repository }}:{{ .Values.ui.image.tag | default "latest" }}"
-          imagePullPolicy: {{ .Values.ui.image.pullPolicy | default "IfNotPresent" }}
+        - name: legal
+          image: "{{ .Values.image.repository }}:{{ required "image.tag: a released celine-legal version (vX.Y.Z)" .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
           env:
-            - name: LEGAL_API_URL
-              value: "http://127.0.0.1:{{ .Values.api.port }}"
-            - name: PORT
-              value: {{ .Values.service.port | quote }}
+            - name: LEGAL_DATA
+              value: /data
+            {{- if .Values.draft.enabled }}
+            # The draft for review at /draft/<revision>/; the root serves releases only.
+            - name: LEGAL_REVISION
+              value: {{ .Values.draft.revision | quote }}
+            {{- end }}
+            {{- with .Values.release }}
+            - name: LEGAL_RELEASE
+              value: {{ . | quote }}
+            {{- end }}
+            {{- range $name, $on := $features }}
+            - name: LEGAL_FEATURE_{{ $name | upper }}
+              value: {{ ternary "true" "false" (eq (toString $on) "true") | quote }}
+            {{- end }}
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities:
               drop: [ALL]
           volumeMounts:
+            - name: data
+              mountPath: /data
+              readOnly: true
             - name: tmp
               mountPath: /tmp
           ports:
             - name: http
-              containerPort: {{ .Values.service.port }}
-              protocol: TCP
-          {{- if .Values.healthCheck.enabled }}
-          # Through the UI to the API: ready only when both answer.
-          livenessProbe:
-            httpGet:
-              path: {{ .Values.healthCheck.path | default "/healthz" }}
-              port: http
-            initialDelaySeconds: 5
-            periodSeconds: 30
-          readinessProbe:
-            httpGet:
-              path: {{ .Values.healthCheck.path | default "/healthz" }}
-              port: http
-            initialDelaySeconds: 2
-            periodSeconds: 10
-          {{- end }}
-          {{- with .Values.ui.resources }}
-          resources:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
-        # The API, with the deployment's built site in its image. Not exposed outside the pod.
-        - name: api
-          image: "{{ required "image.repository: the API image holding this deployment's built legal site" .Values.image.repository }}:{{ .Values.image.tag | default "latest" }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
-          securityContext:
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            capabilities:
-              drop: [ALL]
-          {{- if .Values.preview.token }}
-          # Opens /preview/<token>/ (the drafts of a --preview build) to whoever holds the link.
-          env:
-            - name: LEGAL_PREVIEW_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "celine-services.fullname" . }}-preview
-                  key: token
-          {{- end }}
-          volumeMounts:
-            - name: tmp
-              mountPath: /tmp
-          ports:
-            - name: api
-              containerPort: {{ .Values.api.port }}
+              containerPort: 8080
               protocol: TCP
           {{- if .Values.healthCheck.enabled }}
           livenessProbe:
             httpGet:
               path: /healthz
-              port: api
+              port: http
             initialDelaySeconds: 5
             periodSeconds: 30
           readinessProbe:
             httpGet:
               path: /healthz
-              port: api
+              port: http
             initialDelaySeconds: 2
             periodSeconds: 10
           {{- end }}
@@ -112,6 +87,14 @@ spec:
             {{- toYaml . | nindent 12 }}
           {{- end }}
       volumes:
+        - name: data
+          configMap:
+            name: {{ include "celine-services.fullname" . }}-data
+            items:
+              {{- range $path, $_ := .Values.data.files }}
+              - key: {{ include "celine-legal.dataKey" $path }}
+                path: {{ $path }}
+              {{- end }}
         - name: tmp
           emptyDir: {}
       {{- with .Values.nodeSelector }}

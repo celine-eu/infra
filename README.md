@@ -343,39 +343,58 @@ browser console shows no report on its pages. `task test:security-headers` rende
 ## Legal host
 
 The deployment's legal documents (privacy notices, terms of use, data-sharing notices),
-scoped per community: people read `/<slot>/<community>` (e.g. `/terms/example-rec`), the
-landing page shows the platform's documents only, and no page lists one community's
-documents beside another's. Applications keep linking `<community>/<slot>/` (redirected)
-and reading `<community>/current.json` and `<community>/history.json`. Release `legal`
-(`charts/celine-legal`), at `legal.<domain>`, **public**: legal documents are read before
-anyone signs in, so there is no oauth2-proxy. It is **off** until the environment sets
-`legal.enabled: true` and an image.
+from the generic image `ghcr.io/celine-eu/celine-legal` (github.com/celine-eu/celine-legal)
+and the deployment's own data. Release `legal` (`charts/celine-legal`), at `legal.<domain>`,
+**public**: legal documents are read before anyone signs in, so there is no oauth2-proxy.
+It is **off** until the environment sets `legal.enabled: true` and `legal.image_tag`.
 
-One pod, two containers:
+One host, two sites that never meet:
 
-- **api**: the deployment's own content, so the platform ships no image for it. It holds the
-  built site, listens on `8080` inside the pod only, and answers `/healthz`.
-- **ui**: generic (`ghcr.io/celine-eu/celine-legal-ui`). It listens on `3000`, behind the
-  Service and the Ingress, and passes the API's own paths through to it on localhost.
+- **the root** serves the published releases only. Applications link it and record
+  acceptances against it; a document with nothing published answers "not yet available"
+  and is not offered to them;
+- **`/draft/<revision>/`** (with `legal.draft`) serves the data as it is now, for the
+  parties to review, every page marked not valid. The revision is the commit of the
+  deployment's data; the link is the access.
 
-Both run non-root, write only to `/tmp` (the root filesystem is read-only), and are probed
-on `/healthz`.
+One container, non-root, read-only root filesystem, probed on `/healthz`. The data is a
+ConfigMap mounted at `/data`; a change to it restarts the pod.
 
 | Value | Effect |
 |---|---|
 | `legal.enabled` | installs the release |
-| `legal.image`, `legal.image_tag` | **required** when enabled: the API image holding the built site |
-| `legal.ui_image`, `legal.ui_image_tag` | the UI image; defaults to `ghcr.io/celine-eu/celine-legal-ui:latest` |
+| `legal.image_tag` | **required** when enabled: a released celine-legal version, `vX.Y.Z` |
+| `legal.draft` | serves the draft at `/draft/<revision>/` |
+| `legal.release` | pins the stable site to `vX.Y.Z`; the pod refuses a release that is not the newest published |
+| `legal.features.<name>` | `true`/`false`: overrides a derived feature (below) |
 | `legal.host` | defaults to `legal.<domain>` |
-| `legal.base_url` | where applications find the legal host: defaults to `https://<legal.host>` when the release is installed. Set it alone to use a legal host served elsewhere |
+| `legal.base_url` | where applications find the legal host: defaults to `https://<legal.host>` when the release is installed. Set it alone to use a legal host served elsewhere. Set it to `""` while nothing is published: the applications keep their own documents, and the host serves the draft only |
+
+**The data** comes from the release's environment file,
+`envs/<env>/0050-celine-services/celine-legal/values.yaml.gotmpl`, which belongs to the
+deployment: chart values `data.files` (path under `/data` → text: `register.yaml`,
+`parties.yaml`, the identities, `sharing-offers.yaml`, `editions/…`) and `draft.revision`. The
+chart refuses to render without `register.yaml`, or with a draft and no 40-hex revision.
+
+**The features** the texts describe are derived from the applications' own switches, so a
+text never describes what the environment does not run:
+
+| Feature | On when |
+|---|---|
+| `sms_verification` | `onboarding.sms_provider` is a dev provider (`log`, `console`, `dev`), or `brevo` with `onboarding.dpa_sms_signed` |
+| `document_extraction` | `onboarding.env` sets `EXTRACTION_ENABLED` true, `LLM_BASE_URL` and `LLM_VISION_MODEL` |
+| `dso_data_exchange` | `onboarding.dataspace_enabled` |
+| `ai_assistant` | always (the assistant is released with the services) |
+
+All but `ai_assistant` are off where onboarding is not installed.
 
 With a base URL, the applications use the community's own documents:
 
 - `webapp` and `onboarding` get `LEGAL_BASE_URL`. Community links the registry leaves
   empty, the terms gate and the onboarding consent documents resolve there;
 - `frontend-assistant` gets `PUBLIC_LEGAL_BASE_URL`, for the AI notice's privacy link;
-- Keycloak gets `TERMS_URL` and `PRIVACY_URL`, the pages listing every community's
-  documents, for the login and email footer.
+- Keycloak gets `TERMS_URL` and `PRIVACY_URL` (the host's slot pages, which name no community
+  unless the request does), for the login and email footer.
 
 Without one, every application behaves as before.
 

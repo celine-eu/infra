@@ -300,8 +300,8 @@ releases:
     labels:
       group: celine-services
 
-  # The legal host: the deployment's legal documents as a static site, public. Off until
-  # `legal.enabled: true` and `legal.image`. See
+  # The legal host: the deployment's legal documents, public (the generic celine-legal image
+  # and the deployment's data). Off until `legal.enabled: true` and `legal.image_tag`. See
   # defaults/0050-celine-services/celine-legal/values.yaml.gotmpl.
   - name: legal
     namespace: celine-{{ .Environment.Name }}
