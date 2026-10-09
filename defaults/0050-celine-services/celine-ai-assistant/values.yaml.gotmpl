@@ -56,6 +56,12 @@ extraEnv:
     value: {{ $llm | dig "embed_model" "" | quote }}
   - name: LLM_EMBED_DIMENSIONS
     value: {{ $llm | dig "embed_dimensions" "" | quote }}
+  # Never empty: the assistant refuses an unbounded output cap.
+  - name: LLM_MAX_TOKENS
+    value: {{ $llm | dig "max_tokens" "4096" | quote }}
+  # Empty: not sent, so the server applies the model's own recommended sampling.
+  - name: LLM_TEMPERATURE
+    value: {{ $llm | dig "temperature" "" | quote }}
   # A prefix: each REC's knowledge base is the Qdrant alias
   # <prefix>__<community_id>__<embedding fingerprint> (the assistant's ADR-0008).
   - name: QDRANT_COLLECTION
