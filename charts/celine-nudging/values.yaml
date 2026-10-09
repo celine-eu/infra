@@ -32,10 +32,12 @@ oidc:
   allowedAudiences: ""
   includeClientIdAsAudience: true
   timeout: 10.0
+  # The realm's client is svc-nudging (celine-policies clients.yaml), and every token for
+  # nudging carries that audience. Not svc-<release-name>: no such client exists.
   service:
-    clientId: "svc-celine-nudging"
-    audience: "svc-celine-nudging"
-    clientSecret: "svc-celine-nudging" # [secret]
+    clientId: "svc-nudging"
+    audience: "svc-nudging"
+    clientSecret: "svc-nudging" # [secret]
 
 policies:
   dir: "/app/policies"

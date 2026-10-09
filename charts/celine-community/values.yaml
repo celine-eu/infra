@@ -100,6 +100,10 @@ extraEnv:
     value: "http://flexibility-api:8017"
   - name: NUDGING_API_URL
     value: "http://nudging:8016"
+  - name: WEBAPP_API_URL
+    value: "http://webapp:8014"
+  - name: ROI_API_URL
+    value: "http://roi:8000"
 
 extraSecrets: {}
 

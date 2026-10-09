@@ -18,6 +18,13 @@ extraEnv:
     value: "http://flexibility-api:8017"
   - name: NUDGING_API_URL
     value: "http://nudging:8016"
+  # The manager inbox reads participant and ROI-calculator feedback from the services
+  # that own it. Unset, the BFF would fall back to its local-stack address and every
+  # feedback call would answer 502.
+  - name: WEBAPP_API_URL
+    value: {{ .Environment.Values | dig "community" "webapp_api_url" "http://webapp:8014" | quote }}
+  - name: ROI_API_URL
+    value: {{ .Environment.Values | dig "community" "roi_api_url" "http://roi:8000" | quote }}
   - name: CORS_ORIGINS
     value: '["https://community.{{ .Values.domain }}"]'
 {{- if .Environment.Values | dig "onboarding" "enabled" false }}
