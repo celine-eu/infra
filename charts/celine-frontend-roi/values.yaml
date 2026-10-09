@@ -37,11 +37,17 @@ ingress:
     - /api/v1/scenario
     - /api/v1/capex-estimate
     - /api/v1/compare
+  # The roi routes for visitors who already hold an SSO session (path prefixes): the
+  # feedback form. They pass oauth2-proxy's auth check, which hands roi the user's token
+  # (X-Auth-Request-Access-Token, Authorization); without a session the request gets a
+  # plain 401, never a redirect to sign in. The page and the calculator stay public.
+  authPaths:
     - /api/v1/feedback
-  # Annotations of the API Ingress only, e.g. the edge rate limit
+  # Annotations of the API Ingresses (apiPaths and authPaths), e.g. the edge rate limit
   # (nginx.ingress.kubernetes.io/limit-rps, limit-connections).
   apiAnnotations: {}
 
+  # The whole host behind sign-in (page and calculator). authPaths need a session either way.
   auth:
     enabled: true
   tls:

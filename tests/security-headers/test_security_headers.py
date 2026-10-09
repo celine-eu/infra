@@ -65,7 +65,8 @@ SENT_BY_APP = {
     "frontend-roi": True,
 }
 # Ingress -> the ConfigMap of its own, for an API Ingress whose policy is not the page's
-OWN_CONFIGMAP = {"frontend-roi-api": "frontend-roi-api-security-headers"}
+OWN_CONFIGMAP = {"frontend-roi-api": "frontend-roi-api-security-headers",
+                 "frontend-roi-api-auth": "frontend-roi-api-security-headers"}
 CONFIGMAP = {r: f"{'legal' if r == 'legal' else r}-security-headers" for r in RELEASES}
 
 # ingress-nginx internal/ingress/annotations/customheaders: what a header value may hold

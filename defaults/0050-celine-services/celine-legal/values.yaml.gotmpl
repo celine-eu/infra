@@ -1,36 +1,64 @@
 # defaults/0050-celine-services/celine-legal/values.yaml.gotmpl
 #
-# The legal host. Installed only where `legal.enabled` is true. Environment keys:
+# The legal host (ghcr.io/celine-eu/celine-legal). Installed only where `legal.enabled` is
+# true. Environment keys:
 #
 #   legal:
 #     enabled: false          # install the release
-#     image: ""               # the API image holding the deployment's built legal site (required)
-#     image_tag: latest
-#     ui_image: ghcr.io/celine-eu/celine-legal-ui   # the UI image (generic)
-#     ui_image_tag: latest
+#     image_tag: ""           # required: a released celine-legal version, vX.Y.Z
 #     host: legal.<domain>    # the public host
-#     preview_token: ""       # secret: opens /preview/<token>/ (drafts for review) when the
-#                             # image was built with PREVIEW=true; empty serves no preview
+#     draft: false            # serve the draft for review at /draft/<revision>/
+#     release: ""             # pin the stable site to vX.Y.Z (refused unless the newest published)
+#     features: {}            # name -> true/false: overrides what is derived below
 #     base_url: ""            # where applications find the legal host; default https://<host>
-#                             # when enabled. Set it alone to use a legal host served elsewhere.
+#                             # when enabled. Set it alone to use a legal host served elsewhere;
+#                             # set it to "" to keep the applications off this host while it
+#                             # only serves a draft (nothing published yet).
 #     resources: {}
+#
+# The deployment's legal data (`data.files`) and the draft's revision (`draft.revision`) come
+# from the release's own environment file, envs/<env>/0050-celine-services/celine-legal/
+# values.yaml.gotmpl, which belongs to the deployment.
+#
+# **The features follow the applications' switches**, so a text never describes what this
+# environment does not run (celine-legal templates/features.yaml):
+#   sms_verification     onboarding.sms_provider a dev provider (log, console, dev), or brevo
+#                        with onboarding.dpa_sms_signed
+#   document_extraction  onboarding.env EXTRACTION_ENABLED, with LLM_BASE_URL and
+#                        LLM_VISION_MODEL (upload follows the same switch)
+#   dso_data_exchange    onboarding.dataspace_enabled
+#   ai_assistant         true: the assistant has no switch, it is released with the services
+# All but ai_assistant are off where onboarding is not installed.
 #
 # The same base URL reaches celine-webapp and celine-onboarding (`LEGAL_BASE_URL`), the
 # standalone assistant (`PUBLIC_LEGAL_BASE_URL`) and Keycloak's theme (`TERMS_URL`,
-# `PRIVACY_URL`), each computed the same way in its own defaults file.
+# `PRIVACY_URL`), each computed the same way in its own defaults file. It is the host's root:
+# the published releases, never a draft.
 {{- $legal := .Environment.Values | dig "legal" (dict) | default (dict) }}
+{{- $o := .Environment.Values | dig "onboarding" (dict) | default (dict) }}
+{{- $oe := $o | dig "env" (dict) | default (dict) }}
+{{- $onboarding := $o | dig "enabled" false }}
+{{- $sms := $o | dig "sms_provider" "none" | toString | lower | trim }}
+{{- $smsOn := or (has $sms (list "log" "console" "dev")) (and (eq $sms "brevo") (eq (toString ($o | dig "dpa_sms_signed" false)) "true")) }}
+{{- $extractionOn := and (eq (toString ($oe | dig "EXTRACTION_ENABLED" "false") | lower) "true") ($oe | dig "LLM_BASE_URL" "") ($oe | dig "LLM_VISION_MODEL" "") }}
+{{- $derived := dict
+      "sms_verification" (and $onboarding $smsOn)
+      "document_extraction" (and $onboarding (not (empty $extractionOn)))
+      "dso_data_exchange" (and $onboarding (eq (toString ($o | dig "dataspace_enabled" false)) "true"))
+      "ai_assistant" true }}
 
 image:
-  repository: {{ $legal | dig "image" "" | quote }}
-  tag: {{ $legal | dig "image_tag" "latest" | quote }}
+  tag: {{ $legal | dig "image_tag" "" | quote }}
 
-ui:
-  image:
-    repository: {{ $legal | dig "ui_image" "ghcr.io/celine-eu/celine-legal-ui" | quote }}
-    tag: {{ $legal | dig "ui_image_tag" "latest" | quote }}
+draft:
+  enabled: {{ $legal | dig "draft" false }}
 
-preview:
-  token: {{ $legal | dig "preview_token" "" | quote }}
+release: {{ $legal | dig "release" "" | quote }}
+
+features:
+  {{- range $name, $on := merge ($legal | dig "features" (dict) | default (dict)) $derived }}
+  {{ $name }}: {{ if $on }}true{{ else }}false{{ end }}
+  {{- end }}
 
 ingress:
   host: {{ $legal | dig "host" (printf "legal.%s" .Environment.Values.domain) }}

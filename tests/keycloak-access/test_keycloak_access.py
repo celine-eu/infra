@@ -8,6 +8,9 @@
   the public URL. There is no admin Ingress.
 - What administers Keycloak from inside the cluster (the policies-shell bootstrap and sync,
   provisioning) uses the Keycloak Service.
+- The admin console signs in to master through master's own URL, so the policies-shell
+  bootstrap sets master's Frontend URL to that same localhost URL on every start, as the
+  bootstrap client, merging it into master's attributes and writing only when it differs.
 - The policies-shell bootstrap is told the environment (CELINE_KEYCLOAK_ENV) and, outside dev,
   gets its master-realm client's secret through a Secret; the render refuses a non-dev
   environment without one. The admin second factor is bootstrap's alone: the realm import has
@@ -23,10 +26,14 @@ helmfile environment `dev` or a staging-like one. The values are placeholders
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import subprocess
+import sys
 import tempfile
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
@@ -246,6 +253,167 @@ def test_any_other_admin_mfa_value_stops_the_render(value):
     result = policies_shell(f"keycloak:\n  admin_mfa: {value}\n")
     assert result.returncode != 0
     assert "keycloak.admin_mfa must be true, false or {enabled: true|false}" in result.stderr
+
+
+# ---------------------------------------------------------------------------
+# master's Frontend URL (release policies-shell, init container bootstrap)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("override,url", [("", "http://localhost:18080"),
+                                          ("keycloak:\n  admin_forward_port: 18443\n", "http://localhost:18443")])
+def test_master_frontend_url_derives_from_admin_forward_port_like_kc_hostname_admin(override, url):
+    keycloak = keycloak_env(docs_of(render("0020-auth.yaml.gotmpl", "keycloak", override=override)))
+    shell = containers(docs_of(policies_shell(override)))
+    assert env_of(shell["bootstrap"])["MASTER_FRONTEND_URL"]["value"] == url
+    assert keycloak["KC_HOSTNAME_ADMIN"]["value"] == url
+    assert "MASTER_FRONTEND_URL" not in env_of(shell["shell"])
+
+
+def test_staging_sets_master_frontend_url_as_the_bootstrap_client_and_stores_the_result():
+    override = f"keycloak:\n  admin_forward_port: 18443\npolicies_shell:\n  bootstrap:\n    client_secret: {SECRET}\n"
+    docs = docs_of(policies_shell(override, env="staging"))
+    shell = containers(docs)
+    env = env_of(shell["bootstrap"])
+    assert env["MASTER_FRONTEND_URL"]["value"] == "http://localhost:18443"
+    assert env["CELINE_KEYCLOAK_BOOTSTRAP_CLIENT_SECRET"]["valueFrom"]["secretKeyRef"]["name"] == SECRET_NAME
+    assert "frontend-url.txt" in shell["bootstrap-record"]["command"][-1]
+    for d in of_kind(docs, "Deployment"):
+        assert SECRET not in yaml.safe_dump(d)
+
+
+def bootstrap_script(docs: list[dict]) -> str:
+    return containers(docs)["bootstrap"]["command"][-1]
+
+
+def frontend_url_step(docs: list[dict]) -> str:
+    """The Python the bootstrap script feeds to `python -` for master's Frontend URL."""
+    match = re.search(r"<<'PY'[^\n]*\n(.*?)\nPY\n", bootstrap_script(docs), flags=re.S)
+    assert match, "no frontendUrl step in the bootstrap script"
+    return match.group(1)
+
+
+def test_the_bootstrap_script_is_valid_sh(shell_dev):
+    result = subprocess.run(["sh", "-n"], input=bootstrap_script(shell_dev), capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+
+
+class FakeMaster:
+    """Master as the step sees it: token, realm read/write, discovery. Records every call."""
+
+    PUBLIC_ISSUER = "https://keycloak.example.org/realms/master"
+
+    def __init__(self, attributes: dict, secret: str):
+        self.attributes = dict(attributes)
+        self.secret = secret
+        self.calls: list[tuple[str, str, object]] = []
+        fake = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                pass
+
+            def reply(self, status: int, body: object = None):
+                data = b"" if body is None else json.dumps(body).encode()
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+
+            def authorized(self) -> bool:
+                return self.headers.get("Authorization") == "Bearer t0ken"
+
+            def body(self) -> bytes:
+                return self.rfile.read(int(self.headers.get("Content-Length") or 0))
+
+            def do_POST(self):
+                form = self.body().decode()
+                fake.calls.append(("POST", self.path, form))
+                if self.path == "/realms/master/protocol/openid-connect/token" and f"client_secret={fake.secret}" in form:
+                    self.reply(200, {"access_token": "t0ken"})
+                else:
+                    self.reply(401, {"error": "unauthorized_client"})
+
+            def do_GET(self):
+                fake.calls.append(("GET", self.path, None))
+                if self.path == "/realms/master/.well-known/openid-configuration":
+                    front = fake.attributes.get("frontendUrl")
+                    self.reply(200, {"issuer": f"{front}/realms/master" if front else fake.PUBLIC_ISSUER})
+                elif self.path == "/admin/realms/master" and self.authorized():
+                    self.reply(200, {"realm": "master", "attributes": dict(fake.attributes)})
+                else:
+                    self.reply(403)
+
+            def do_PUT(self):
+                rep = json.loads(self.body())
+                fake.calls.append(("PUT", self.path, rep))
+                if self.path == "/admin/realms/master" and self.authorized():
+                    fake.attributes = rep["attributes"]  # Keycloak replaces the map whole
+                    self.reply(204)
+                else:
+                    self.reply(403)
+
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+        self.url = f"http://127.0.0.1:{self.server.server_port}"
+
+    def run(self, step: str, url: str, secret: str) -> subprocess.CompletedProcess:
+        env = {"PATH": os.environ.get("PATH", ""), "MASTER_FRONTEND_URL": url, "CELINE_KEYCLOAK_BASE_URL": self.url}
+        if secret:
+            env["CELINE_KEYCLOAK_BOOTSTRAP_CLIENT_SECRET"] = secret
+        return subprocess.run([sys.executable, "-"], input=step, capture_output=True, text=True, env=env, timeout=60)
+
+    def puts(self) -> list:
+        return [c for c in self.calls if c[0] == "PUT"]
+
+
+@pytest.fixture
+def fake_master():
+    masters = []
+
+    def make(attributes: dict, secret: str = SECRET) -> FakeMaster:
+        masters.append(FakeMaster(attributes, secret))
+        return masters[-1]
+
+    yield make
+    for m in masters:
+        m.server.shutdown()
+
+
+def test_the_step_sets_frontend_url_and_keeps_masters_other_attributes(shell_dev, fake_master):
+    master = fake_master({"cibaInterval": "5", "frontendUrl": "https://keycloak.example.org"})
+    result = master.run(frontend_url_step(shell_dev), "http://localhost:18080", SECRET)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert master.attributes == {"cibaInterval": "5", "frontendUrl": "http://localhost:18080"}
+    assert "https://keycloak.example.org -> http://localhost:18080" in result.stdout
+    assert SECRET not in result.stdout + result.stderr and "t0ken" not in result.stdout + result.stderr
+    # signed in as the bootstrap client, never as the master admin user
+    (token,) = [c for c in master.calls if c[0] == "POST"]
+    assert "grant_type=client_credentials" in token[2] and "client_id=svc-celine-policies-bootstrap" in token[2]
+    assert "password" not in token[2]
+
+
+def test_the_step_writes_nothing_when_frontend_url_is_already_right(shell_dev, fake_master):
+    master = fake_master({"frontendUrl": "http://localhost:18080"})
+    result = master.run(frontend_url_step(shell_dev), "http://localhost:18080", SECRET)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "no change" in result.stdout and master.puts() == []
+
+
+def test_without_the_bootstrap_client_secret_master_is_left_alone(shell_dev, fake_master):
+    master = fake_master({})
+    result = master.run(frontend_url_step(shell_dev), "http://localhost:18080", "")
+    assert result.returncode == 0 and "left alone" in result.stdout
+    assert master.calls == []
+
+
+def test_a_rejected_client_fails_the_step_without_printing_the_secret(shell_dev, fake_master):
+    secret = "f" * 64  # not the secret the fake master holds
+    master = fake_master({})
+    result = master.run(frontend_url_step(shell_dev), "http://localhost:18080", secret)
+    assert result.returncode == 1 and "HTTP 401" in result.stdout
+    assert secret not in result.stdout + result.stderr and master.puts() == []
 
 
 # ---------------------------------------------------------------------------

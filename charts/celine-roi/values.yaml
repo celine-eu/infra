@@ -21,7 +21,8 @@ service:
   port: 8000
 
 # --------------------------------------------------------------------------
-# Ingress — disabled, reached through celine-frontend-roi's ingress (no sign-in)
+# Ingress — disabled, reached through celine-frontend-roi's ingress (no sign-in; the
+# feedback paths only with an existing SSO session, ingress.authPaths there)
 # --------------------------------------------------------------------------
 ingress:
   enabled: false

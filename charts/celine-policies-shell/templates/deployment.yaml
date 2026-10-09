@@ -51,12 +51,14 @@ spec:
               BOOTSTRAP="celine-policies keycloak bootstrap $OVERLAY --secrets-file /tmp/.secrets.yaml"
               rc=0
 
+              reachable=1
               i=0
               until python -c "import httpx, os; httpx.get(os.environ['CELINE_KEYCLOAK_BASE_URL'].rstrip('/') + '/realms/master/.well-known/openid-configuration', timeout=10).raise_for_status()" 2>/dev/null; do
                 i=$((i + 1))
                 if [ "$i" -ge {{ .Values.bootstrap.waitRetries }} ]; then
                   echo "bootstrap: Keycloak not reachable after {{ .Values.bootstrap.waitRetries }} attempts" | tee $D/plan.txt
                   rc=1
+                  reachable=0
                   break
                 fi
                 echo "Keycloak not ready, retrying in {{ .Values.bootstrap.waitDelaySeconds }}s ($i/{{ .Values.bootstrap.waitRetries }})..."
@@ -78,6 +80,61 @@ spec:
                 $BOOTSTRAP --check > $D/check.txt 2>&1 || rc=$?
                 cat $D/check.txt
               fi
+              # 4. master's Frontend URL: the admin console's port-forward URL (KC_HOSTNAME_ADMIN),
+              #    or the console never signs in to master. Not a platform.yaml key (celine-policies
+              #    has none for it), so converged here: as the bootstrap client, read master, merge
+              #    frontendUrl into the attributes read back (a PUT replaces `attributes` whole),
+              #    write only if it differs, then check master's issuer. Runs even when a step
+              #    above failed, so the console stays reachable to repair it. Never prints the
+              #    secret or the token.
+              if [ "$reachable" -eq 1 ] && [ -n "$MASTER_FRONTEND_URL" ]; then
+                frc=0
+                python - > $D/frontend-url.txt 2>&1 <<'PY' || frc=$?
+              import os, sys
+              import httpx
+
+              url = os.environ["MASTER_FRONTEND_URL"].rstrip("/")
+              base = os.environ["CELINE_KEYCLOAK_BASE_URL"].rstrip("/")
+              client_id = os.environ.get("CELINE_KEYCLOAK_BOOTSTRAP_CLIENT_ID") or "svc-celine-policies-bootstrap"
+              secret = os.environ.get("CELINE_KEYCLOAK_BOOTSTRAP_CLIENT_SECRET", "")
+              if not secret:
+                  print(f"master frontendUrl: no bootstrap client secret, left alone (want {url}; README 'Keycloak admin access')")
+                  sys.exit(0)
+
+              def fail(message):
+                  print(f"master frontendUrl: {message}")
+                  sys.exit(1)
+
+              with httpx.Client(timeout=30) as http:
+                  r = http.post(f"{base}/realms/master/protocol/openid-connect/token",
+                                data={"grant_type": "client_credentials", "client_id": client_id, "client_secret": secret})
+                  if r.status_code != 200:
+                      fail(f"signing in to master as {client_id}: HTTP {r.status_code}")
+                  headers = {"Authorization": "Bearer " + r.json()["access_token"]}
+                  realm_url = f"{base}/admin/realms/master"
+                  r = http.get(realm_url, headers=headers)
+                  if r.status_code != 200:
+                      fail(f"reading master: HTTP {r.status_code}")
+                  attributes = dict(r.json().get("attributes") or {})
+                  current = attributes.get("frontendUrl") or ""
+                  if current == url:
+                      print(f"master frontendUrl: {url}, no change")
+                  else:
+                      attributes["frontendUrl"] = url
+                      r = http.put(realm_url, headers=headers, json={"attributes": attributes})
+                      if r.status_code not in (200, 204):
+                          fail(f"writing master: HTTP {r.status_code}")
+                      r = http.get(realm_url, headers=headers)
+                      if r.status_code != 200 or (r.json().get("attributes") or {}).get("frontendUrl") != url:
+                          fail(f"master accepted {url} but it did not take")
+                      print(f"master frontendUrl: {current or '<unset>'} -> {url}")
+                  issuer = http.get(f"{base}/realms/master/.well-known/openid-configuration").json().get("issuer")
+                  if issuer != f"{url}/realms/master":
+                      fail(f"master's issuer is {issuer}, not {url}/realms/master")
+              PY
+                cat $D/frontend-url.txt
+                [ "$rc" -eq 0 ] && rc=$frc
+              fi
               echo "$rc" > $D/rc
               exit 0
           env:
@@ -88,6 +145,10 @@ spec:
             {{- end }}
             {{- with .Values.bootstrap.adminMfaRequired | toString }}
             - name: CELINE_KEYCLOAK_ADMIN_MFA_REQUIRED
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.bootstrap.masterFrontendUrl }}
+            - name: MASTER_FRONTEND_URL
               value: {{ . | quote }}
             {{- end }}
             {{- with .Values.bootstrap.smtp }}
@@ -173,7 +234,7 @@ spec:
                 exit "$rc"
               fi
               PREFIX="$ENVIRONMENT/$(date -u +%Y%m%dT%H%M%SZ)-$IMAGE_TAG"
-              for f in export.json plan.txt apply.txt check.txt; do
+              for f in export.json plan.txt apply.txt check.txt frontend-url.txt; do
                 [ -f "$D/$f" ] || continue
                 if curl -fsS --aws-sigv4 "aws:amz:$REGION:s3" --user "$S3_ACCESS_KEY_ID:$S3_SECRET_ACCESS_KEY" \
                     -T "$D/$f" "${S3_ENDPOINT_URL%/}/$BUCKET/$PREFIX/$f"; then

@@ -24,6 +24,15 @@ marquez:
 datasetApi:
   url: "http://dataset-api:8001"
 
+# Use the admin CLI client so the token carries aud=svc-dataset-api.
+# The service account (svc-dataset-api) cannot call the service itself —
+# Keycloak won't add its own client_id to the audience of a self-issued token.
+oidc:
+  clientId: "celine-cli"
+  existingSecret: ""
+  secretKey: ""
+  clientSecretValue: {{ .Environment.Values | dig "auth_setup" "clientCLISecret" "celine-cli" | quote }}
+
 {{- if .Values.tls_setup.self_signed }}
 extraEnv:
   - name: SSL_CERT_FILE

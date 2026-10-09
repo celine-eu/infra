@@ -222,7 +222,13 @@ takes no token. `celine-frontend-roi` routes only the calculator's API paths to 
 (`ingress.apiPaths`); any other `/api` path - `/api/v1/estimates`, the stored calculator
 inputs, readable only with the realm role `platform-admin` - never reaches roi through the
 public host. What one caller can cost is bounded per client address twice: at the edge, on
-the API Ingress only, and inside roi.
+the API Ingresses only, and inside roi.
+
+The feedback form (`ingress.authPaths`, `/api/v1/feedback` and below) is the one exception:
+it is for visitors who already hold an SSO session, e.g. from the webapp. Those paths pass
+oauth2-proxy's auth check (`auth-url`, no `auth-signin`), which hands roi the user's token;
+without a session the request gets a plain 401 and no redirect, so nobody is asked to sign in
+on `roi.<domain>`. roi verifies the token against the audience `oauth2_proxy`.
 
 | Value | Effect |
 |---|---|
@@ -338,39 +344,58 @@ browser console shows no report on its pages. `task test:security-headers` rende
 ## Legal host
 
 The deployment's legal documents (privacy notices, terms of use, data-sharing notices),
-scoped per community: people read `/<slot>/<community>` (e.g. `/terms/example-rec`), the
-landing page shows the platform's documents only, and no page lists one community's
-documents beside another's. Applications keep linking `<community>/<slot>/` (redirected)
-and reading `<community>/current.json` and `<community>/history.json`. Release `legal`
-(`charts/celine-legal`), at `legal.<domain>`, **public**: legal documents are read before
-anyone signs in, so there is no oauth2-proxy. It is **off** until the environment sets
-`legal.enabled: true` and an image.
+from the generic image `ghcr.io/celine-eu/celine-legal` (github.com/celine-eu/celine-legal)
+and the deployment's own data. Release `legal` (`charts/celine-legal`), at `legal.<domain>`,
+**public**: legal documents are read before anyone signs in, so there is no oauth2-proxy.
+It is **off** until the environment sets `legal.enabled: true` and `legal.image_tag`.
 
-One pod, two containers:
+One host, two sites that never meet:
 
-- **api**: the deployment's own content, so the platform ships no image for it. It holds the
-  built site, listens on `8080` inside the pod only, and answers `/healthz`.
-- **ui**: generic (`ghcr.io/celine-eu/celine-legal-ui`). It listens on `3000`, behind the
-  Service and the Ingress, and passes the API's own paths through to it on localhost.
+- **the root** serves the published releases only. Applications link it and record
+  acceptances against it; a document with nothing published answers "not yet available"
+  and is not offered to them;
+- **`/draft/<revision>/`** (with `legal.draft`) serves the data as it is now, for the
+  parties to review, every page marked not valid. The revision is the commit of the
+  deployment's data; the link is the access.
 
-Both run non-root, write only to `/tmp` (the root filesystem is read-only), and are probed
-on `/healthz`.
+One container, non-root, read-only root filesystem, probed on `/healthz`. The data is a
+ConfigMap mounted at `/data`; a change to it restarts the pod.
 
 | Value | Effect |
 |---|---|
 | `legal.enabled` | installs the release |
-| `legal.image`, `legal.image_tag` | **required** when enabled: the API image holding the built site |
-| `legal.ui_image`, `legal.ui_image_tag` | the UI image; defaults to `ghcr.io/celine-eu/celine-legal-ui:latest` |
+| `legal.image_tag` | **required** when enabled: a released celine-legal version, `vX.Y.Z` |
+| `legal.draft` | serves the draft at `/draft/<revision>/` |
+| `legal.release` | pins the stable site to `vX.Y.Z`; the pod refuses a release that is not the newest published |
+| `legal.features.<name>` | `true`/`false`: overrides a derived feature (below) |
 | `legal.host` | defaults to `legal.<domain>` |
-| `legal.base_url` | where applications find the legal host: defaults to `https://<legal.host>` when the release is installed. Set it alone to use a legal host served elsewhere |
+| `legal.base_url` | where applications find the legal host: defaults to `https://<legal.host>` when the release is installed. Set it alone to use a legal host served elsewhere. Set it to `""` while nothing is published: the applications keep their own documents, and the host serves the draft only |
+
+**The data** comes from the release's environment file,
+`envs/<env>/0050-celine-services/celine-legal/values.yaml.gotmpl`, which belongs to the
+deployment: chart values `data.files` (path under `/data` → text: `register.yaml`,
+`parties.yaml`, the identities, `sharing-offers.yaml`, `editions/…`) and `draft.revision`. The
+chart refuses to render without `register.yaml`, or with a draft and no 40-hex revision.
+
+**The features** the texts describe are derived from the applications' own switches, so a
+text never describes what the environment does not run:
+
+| Feature | On when |
+|---|---|
+| `sms_verification` | `onboarding.sms_provider` is a dev provider (`log`, `console`, `dev`), or `brevo` with `onboarding.dpa_sms_signed` |
+| `document_extraction` | `onboarding.env` sets `EXTRACTION_ENABLED` true, `LLM_BASE_URL` and `LLM_VISION_MODEL` |
+| `dso_data_exchange` | `onboarding.dataspace_enabled` |
+| `ai_assistant` | always (the assistant is released with the services) |
+
+All but `ai_assistant` are off where onboarding is not installed.
 
 With a base URL, the applications use the community's own documents:
 
 - `webapp` and `onboarding` get `LEGAL_BASE_URL`. Community links the registry leaves
   empty, the terms gate and the onboarding consent documents resolve there;
 - `frontend-assistant` gets `PUBLIC_LEGAL_BASE_URL`, for the AI notice's privacy link;
-- Keycloak gets `TERMS_URL` and `PRIVACY_URL`, the pages listing every community's
-  documents, for the login and email footer.
+- Keycloak gets `TERMS_URL` and `PRIVACY_URL` (the host's slot pages, which name no community
+  unless the request does), for the login and email footer.
 
 Without one, every application behaves as before.
 
@@ -462,21 +487,42 @@ exact URL. localhost is a secure context, so plain http needs no certificate. `K
 stays the public URL: every realm's issuer, and every token minted inside the cluster, is
 unchanged.
 
-**One-time, per Keycloak: master's Frontend URL.** The console signs in to master through
+**Master's Frontend URL is set on every deploy.** The console signs in to master through
 master's own URL, and `KC_HOSTNAME_ADMIN` does not change that (measured on Keycloak 26.6.0 and
 26.7.3: without it the console calls the public host for master and never shows a login). So
-master's Frontend URL must be the same localhost URL. `task keycloak:forward` warns while it is
-not. With the forward running, as the bootstrap client (its secret is
-`policies_shell.bootstrap.client_secret`; `read -rs` keeps it out of the shell history):
+master's Frontend URL (its realm attribute `frontendUrl`) must be the same localhost URL. The
+`policies-shell` pod's `bootstrap` init container sets it on every start, after `keycloak
+bootstrap`:
+
+- the URL is `http://localhost:<keycloak.admin_forward_port>`, derived like `KC_HOSTNAME_ADMIN`,
+  so the two cannot disagree (chart value `bootstrap.masterFrontendUrl`; empty leaves master
+  alone);
+- it signs in as the bootstrap client through `keycloak.internal_url`, reads master, merges
+  `frontendUrl` into the attributes it read (a `PUT` replaces the whole map) and writes only
+  when the value differs, then checks master's issuer. It never prints the secret or the token;
+- without `policies_shell.bootstrap.client_secret` (allowed in `dev` only) it logs that it left
+  master alone;
+- a failure fails the pod, like any other bootstrap step. Its output is in the init container's
+  log (`master frontendUrl: ...`) and in the stored record as `frontend-url.txt`.
+
+`task keycloak:forward` warns while master's issuer is not the forwarded URL. The first fix is
+to run the step again: `kubectl rollout restart deployment/policies-shell`, then
+`kubectl logs deployment/policies-shell -c bootstrap | grep 'master frontendUrl'`. If the shell
+cannot run, set it by hand with the forward running, as the bootstrap client (its secret is
+`policies_shell.bootstrap.client_secret`; `read -rs` keeps it out of the shell history; needs
+`jq`):
 
 ```bash
 U=http://localhost:18080
 read -rs S
 T=$(curl -s -d grant_type=client_credentials -d client_id=svc-celine-policies-bootstrap \
       --data-urlencode client_secret="$S" "$U/realms/master/protocol/openid-connect/token" \
-    | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p')
-curl -s -X PUT -H "Authorization: Bearer $T" -H 'Content-Type: application/json' \
-  -d "{\"attributes\":{\"frontendUrl\":\"$U\"}}" "$U/admin/realms/master"
+    | jq -r .access_token)
+# merge into master's attributes: a PUT with frontendUrl alone would drop the others
+curl -s -H "Authorization: Bearer $T" "$U/admin/realms/master" \
+  | jq --arg u "$U" '{attributes: ((.attributes // {}) + {frontendUrl: $u})}' \
+  | curl -s -X PUT -H "Authorization: Bearer $T" -H 'Content-Type: application/json' \
+      -d @- "$U/admin/realms/master"
 unset S T
 ```
 

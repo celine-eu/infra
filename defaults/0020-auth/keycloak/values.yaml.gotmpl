@@ -126,8 +126,9 @@ extraEnv: |
   # The admin console's own links and redirects, for the port-forward (`task keycloak:forward`
   # forwards to this port). localhost is a secure context, so plain http needs no
   # certificate. KC_HOSTNAME above stays the URL of every realm, issuers included. The
-  # console also needs the master realm's Frontend URL set to the same value (see the
-  # README, "Keycloak admin access").
+  # console also needs the master realm's Frontend URL set to the same value: the
+  # policies-shell bootstrap sets it on every start, from the same admin_forward_port
+  # (README, "Keycloak admin access").
   - name: KC_HOSTNAME_ADMIN
     value: "http://localhost:{{ $adminPort }}"
   - name: KEYCLOAK_IMPORT

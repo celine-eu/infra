@@ -1,0 +1,13 @@
+{{- include "celine-legal.validateDataPaths" . }}
+# The deployment's legal data, one key per file; the Deployment mounts each key at its path
+# under /data (LEGAL_DATA).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "celine-services.fullname" . }}-data
+  labels:
+    {{- include "celine-services.labels" . | nindent 4 }}
+data:
+  {{- range $path, $content := .Values.data.files }}
+  {{ include "celine-legal.dataKey" $path }}: {{ $content | toString | quote }}
+  {{- end }}
