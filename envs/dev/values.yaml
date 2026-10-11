@@ -172,11 +172,14 @@ ai_assistant:
   llm:
     base_url: ""
     api_key: ""
-    chat_model: ""
+    # The GX10 serves whichever chat model is deployed under the extra name `chat`.
+    chat_model: "chat"
     vision_model: ""
     embed_base_url: ""
-    embed_model: ""
-    embed_dimensions: ""
+    embed_model: "bge-m3"
+    embed_dimensions: "1024"
+    max_tokens: "4096"
+    temperature: ""
   qdrant_collection: celine_docs
 
 webapp:
