@@ -1,17 +1,28 @@
+# The add-on layer: envs/<env>/addons.yaml.gotmpl, loaded only where it exists, after
+# values.yaml (README, "Add-on layer"). Absent, nothing changes.
 environments:
   dev:
     values:
       - ../envs/dev/values.yaml
+      {{- if isFile "../envs/dev/addons.yaml.gotmpl" }}
+      - ../envs/dev/addons.yaml.gotmpl
+      {{- end }}
     secrets:
       - ../envs/dev/secrets.sops.yaml
   staging:
     values:
       - ../envs/staging/values.yaml
+      {{- if isFile "../envs/staging/addons.yaml.gotmpl" }}
+      - ../envs/staging/addons.yaml.gotmpl
+      {{- end }}
     secrets:
       - ../envs/staging/secrets.sops.yaml
   prod:
     values:
       - ../envs/prod/values.yaml
+      {{- if isFile "../envs/prod/addons.yaml.gotmpl" }}
+      - ../envs/prod/addons.yaml.gotmpl
+      {{- end }}
     secrets:
       - ../envs/prod/secrets.sops.yaml
 ---

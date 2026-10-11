@@ -1,9 +1,44 @@
+{{- /* The add-on layer (README, "Add-on layer"): with `dataspace.enabled`,
+       `dataspace.dataset_api.extra_env` (env entries: name plus value or valueFrom) is
+       appended to the service's env, and `dataspace.dataset_api.client_id`, when set, is the
+       realm client it calls out as, with its secret from `dataspace.client_secrets.<client_id>`,
+       then required. The audience it accepts is unchanged. */}}
+{{- $dsOn := .Environment.Values | dig "dataspace" "enabled" false }}
+{{- if not (kindIs "bool" $dsOn) }}
+{{- fail (printf "dataspace.enabled must be true or false, got %v" $dsOn) }}
+{{- end }}
+{{- $dsEnv := list }}
+{{- $dsClientId := "" }}
+{{- $dsClientSecret := "" }}
+{{- if $dsOn }}
+{{- $dsEnv = .Environment.Values | dig "dataspace" "dataset_api" "extra_env" list }}
+{{- if not (kindIs "slice" $dsEnv) }}
+{{- fail "dataspace.dataset_api.extra_env must be a list of env entries (name plus value or valueFrom)" }}
+{{- end }}
+{{- range $i, $e := $dsEnv }}
+{{- if not (and (kindIs "map" $e) ($e | dig "name" "") (or (hasKey $e "value") (hasKey $e "valueFrom"))) }}
+{{- fail (printf "dataspace.dataset_api.extra_env[%d] is not an env entry (name plus value or valueFrom)" $i) }}
+{{- end }}
+{{- end }}
+{{- $dsClientId = .Environment.Values | dig "dataspace" "dataset_api" "client_id" "" | toString }}
+{{- if $dsClientId }}
+{{- $dsClientSecret = index (.Environment.Values | dig "dataspace" "client_secrets" (dict) | default (dict)) $dsClientId | default "" | toString }}
+{{- if not $dsClientSecret }}
+{{- fail (printf "dataspace.dataset_api.client_id is %s: dataspace.client_secrets.%s is required in the environment's secrets" $dsClientId $dsClientId) }}
+{{- end }}
+{{- end }}
+{{- end }}
 image:
   tag: {{ .Environment.Values.dataset_api.image_tag | default "latest" | quote }}
 
 oidc:
   service:
+    {{- if $dsClientId }}
+    clientId: {{ $dsClientId | quote }}
+    clientSecret: {{ $dsClientSecret | quote }}
+    {{- else }}
     clientSecret: {{ .Environment.Values | dig "dataset_api" "client_secret" "svc-dataset-api" | quote }}
+    {{- end }}
 
 migrate:
   enabled: true
@@ -11,5 +46,9 @@ migrate:
 
 {{- with .Environment.Values | dig "dataset_api" "resources" nil }}
 resources:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- with $dsEnv }}
+extraEnvAppend:
   {{- toYaml . | nindent 2 }}
 {{- end }}

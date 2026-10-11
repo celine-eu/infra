@@ -118,6 +118,13 @@ onboarding:
   dsConnectorUrl: ""
   dsOnboardingClientSecret: "" # [secret] only when dataspaceEnabled
   identityRegistryUrl: ""
+  # Each community's collector-client secret, by alias (the REC's
+  # `dataspace.organization`): SVC_DS_COLLECTOR_<ALIAS>_SECRET, the alias
+  # upper-cased with '-' as '_'. Only when dataspaceEnabled.
+  dsCollectorSecrets: {} # [secret] alias -> secret
+  # REC_ASSERTION_HMAC_KEY: the key of the community's key assertion
+  # (onboarding `config/settings.py`). Empty: not set.
+  recAssertionHmacKey: "" # [secret]
 
   # The CLI's service account (`onboarding-cli admin …` in the pod).
   cliClientId: "svc-onboarding-cli"

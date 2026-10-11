@@ -1,3 +1,30 @@
+{{- /* The add-on layer's databases (README, "Add-on layer"): with `dataspace.enabled`, each
+       name in `dataspace.databases` is a role and a database of the same name, shaped like
+       every role below. Its password is `postgres_db.<name>`, as mandatory as theirs. */}}
+{{- $dsOn := .Environment.Values | dig "dataspace" "enabled" false }}
+{{- if not (kindIs "bool" $dsOn) }}
+{{- fail (printf "dataspace.enabled must be true or false, got %v" $dsOn) }}
+{{- end }}
+{{- $dsDatabases := list }}
+{{- if $dsOn }}
+{{- $dsDatabases = .Environment.Values | dig "dataspace" "databases" nil }}
+{{- if not (kindIs "slice" $dsDatabases) }}
+{{- fail "dataspace.enabled is true: dataspace.databases must be a list of role/database names (an empty list for none)" }}
+{{- end }}
+{{- $seen := dict }}
+{{- range $dsDatabases }}
+{{- if not (and (kindIs "string" .) (regexMatch "^[a-z_][a-z0-9_]{0,62}$" .)) }}
+{{- fail (printf "dataspace.databases: %v is not a role name (lower-case letters, digits and _, starting with a letter or _)" .) }}
+{{- end }}
+{{- if hasKey $seen . }}
+{{- fail (printf "dataspace.databases: %s is listed twice" .) }}
+{{- end }}
+{{- $_ := set $seen . true }}
+{{- if not ($.Environment.Values | dig "postgres_db" . "") }}
+{{- fail (printf "dataspace.databases lists %s: postgres_db.%s (its role password) is required in the environment's secrets" . .) }}
+{{- end }}
+{{- end }}
+{{- end }}
 cluster:
   name: postgis1
   image: ghcr.io/cloudnative-pg/postgis:17
@@ -53,6 +80,10 @@ roles:
   - name: onboarding
     password: {{ .Environment.Values.postgres_db.onboarding | quote }}
 {{- end }}
+{{- range $dsDatabases }}
+  - name: {{ . }}
+    password: {{ index $.Environment.Values.postgres_db . | quote }}
+{{- end }}
 
 databases:
   - name: datasets
@@ -99,6 +130,10 @@ databases:
 {{- if .Environment.Values | dig "onboarding" "enabled" false }}
   - name: onboarding
     owner: onboarding
+{{- end }}
+{{- range $dsDatabases }}
+  - name: {{ . }}
+    owner: {{ . }}
 {{- end }}
 
 poolers:

@@ -1,3 +1,42 @@
+{{- /* The add-on layer (README, "Add-on layer"): with `dataspace.enabled`, the start-up sync
+       also applies `dataspace.policies_shell.overlays` ([{name, content}], in order), and each realm
+       client id in `dataspace.policies_shell.clients` gets its secret as SVC_<ID>_SECRET (the id
+       upper-cased, '-' as '_') from `dataspace.client_secrets.<id>`, which is then required.
+       Never --prune. */}}
+{{- $dsOn := .Environment.Values | dig "dataspace" "enabled" false }}
+{{- if not (kindIs "bool" $dsOn) }}
+{{- fail (printf "dataspace.enabled must be true or false, got %v" $dsOn) }}
+{{- end }}
+{{- $dsOverlays := list }}
+{{- $dsEnv := list }}
+{{- if $dsOn }}
+{{- $dsOverlays = .Environment.Values | dig "dataspace" "policies_shell" "overlays" nil }}
+{{- if not (and (kindIs "slice" $dsOverlays) $dsOverlays) }}
+{{- fail "dataspace.enabled is true: dataspace.policies_shell.overlays is required, a list of {name, content}: the realm declarations the start-up sync adds, in order" }}
+{{- end }}
+{{- $clients := .Environment.Values | dig "dataspace" "policies_shell" "clients" nil }}
+{{- if not (kindIs "slice" $clients) }}
+{{- fail "dataspace.enabled is true: dataspace.policies_shell.clients is required, the list of realm client ids whose secrets the sync needs (an empty list for none)" }}
+{{- end }}
+{{- $secrets := .Environment.Values | dig "dataspace" "client_secrets" (dict) | default (dict) }}
+{{- /* The names this file already sets: a client id giving one of them would set it twice. */}}
+{{- $taken := list "SVC_DT_SECRET" "SVC_PIPELINES_SECRET" "SVC_DATASET_SECRET" "SVC_NUDGING_SECRET" "SVC_REC_REGISTRY_SECRET" "SVC_FLEXIBILITY_SECRET" "SVC_WEBAPP_SECRET" "SVC_COMMUNITY_SECRET" "SVC_PROVISIONING_SECRET" "SVC_GRID_SECRET" "SVC_FORECAST_SECRET" "SVC_ONBOARDING_SECRET" "SVC_ONBOARDING_CLI_SECRET" "CELINE_ADMIN_CLI_SECRET" "OAUTH2_PROXY_CLIENT_SECRET" }}
+{{- range $clients }}
+{{- if not (and (kindIs "string" .) (regexMatch "^[a-z0-9][a-z0-9-]*$" .)) }}
+{{- fail (printf "dataspace.policies_shell.clients: %v is not a realm client id (lower-case letters, digits and '-')" .) }}
+{{- end }}
+{{- $name := printf "%s_SECRET" (. | upper | replace "-" "_") }}
+{{- if has $name $taken }}
+{{- fail (printf "dataspace.policies_shell.clients: %s gives %s, which is already set" . $name) }}
+{{- end }}
+{{- $taken = append $taken $name }}
+{{- $secret := index $secrets . | default "" | toString }}
+{{- if not $secret }}
+{{- fail (printf "dataspace.policies_shell.clients lists %s: dataspace.client_secrets.%s is required in the environment's secrets" . .) }}
+{{- end }}
+{{- $dsEnv = append $dsEnv (dict "name" $name "value" $secret) }}
+{{- end }}
+{{- end }}
 image:
   tag: {{ .Values.policies_shell.image_tag | default "latest" | quote }}
 
@@ -94,6 +133,10 @@ extraEnv:
     value: {{ .Values.domain | quote }}
   - name: CELINE_URL_SCHEME
     value: "https"
+{{- range $dsEnv }}
+  - name: {{ .name }}
+    value: {{ .value | quote }}
+{{- end }}
 
 {{- if .Values.tls_setup.self_signed }}
   - name: SSL_CERT_FILE
@@ -169,3 +212,7 @@ bootstrap:
     bucket: {{ .Environment.Values | dig "policies_shell" "bootstrap" "bucket" "" | quote }}
     s3Secret: {{ .Environment.Values | dig "policies_shell" "bootstrap" "s3_secret" "" | quote }}
     environment: {{ .Environment.Name | quote }}
+{{- with $dsOverlays }}
+syncOverlays:
+  {{- toYaml . | nindent 2 }}
+{{- end }}

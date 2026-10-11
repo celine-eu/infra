@@ -198,7 +198,7 @@ peer.
 | `onboarding.client_secret`, `onboarding.cli_client_secret` | secret: `svc-onboarding` and `svc-onboarding-cli`, the same keys `policies-shell` syncs to the realm |
 | `onboarding.image_tag`, `onboarding.ui_image_tag` | the API image tag, and the UI's (defaults to the API's) |
 | `onboarding.host` | defaults to `onboarding.<domain>` |
-| `onboarding.dataspace_enabled` | `false` by default. A template declaring `consent.data_sharing` also needs a connector, or the API does not start |
+| `onboarding.dataspace_enabled` | `false` by default. A template declaring `consent.data_sharing` also needs a connector, or the API does not start. The add-on layer's `dataspace.enabled` turns it on as well ([Add-on layer](#add-on-layer)) |
 | `onboarding.sms_provider` | `none` by default: no phone verification. The service's own default, `log`, only prints the code to the pod log. `brevo` also needs `dpa_sms_signed` and `brevo_api_key` |
 | `onboarding.smtp` | overrides the shared `smtp` block, as in [Email (SMTP)](#email-smtp). STARTTLS or plain only: a resolved block with `ssl: true` stops the render |
 | `onboarding.templates.files`, `onboarding.templates.binary_files` | the community templates, `<slug>/<path>` to text or base64, mounted from a ConfigMap (1 MiB at most) |
@@ -541,6 +541,65 @@ v1.14.3, Keycloak 26.7.3 and the rendered Ingress (2026-10-04):
 - sign-in and the account console of the platform realm worked;
 - the console signed in through `task keycloak:forward`;
 - bootstrap's calls through the Service worked.
+
+---
+
+## Add-on layer
+
+A project that adds services next to CELINE (a dataspace, for instance) can switch on the
+pieces infra needs for it without editing infra or the environment's `values.yaml`: every
+group in `helmfile.d/` also loads **`envs/<env>/addons.yaml.gotmpl`**, after `values.yaml`
+and before the secrets file, when that file exists.
+
+- **Absent, nothing changes**: the hook is an `isFile` test in each group's `environments`
+  block, so an environment without the file renders exactly as before.
+- **Present, it must render**: it is a helmfile values template, so it can be the layer
+  itself or a `readFile` of a file another checkout owns. A `readFile` whose target is
+  missing stops every group. A relative `readFile` path is joined to `infra/envs/<env>/`
+  and cleaned as text, never through a symlinked environment directory: three `../` are
+  the directory holding `infra/`, so from an `envs/staging/` linked in from a deployment
+  repository that has `infra` as a submodule, a checkout beside that repository is
+  `../../../../<checkout>/…`. An absolute path avoids the question.
+- `envs/*/addons.yaml.gotmpl` is gitignored: the file is written per machine, by the
+  project that owns the layer.
+
+Today the layer carries one feature, `dataspace:`. Everything is off unless
+`dataspace.enabled` is `true`; `dataspace.enabled` must be a boolean, and once it is on every
+input below that is marked required stops the render when missing.
+
+```yaml
+dataspace:
+  enabled: false                       # true or false; anything else stops the render
+  databases: []                        # postgres-db: role and database names (required list)
+  onboarding:
+    enabled: true                      # the onboarding part; set false to keep it off
+    identity_registry_url: ""          # required: IDENTITY_REGISTRY_URL
+    connector_url: ""                  # DS_CONNECTOR_URL when set
+    collector_aliases: []              # SVC_DS_COLLECTOR_<ALIAS>_SECRET each
+    template_patches: {}               # <slug>/<path> -> map, deep-merged into the template
+  dataset_api:
+    extra_env: []                      # env entries appended to dataset-api's env
+    client_id: ""                      # the realm client dataset-api calls out as, when set
+  policies_shell:
+    overlays: []                       # required: [{name, content}], realm declarations
+    clients: []                        # required list: realm client ids needing a secret
+  client_secrets: {}                   # secret: realm client id -> secret
+onboarding:
+  rec_assertion_hmac_key: ""           # secret: required once the dataspace reaches onboarding
+```
+
+| Value | Effect, with `dataspace.enabled: true` |
+|---|---|
+| `dataspace.databases` | each name becomes a role and a database of that name in `postgres-db`, shaped like every other role (Secret `<name>-db-secret` with `cnpg.io/reload`, a managed role, a `Database` CR). The password is `postgres_db.<name>` in the secrets file, **required**. The Cluster's `parameters` are untouched |
+| `dataspace.onboarding.*` | onboarding runs with `DATASPACE_ENABLED=true`, whatever `onboarding.dataspace_enabled` says, unless `dataspace.onboarding.enabled` is `false`. While onboarding is enabled: `identity_registry_url` is **required**; `client_secrets.svc-ds-onboarding` is **required** (`DS_ONBOARDING_CLIENT_SECRET`); each alias in `collector_aliases` needs `client_secrets.svc-ds-collector-<alias>` (**required**), exported as `SVC_DS_COLLECTOR_<ALIAS>_SECRET` (upper-cased, `-` as `_`); `onboarding.rec_assertion_hmac_key` is **required** (`REC_ASSERTION_HMAC_KEY`) |
+| `dataspace.onboarding.template_patches` | each `<slug>/<path>` is deep-merged into `onboarding.templates.files[<path>]`: maps merge key by key, the patch wins, lists are replaced. A path that is not in `templates.files` stops the render. A patched template is written back as YAML, so its comments and key order are not kept |
+| `dataspace.dataset_api.extra_env` | appended after the dataset-api chart's own env (chart value `extraEnvAppend`). Each entry needs a `name` and a `value` or `valueFrom` |
+| `dataspace.dataset_api.client_id` | optional: the realm client dataset-api calls other services as (`oidc.service.clientId`), its secret `client_secrets.<client_id>` **required**. The audience it accepts does not change. Unset: `svc-dataset-api` as before |
+| `dataspace.policies_shell.overlays` | **required**, a list of `{name, content}`: mounted into policies-shell and passed to its start-up `celine-policies keycloak sync` as `--overlay`, in list order, after `clients.yaml` (chart value `syncOverlays`; celine-policies 1.7.0 or later). A name given twice stops the render. A changed overlay restarts the shell. Never `--prune` |
+| `dataspace.policies_shell.clients` | **required** list: each realm client id gets its secret as `SVC_<ID>_SECRET` in policies-shell (the id upper-cased, `-` as `_`: `svc-ds-portal` gives `SVC_DS_PORTAL_SECRET`) from `client_secrets.<id>`, **required**. A name the shell already sets stops the render |
+
+Removing the file, or setting `dataspace.enabled: false`, renders every environment exactly as
+without the layer.
 
 ---
 

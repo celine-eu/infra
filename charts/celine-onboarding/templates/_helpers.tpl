@@ -55,6 +55,27 @@
 {{- printf "%s-rec-templates" (include "celine-services.fullname" .) }}
 {{- end }}
 
+{{/* onboarding.dsCollectorSecrets as env name -> secret: SVC_DS_COLLECTOR_<ALIAS>_SECRET,
+     the alias upper-cased with '-' as '_' (onboarding `config/settings.py`). A bad alias, an
+     empty secret or two aliases with one name fail the render. */}}
+{{- define "celine-onboarding.collectorSecrets" -}}
+{{- $out := dict }}
+{{- range $alias, $secret := .Values.onboarding.dsCollectorSecrets | default dict }}
+{{- if not (regexMatch "^[A-Za-z0-9][A-Za-z0-9_-]*$" $alias) }}
+{{- fail (printf "onboarding.dsCollectorSecrets: %q is not a collector alias (letters, digits, '-' and '_')" $alias) }}
+{{- end }}
+{{- if not (toString ($secret | default "")) }}
+{{- fail (printf "onboarding.dsCollectorSecrets.%s is empty: the collector client's secret is required" $alias) }}
+{{- end }}
+{{- $name := printf "SVC_DS_COLLECTOR_%s_SECRET" ($alias | upper | replace "-" "_") }}
+{{- if hasKey $out $name }}
+{{- fail (printf "onboarding.dsCollectorSecrets: two aliases give %s" $name) }}
+{{- end }}
+{{- $_ := set $out $name (toString $secret) }}
+{{- end }}
+{{- toYaml $out }}
+{{- end }}
+
 {{/* Plain and secret-backed env for the service's own flat settings. */}}
 {{- define "celine-onboarding.env" -}}
 {{- $o := .Values.onboarding }}
@@ -100,6 +121,20 @@
     secretKeyRef:
       name: {{ $secretName }}
       key: DS_ONBOARDING_CLIENT_SECRET
+{{- range $name, $_ := include "celine-onboarding.collectorSecrets" . | fromYaml }}
+- name: {{ $name }}
+  valueFrom:
+    secretKeyRef:
+      name: {{ $secretName }}
+      key: {{ $name }}
+{{- end }}
+{{- end }}
+{{- if $o.recAssertionHmacKey }}
+- name: REC_ASSERTION_HMAC_KEY
+  valueFrom:
+    secretKeyRef:
+      name: {{ $secretName }}
+      key: REC_ASSERTION_HMAC_KEY
 {{- end }}
 {{- if $o.dsConnectorUrl }}
 - name: DS_CONNECTOR_URL
@@ -188,6 +223,10 @@
 {{- end }}
 {{- if $o.dataspaceEnabled }}
 {{- $_ := set $data "DS_ONBOARDING_CLIENT_SECRET" ($o.dsOnboardingClientSecret | default "" | toString) }}
+{{- $data = merge $data (include "celine-onboarding.collectorSecrets" . | fromYaml) }}
+{{- end }}
+{{- if $o.recAssertionHmacKey }}
+{{- $_ := set $data "REC_ASSERTION_HMAC_KEY" ($o.recAssertionHmacKey | toString) }}
 {{- end }}
 {{- toYaml (merge $data (.Values.extraSecrets | default dict)) }}
 {{- end }}

@@ -18,9 +18,15 @@ spec:
     metadata:
       labels:
         {{- include "celine-policies-shell.selectorLabels" . | nindent 8 }}
-      {{- with .Values.podAnnotations }}
+      {{- if or .Values.podAnnotations .Values.syncOverlays }}
       annotations:
+        {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- if .Values.syncOverlays }}
+        # A changed overlay restarts the shell, whose start-up sync applies it.
+        checksum/sync-overlays: {{ include "celine-policies-shell.syncOverlays" . | sha256sum | quote }}
+        {{- end }}
       {{- end }}
     spec:
       {{- with .Values.imagePullSecrets }}
@@ -290,7 +296,7 @@ spec:
               SECRET_FILE=/tmp/.secrets.yaml
               
               i=0
-              until celine-policies keycloak sync --secrets-file "$SECRET_FILE" "$CLIENTS_FILE"; do
+              until celine-policies keycloak sync --secrets-file "$SECRET_FILE" "$CLIENTS_FILE"{{ range include "celine-policies-shell.syncOverlays" . | fromYamlArray }} --overlay "/etc/celine-policies-sync/{{ .name }}"{{ end }}; do
                 i=$((i + 1))
                 if [ "$i" -ge "$MAX_RETRIES" ]; then
                   # Fail the pod: a shell that idles after a sync that never ran looks
@@ -319,16 +325,28 @@ spec:
                   key: {{ default .name .key }}
               {{- end }}
             {{- end }}
-          {{- with .Values.volumeMounts }}
+          {{- if or .Values.volumeMounts .Values.syncOverlays }}
           volumeMounts:
+            {{- with .Values.volumeMounts }}
             {{- toYaml . | nindent 12 }}
+            {{- end }}
+            {{- if .Values.syncOverlays }}
+            - name: sync-overlays
+              mountPath: /etc/celine-policies-sync
+              readOnly: true
+            {{- end }}
           {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-      {{- if or .Values.volumes .Values.bootstrap.enabled }}
+      {{- if or .Values.volumes .Values.bootstrap.enabled .Values.syncOverlays }}
       volumes:
         {{- with .Values.volumes }}
         {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- if .Values.syncOverlays }}
+        - name: sync-overlays
+          configMap:
+            name: {{ include "celine-policies-shell.fullname" . }}-sync-overlays
         {{- end }}
         {{- if .Values.bootstrap.enabled }}
         - name: bootstrap-record

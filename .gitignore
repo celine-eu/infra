@@ -1,6 +1,8 @@
 .sops/*/key.txt
 envs/*/secrets*.yaml
 envs/*/secrets*.yaml.*
+# The add-on layer is written per machine (README, "Add-on layer")
+envs/*/addons.yaml.gotmpl
 .sops.yaml
 /sources.txt
 *.tgz

@@ -87,6 +87,9 @@ extraEnv:
         key: connection-string
   - name: REC_REGISTRY_URL
     value: "http://rec-registry:8004"
+# Further env entries, appended after extraEnv (which an environment would otherwise
+# have to restate whole, being a list).
+extraEnvAppend: []
 
 extraSecrets: {}
 

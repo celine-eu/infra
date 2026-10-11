@@ -1,0 +1,14 @@
+{{- if .Values.syncOverlays }}
+# Further files declaring part of the realm, passed to the shell's start-up `keycloak sync`
+# as `--overlay`, in list order, after clients.yaml. Never --prune.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "celine-policies-shell.fullname" . }}-sync-overlays
+  labels:
+    {{- include "celine-policies-shell.labels" . | nindent 4 }}
+data:
+  {{- range include "celine-policies-shell.syncOverlays" . | fromYamlArray }}
+  {{ .name }}: {{ .content | quote }}
+  {{- end }}
+{{- end }}

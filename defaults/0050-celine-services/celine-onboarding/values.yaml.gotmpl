@@ -28,7 +28,82 @@
 #
 # and `postgres_db.onboarding`, the database role's password (secret), which
 # postgres-db reads only when onboarding is enabled.
+#
+# The add-on layer (README, "Add-on layer") turns the dataspace on as well:
+# with `dataspace.enabled` (and `dataspace.onboarding.enabled`, true unless set
+# false), DATASPACE_ENABLED is true whatever `onboarding.dataspace_enabled` says,
+# and these become mandatory while onboarding is enabled:
+#
+#   dataspace:
+#     onboarding:
+#       identity_registry_url: http://…   # REQUIRED: IDENTITY_REGISTRY_URL
+#       connector_url: ""                 # DS_CONNECTOR_URL when set
+#       collector_aliases: []             # SVC_DS_COLLECTOR_<ALIAS>_SECRET each
+#       template_patches: {}              # <slug>/<path> → a map deep-merged into
+#                                         # templates.files[<path>] (which must exist)
+#     client_secrets:                     # secret
+#       svc-ds-onboarding: …              # REQUIRED: DS_ONBOARDING_CLIENT_SECRET
+#       svc-ds-collector-<alias>: …       # REQUIRED for each collector alias
+#
+#   onboarding:
+#     rec_assertion_hmac_key: …           # REQUIRED, secret: REC_ASSERTION_HMAC_KEY
 {{- $o := .Environment.Values | dig "onboarding" (dict) | default (dict) }}
+{{- $ds := .Environment.Values | dig "dataspace" (dict) | default (dict) }}
+{{- $dsOn := $ds | dig "enabled" false }}
+{{- if not (kindIs "bool" $dsOn) }}
+{{- fail (printf "dataspace.enabled must be true or false, got %v" $dsOn) }}
+{{- end }}
+{{- $dsO := $ds | dig "onboarding" (dict) | default (dict) }}
+{{- $dsOEnabled := $dsO | dig "enabled" true }}
+{{- if not (kindIs "bool" $dsOEnabled) }}
+{{- fail (printf "dataspace.onboarding.enabled must be true or false, got %v" $dsOEnabled) }}
+{{- end }}
+{{- /* The dataspace side of onboarding, from the add-on layer. Its inputs are checked only
+       where onboarding is on: values files render at group load (see the SMTP check below). */}}
+{{- $dsOnboarding := and $dsOn $dsOEnabled }}
+{{- $dsCheck := and $dsOnboarding ($o | dig "enabled" false) }}
+{{- $dsSecrets := $ds | dig "client_secrets" (dict) | default (dict) }}
+{{- $dsCollectorSecrets := dict }}
+{{- $templateFiles := $o | dig "templates" "files" (dict) | default (dict) }}
+{{- if $dsCheck }}
+{{- if not ($dsO | dig "identity_registry_url" "") }}
+{{- fail "dataspace.enabled is true: dataspace.onboarding.identity_registry_url is required (onboarding's IDENTITY_REGISTRY_URL), or set dataspace.onboarding.enabled: false" }}
+{{- end }}
+{{- if not (index $dsSecrets "svc-ds-onboarding") }}
+{{- fail "dataspace.enabled is true: dataspace.client_secrets.svc-ds-onboarding is required in the environment's secrets (onboarding's DS_ONBOARDING_CLIENT_SECRET)" }}
+{{- end }}
+{{- if not ($o | dig "rec_assertion_hmac_key" "") }}
+{{- fail "dataspace.enabled is true: onboarding.rec_assertion_hmac_key is required in the environment's secrets (onboarding's REC_ASSERTION_HMAC_KEY)" }}
+{{- end }}
+{{- $aliases := $dsO | dig "collector_aliases" list }}
+{{- if not (kindIs "slice" $aliases) }}
+{{- fail "dataspace.onboarding.collector_aliases must be a list of collector aliases" }}
+{{- end }}
+{{- range $aliases }}
+{{- $key := printf "svc-ds-collector-%v" . }}
+{{- if not (index $dsSecrets $key) }}
+{{- fail (printf "dataspace.onboarding.collector_aliases lists %v: dataspace.client_secrets.%s is required in the environment's secrets" . $key) }}
+{{- end }}
+{{- $_ := set $dsCollectorSecrets (toString .) (index $dsSecrets $key | toString) }}
+{{- end }}
+{{- $patches := $dsO | dig "template_patches" (dict) | default (dict) }}
+{{- if not (kindIs "map" $patches) }}
+{{- fail "dataspace.onboarding.template_patches must be a map of template path to patch" }}
+{{- end }}
+{{- if $patches }}
+{{- $templateFiles = deepCopy $templateFiles }}
+{{- range $path, $patch := $patches }}
+{{- if not (hasKey $templateFiles $path) }}
+{{- fail (printf "dataspace.onboarding.template_patches: %s is not in onboarding.templates.files, so there is nothing to patch" $path) }}
+{{- end }}
+{{- if not (kindIs "map" $patch) }}
+{{- fail (printf "dataspace.onboarding.template_patches.%s must be a map, deep-merged into the template" $path) }}
+{{- end }}
+{{- $doc := index $templateFiles $path | fromYaml | default (dict) }}
+{{- $_ := set $templateFiles $path (mergeOverwrite $doc (deepCopy $patch) | toYaml) }}
+{{- end }}
+{{- end }}
+{{- end }}
 {{- $host := $o | dig "host" (printf "onboarding.%s" .Values.domain) }}
 {{- /* Unset or empty: 0.0.0.0, which no peer is, so no proxy is trusted. The chart
        refuses "*" and /0 (celine-onboarding.validate). */}}
@@ -62,7 +137,19 @@ healthCheck:
 onboarding:
   forwardedAllowIps: {{ $ips | quote }}
   encryptionKey: {{ $o | dig "encryption_key" "" | quote }}
-  dataspaceEnabled: {{ $o | dig "dataspace_enabled" false }}
+  dataspaceEnabled: {{ or ($o | dig "dataspace_enabled" false) $dsOnboarding }}
+  {{- if $dsCheck }}
+  identityRegistryUrl: {{ $dsO | dig "identity_registry_url" "" | quote }}
+  dsOnboardingClientSecret: {{ index $dsSecrets "svc-ds-onboarding" | toString | quote }}
+  recAssertionHmacKey: {{ $o | dig "rec_assertion_hmac_key" "" | toString | quote }}
+  {{- with $dsO | dig "connector_url" "" }}
+  dsConnectorUrl: {{ . | quote }}
+  {{- end }}
+  {{- with $dsCollectorSecrets }}
+  dsCollectorSecrets:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- end }}
   cliClientSecret: {{ $o | dig "cli_client_secret" "svc-onboarding-cli" | quote }}
   corsOrigins: {{ printf "https://%s" $host | quote }}
   smsProvider: {{ $o | dig "sms_provider" "none" | quote }}
@@ -80,7 +167,7 @@ onboarding:
 
 templates:
   files:
-    {{- $o | dig "templates" "files" (dict) | default (dict) | toYaml | nindent 4 }}
+    {{- $templateFiles | toYaml | nindent 4 }}
   binaryFiles:
     {{- $o | dig "templates" "binary_files" (dict) | default (dict) | toYaml | nindent 4 }}
 

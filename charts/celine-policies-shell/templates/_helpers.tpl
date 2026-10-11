@@ -98,3 +98,36 @@ reached over TLS from there too.
 {{- end }}
 {{- end }}
 {{- end }}
+
+{{/*
+syncOverlays, checked: a list of {name, content}, in order. A name that is no plain file name,
+a name given twice, or an empty overlay stops the render; a map content is written as YAML.
+*/}}
+{{- define "celine-policies-shell.syncOverlays" -}}
+{{- $out := list }}
+{{- $seen := dict }}
+{{- $in := .Values.syncOverlays | default list }}
+{{- if not (kindIs "slice" $in) }}
+{{- fail "syncOverlays must be a list of {name, content}" }}
+{{- end }}
+{{- range $i, $o := $in }}
+{{- if not (kindIs "map" $o) }}
+{{- fail (printf "syncOverlays[%d] must be {name, content}" $i) }}
+{{- end }}
+{{- $name := $o.name | default "" | toString }}
+{{- if not (regexMatch "^[A-Za-z0-9][A-Za-z0-9._-]*$" $name) }}
+{{- fail (printf "syncOverlays[%d]: %q is not a file name (letters, digits, '.', '-' and '_')" $i $name) }}
+{{- end }}
+{{- if hasKey $seen $name }}
+{{- fail (printf "syncOverlays: %s is given twice" $name) }}
+{{- end }}
+{{- $_ := set $seen $name true }}
+{{- $content := $o.content }}
+{{- $text := ternary (toYaml $content) (toString ($content | default "")) (kindIs "map" $content) }}
+{{- if not (trim $text) }}
+{{- fail (printf "syncOverlays: %s is empty" $name) }}
+{{- end }}
+{{- $out = append $out (dict "name" $name "content" $text) }}
+{{- end }}
+{{- toYaml $out }}
+{{- end }}

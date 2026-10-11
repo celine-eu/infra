@@ -131,6 +131,15 @@ bootstrap:
     environment: ""
 
 # --------------------------------------------------------------------------
+# Sync overlays: further files declaring part of the realm (celine-policies
+# `keycloak sync --overlay`, repeatable, merged with clients.yaml before the
+# sync). A list of {name, content}, passed in list order; a name given twice
+# stops the render. Empty: none, and the start-up sync is exactly
+# `sync clients.yaml`.
+# --------------------------------------------------------------------------
+syncOverlays: []
+
+# --------------------------------------------------------------------------
 # Extra environment variables (plain value or secretKeyRef)
 # --------------------------------------------------------------------------
 # Client secrets — substituted into clients.yaml during keycloak sync.
