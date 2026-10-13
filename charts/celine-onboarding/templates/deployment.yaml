@@ -12,6 +12,10 @@
 {{- else }}
 {{- $volumes = append $volumes (dict "name" "data" "emptyDir" (dict)) }}
 {{- end }}
+{{- if and (not .Values.strategy) .Values.persistence.enabled (eq (.Values.persistence.accessMode | default "ReadWriteOnce") "ReadWriteOnce") }}
+{{- /* rollingUpdate: null clears the field the API server defaulted on the live object */}}
+{{- $_ := set $v "strategy" (dict "type" "Recreate" "rollingUpdate" nil) }}
+{{- end }}
 {{- $annotations := deepCopy (.Values.podAnnotations | default dict) }}
 {{- if include "celine-onboarding.hasTemplates" . }}
 {{- $mounts = append $mounts (dict "name" "rec-templates" "mountPath" .Values.templates.mountPath "readOnly" true) }}

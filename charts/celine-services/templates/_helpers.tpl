@@ -599,6 +599,11 @@ metadata:
     {{- include "celine-services.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount | default 1 }}
+  {{- /* Optional: the rollout strategy, as the Deployment spec takes it (e.g. Recreate for a ReadWriteOnce volume) */}}
+  {{- with .Values.strategy }}
+  strategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "celine-services.selectorLabels" . | nindent 6 }}

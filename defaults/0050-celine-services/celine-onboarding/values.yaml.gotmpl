@@ -18,6 +18,18 @@
 #     dpa_sms_signed: false
 #     brevo_sms_sender: ""
 #     brevo_api_key: ""                  # secret, with sms_provider: brevo
+#     otp_hmac_key: ""                   # secret: OTP_HMAC_KEY, keys the OTP hashes. REQUIRED while
+#                                        # phone verification is on (sms_provider log, console or
+#                                        # dev, or brevo with dpa_sms_signed): a random secret of
+#                                        # its own, never encryption_key or rec_assertion_hmac_key
+#     extraction_enabled: false          # read bills and identity documents with a vision model;
+#                                        # on only with llm.base_url and llm.vision_model too.
+#                                        # Uploads need persistence
+#     llm:                               # an OpenAI-compatible endpoint (as ai_assistant.llm)
+#       base_url: ""
+#       vision_model: ""
+#       api_key: ""                      # secret, if the endpoint needs one: reaches the pod
+#                                        # from the release's Secret, never as a plain value
 #     smtp: {}                           # overrides the shared `smtp` block (README "Email (SMTP)")
 #     templates:
 #       files: {}                        # <slug>/<path> → text
@@ -124,6 +136,26 @@
 {{- fail "onboarding: the resolved SMTP block has ssl: true; onboarding has no implicit-TLS mode. Use STARTTLS (ssl: false, starttls: true, usually port 587) or set onboarding.smtp" }}
 {{- end }}
 
+{{- /* OTP_HMAC_KEY: onboarding refuses to start without it while phone verification is on
+       (its posture guard; the rule is onboarding's `phone_verification_enabled`, the same as
+       the legal defaults' sms_verification), or when it equals an ENCRYPTION_KEY key. Caught
+       here so a diff fails before an apply. Only where onboarding is on (group load). */}}
+{{- $otpKey := $o | dig "otp_hmac_key" "" | toString | trim }}
+{{- if $o | dig "enabled" false }}
+{{- $smsName := $o | dig "sms_provider" "none" | toString | lower | trim }}
+{{- $phoneOn := or (has $smsName (list "log" "console" "dev")) (and (eq $smsName "brevo") (eq (toString ($o | dig "dpa_sms_signed" false)) "true")) }}
+{{- if and $phoneOn (not $otpKey) }}
+{{- fail (printf "onboarding: phone verification is on (sms_provider %s): onboarding.otp_hmac_key is required in the environment's secrets (onboarding's OTP_HMAC_KEY), a random secret of its own" $smsName) }}
+{{- end }}
+{{- if $otpKey }}
+{{- $encKeys := list }}
+{{- range splitList "," ($o | dig "encryption_key" "" | toString) }}{{- $encKeys = append $encKeys (trim .) }}{{- end }}
+{{- if or (has $otpKey $encKeys) (eq $otpKey ($o | dig "rec_assertion_hmac_key" "" | toString | trim)) }}
+{{- fail "onboarding.otp_hmac_key must be a secret of its own: it equals onboarding.encryption_key (one of its keys) or onboarding.rec_assertion_hmac_key" }}
+{{- end }}
+{{- end }}
+{{- end }}
+
 image:
   tag: {{ $o | dig "image_tag" "latest" | quote }}
 
@@ -137,7 +169,10 @@ healthCheck:
 onboarding:
   forwardedAllowIps: {{ $ips | quote }}
   encryptionKey: {{ $o | dig "encryption_key" "" | quote }}
-  dataspaceEnabled: {{ or ($o | dig "dataspace_enabled" false) $dsOnboarding }}
+  {{- /* Onboarding's effective dataspace switch: it collects the data-release consent. The
+         legal defaults (dso_data_exchange) and the webapp's (DATA_SHARING_ENABLED) derive
+         from the same expression: keep the three in step. */}}
+  dataspaceEnabled: {{ or (eq (toString ($o | dig "dataspace_enabled" false)) "true") $dsOnboarding }}
   {{- if $dsCheck }}
   identityRegistryUrl: {{ $dsO | dig "identity_registry_url" "" | quote }}
   dsOnboardingClientSecret: {{ index $dsSecrets "svc-ds-onboarding" | toString | quote }}
@@ -156,6 +191,14 @@ onboarding:
   dpaSmsSigned: {{ $o | dig "dpa_sms_signed" false }}
   brevoSmsSender: {{ $o | dig "brevo_sms_sender" "" | quote }}
   brevoApiKey: {{ $o | dig "brevo_api_key" "" | quote }}
+  {{- with $o | dig "otp_hmac_key" "" | toString }}
+  otpHmacKey: {{ . | quote }}
+  {{- end }}
+  extractionEnabled: {{ eq (toString ($o | dig "extraction_enabled" false)) "true" }}
+  llm:
+    baseUrl: {{ $o | dig "llm" "base_url" "" | quote }}
+    visionModel: {{ $o | dig "llm" "vision_model" "" | quote }}
+    apiKey: {{ $o | dig "llm" "api_key" "" | quote }}
   smtp:
     host: {{ $smtp | dig "host" "" | quote }}
     port: {{ $smtp | dig "port" 587 }}

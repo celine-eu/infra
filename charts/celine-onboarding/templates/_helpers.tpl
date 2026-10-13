@@ -136,6 +136,13 @@
       name: {{ $secretName }}
       key: REC_ASSERTION_HMAC_KEY
 {{- end }}
+{{- if $o.otpHmacKey }}
+- name: OTP_HMAC_KEY
+  valueFrom:
+    secretKeyRef:
+      name: {{ $secretName }}
+      key: OTP_HMAC_KEY
+{{- end }}
 {{- if $o.dsConnectorUrl }}
 - name: DS_CONNECTOR_URL
   value: {{ $o.dsConnectorUrl | quote }}
@@ -227,6 +234,9 @@
 {{- end }}
 {{- if $o.recAssertionHmacKey }}
 {{- $_ := set $data "REC_ASSERTION_HMAC_KEY" ($o.recAssertionHmacKey | toString) }}
+{{- end }}
+{{- if $o.otpHmacKey }}
+{{- $_ := set $data "OTP_HMAC_KEY" ($o.otpHmacKey | toString) }}
 {{- end }}
 {{- toYaml (merge $data (.Values.extraSecrets | default dict)) }}
 {{- end }}

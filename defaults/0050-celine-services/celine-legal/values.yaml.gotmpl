@@ -10,6 +10,7 @@
 #     draft: false            # serve the draft for review at /draft/<revision>/
 #     release: ""             # pin the stable site to vX.Y.Z (refused unless the newest published)
 #     features: {}            # name -> true/false: overrides what is derived below
+#                             # (existing_members only on an image that knows it, see below)
 #     base_url: ""            # where applications find the legal host; default https://<host>
 #                             # when enabled. Set it alone to use a legal host served elsewhere;
 #                             # set it to "" to keep the applications off this host while it
@@ -24,11 +25,27 @@
 # environment does not run (celine-legal templates/features.yaml):
 #   sms_verification     onboarding.sms_provider a dev provider (log, console, dev), or brevo
 #                        with onboarding.dpa_sms_signed
-#   document_extraction  onboarding.env EXTRACTION_ENABLED, with LLM_BASE_URL and
-#                        LLM_VISION_MODEL (upload follows the same switch)
-#   dso_data_exchange    onboarding.dataspace_enabled
+#   document_extraction  onboarding.extraction_enabled with llm.base_url and llm.vision_model;
+#                        onboarding.env EXTRACTION_ENABLED, LLM_BASE_URL, LLM_VISION_MODEL win
+#                        where set, as they do in the pod (upload follows the same switch)
+#   dso_data_exchange    where consent to release data to the dataspace is collected: onboarding's
+#                        effective DATASPACE_ENABLED (onboarding.dataspace_enabled, or the add-on
+#                        layer's dataspace.enabled with dataspace.onboarding.enabled, true unless
+#                        set false), or an explicit webapp.data_sharing_enabled: true (its page
+#                        grants as well as withdraws). The webapp's page defaults to onboarding's
+#                        switch, so by default both follow the place that collects the consent,
+#                        and webapp.data_sharing_enabled: false never turns the texts off while
+#                        onboarding still collects. The same expression is in the onboarding
+#                        and webapp defaults: keep the three in step
 #   ai_assistant         true: the assistant has no switch, it is released with the services
-# All but ai_assistant are off where onboarding is not installed.
+#   existing_members     any onboarding template (`onboarding.templates.files`, <slug>/manifest.yaml)
+#                        with existing_members.enabled, after the add-on layer's template_patches.
+#                        Deployment-wide: one such template puts the passage in every community's
+#                        notice. Only for a legal image that knows it, image_tag vX.Y.Z from
+#                        v0.2.0 on: an older image's draft refuses a feature it does not know,
+#                        so nothing is set for it there, and setting it in `features` fails here
+# All but ai_assistant are off where onboarding is not installed, dso_data_exchange
+# included unless webapp.data_sharing_enabled is true (a webapp reaching an onboarding elsewhere).
 #
 # The same base URL reaches celine-webapp and celine-onboarding (`LEGAL_BASE_URL`), the
 # standalone assistant (`PUBLIC_LEGAL_BASE_URL`) and Keycloak's theme (`TERMS_URL`,
@@ -40,12 +57,50 @@
 {{- $onboarding := $o | dig "enabled" false }}
 {{- $sms := $o | dig "sms_provider" "none" | toString | lower | trim }}
 {{- $smsOn := or (has $sms (list "log" "console" "dev")) (and (eq $sms "brevo") (eq (toString ($o | dig "dpa_sms_signed" false)) "true")) }}
-{{- $extractionOn := and (eq (toString ($oe | dig "EXTRACTION_ENABLED" "false") | lower) "true") ($oe | dig "LLM_BASE_URL" "") ($oe | dig "LLM_VISION_MODEL" "") }}
+{{- /* onboarding.env comes after the chart's own variables (extraEnv), so it wins. */}}
+{{- $exFlag := ternary ($oe | dig "EXTRACTION_ENABLED" "") ($o | dig "extraction_enabled" false) (hasKey $oe "EXTRACTION_ENABLED") }}
+{{- $llmUrl := $oe | dig "LLM_BASE_URL" "" | default ($o | dig "llm" "base_url" "") }}
+{{- $llmModel := $oe | dig "LLM_VISION_MODEL" "" | default ($o | dig "llm" "vision_model" "") }}
+{{- $extractionOn := and (eq (toString $exFlag | lower) "true") $llmUrl $llmModel }}
+{{- /* The add-on layer's onboarding side (celine-onboarding defaults). */}}
+{{- $ds := .Environment.Values | dig "dataspace" (dict) | default (dict) }}
+{{- $dsOnboarding := and (eq (toString ($ds | dig "enabled" false)) "true") (eq (toString ($ds | dig "onboarding" "enabled" true)) "true") }}
+{{- /* dso_data_exchange: onboarding's effective DATASPACE_ENABLED, as the onboarding defaults
+       decide it, or the webapp's data-sharing page set on explicitly (the webapp defaults
+       give it onboarding's switch otherwise). Keep in step with both files. */}}
+{{- $dsCollect := and (eq (toString $onboarding) "true") (or (eq (toString ($o | dig "dataspace_enabled" false)) "true") $dsOnboarding) }}
+{{- $webappSharing := eq (toString (.Environment.Values | dig "webapp" "data_sharing_enabled" false) | lower) "true" }}
+{{- /* existing_members: as onboarding reads the templates, with the add-on layer's patches
+       deep-merged where its onboarding side is on. */}}
+{{- $patches := $ds | dig "onboarding" "template_patches" (dict) | default (dict) }}
+{{- $existingOn := false }}
+{{- range $path, $text := ($o | dig "templates" "files" (dict) | default (dict)) }}
+{{- if eq (base $path) "manifest.yaml" }}
+{{- $doc := $text | toString | fromYaml | default (dict) }}
+{{- if and $dsOnboarding (kindIs "map" (index $patches $path)) }}
+{{- $doc = mergeOverwrite (deepCopy $doc) (deepCopy (index $patches $path)) }}
+{{- end }}
+{{- if eq (toString ($doc | dig "existing_members" "enabled" false)) "true" }}
+{{- $existingOn = true }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- /* The first celine-legal release whose templates know existing_members. */}}
+{{- $existingMembersSince := "0.2.0" }}
+{{- $tag := $legal | dig "image_tag" "" | toString }}
+{{- $knowsExisting := and (regexMatch "^v[0-9]+[.][0-9]+[.][0-9]+$" $tag) (semverCompare (printf ">=%s" $existingMembersSince) (trimPrefix "v" $tag)) }}
+{{- $explicit := $legal | dig "features" (dict) | default (dict) }}
+{{- if and (hasKey $explicit "existing_members") (not $knowsExisting) }}
+{{- fail (printf "legal.features.existing_members: legal.image_tag %q does not know this feature, and its draft would refuse it; it needs celine-legal v%s or later" $tag $existingMembersSince) }}
+{{- end }}
 {{- $derived := dict
       "sms_verification" (and $onboarding $smsOn)
       "document_extraction" (and $onboarding (not (empty $extractionOn)))
-      "dso_data_exchange" (and $onboarding (eq (toString ($o | dig "dataspace_enabled" false)) "true"))
+      "dso_data_exchange" (or $dsCollect $webappSharing)
       "ai_assistant" true }}
+{{- if $knowsExisting }}
+{{- $_ := set $derived "existing_members" (and $onboarding $existingOn) }}
+{{- end }}
 
 image:
   tag: {{ $legal | dig "image_tag" "" | quote }}
@@ -55,8 +110,15 @@ draft:
 
 release: {{ $legal | dig "release" "" | quote }}
 
+{{- /* An explicit value wins, false included: sprig's merge treats false as empty and would
+       fill it from $derived. */}}
+{{- $features := deepCopy $derived }}
+{{- range $name, $on := $explicit }}
+{{- $_ := set $features $name $on }}
+{{- end }}
+
 features:
-  {{- range $name, $on := merge ($legal | dig "features" (dict) | default (dict)) $derived }}
+  {{- range $name, $on := $features }}
   {{ $name }}: {{ if $on }}true{{ else }}false{{ end }}
   {{- end }}
 

@@ -160,6 +160,10 @@ onboarding:
   dpaSmsSigned: false
   brevoSmsSender: ""
   brevoApiKey: "" # [secret] only with smsProvider: brevo
+  # OTP_HMAC_KEY: keys the OTP hashes (onboarding `config/posture.py`). The
+  # service refuses to start without it while phone verification is on, or
+  # when it equals an ENCRYPTION_KEY key. Empty: not set.
+  otpHmacKey: "" # [secret]
 
   # Empty host: no email at all. Never left to the service's own default,
   # which is a development Mailpit. STARTTLS (tls: true) or plain; the
@@ -189,7 +193,8 @@ templates:
 
 # DATA_DIR: uploaded documents (only with extractionEnabled) and short-lived
 # exports. emptyDir unless enabled. A ReadWriteOnce claim can hold a rolling
-# update on a multi-node cluster.
+# update on a multi-node cluster, so with one the Deployment uses the Recreate
+# strategy unless `strategy` below says otherwise.
 persistence:
   enabled: false
   existingClaim: ""
@@ -197,6 +202,11 @@ persistence:
   accessMode: ReadWriteOnce
   size: 1Gi
   mountPath: /app/data
+
+# The Deployment's rollout strategy. Empty: Recreate when persistence uses a
+# ReadWriteOnce claim (the old pod must release it before the new one mounts
+# it), the Kubernetes default (RollingUpdate) otherwise.
+strategy: {}
 
 logLevel: "INFO"
 extraEnv: []

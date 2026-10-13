@@ -1,3 +1,44 @@
+# defaults/0050-celine-services/celine-webapp/values.yaml.gotmpl
+#
+# The community webapp's API. Environment keys (all optional but image_tag):
+#
+#   webapp:
+#     image_tag: latest
+#     client_secret: svc-webapp       # secret
+#     data_sharing_enabled: <derived> # the Data sharing page, where a member grants and
+#                                     # withdraws the data-release consent (DATA_SHARING_ENABLED,
+#                                     # celine-webapp v1.15.0 on). Unset: onboarding's effective
+#                                     # dataspace switch (onboarding.enabled, and
+#                                     # onboarding.dataspace_enabled or the add-on layer's
+#                                     # dataspace.enabled with dataspace.onboarding.enabled), so
+#                                     # the page that withdraws a consent is there wherever the
+#                                     # wizard collects it (GDPR Art. 7(3)). true or false wins.
+#     onboarding_api_url: ""          # ONBOARDING_API_URL; default http://onboarding:8040 where
+#                                     # onboarding is installed. Emitted only with the page on
+#                                     # or when set
+#     resources: {}
+#
+# The legal defaults count an explicit data_sharing_enabled: true for dso_data_exchange.
+{{- $w := .Environment.Values | dig "webapp" (dict) | default (dict) }}
+{{- $o := .Environment.Values | dig "onboarding" (dict) | default (dict) }}
+{{- $ds := .Environment.Values | dig "dataspace" (dict) | default (dict) }}
+{{- $onboardingOn := eq (toString ($o | dig "enabled" false)) "true" }}
+{{- /* Onboarding's effective dataspace switch, as the onboarding defaults decide it (the
+       legal defaults use the same expression): keep the three in step. */}}
+{{- $dsOnboarding := and (eq (toString ($ds | dig "enabled" false)) "true") (eq (toString ($ds | dig "onboarding" "enabled" true)) "true") }}
+{{- $dsCollect := and $onboardingOn (or (eq (toString ($o | dig "dataspace_enabled" false)) "true") $dsOnboarding) }}
+{{- /* An explicit value wins, false included (no merge/default, which would drop a false). */}}
+{{- $sharingRaw := $w | dig "data_sharing_enabled" nil }}
+{{- $sharingSet := not (kindIs "invalid" $sharingRaw) }}
+{{- $sharing := ternary (eq (toString $sharingRaw | lower) "true") $dsCollect $sharingSet }}
+{{- $onboardingUrl := $w | dig "onboarding_api_url" "" | toString | trimSuffix "/" }}
+{{- $onboardingUrlSet := ne $onboardingUrl "" }}
+{{- if and (not $onboardingUrlSet) $onboardingOn }}
+{{- $onboardingUrl = "http://onboarding:8040" }}
+{{- end }}
+{{- if and $sharing (not $onboardingUrl) }}
+{{- fail "webapp.data_sharing_enabled is true but there is no onboarding to reach: install onboarding (onboarding.enabled) or set webapp.onboarding_api_url" }}
+{{- end }}
 {{- /* The legal host's base URL: `legal.base_url`, else https://<legal host> when the
        release is installed, else none (see celine-legal's defaults). */}}
 {{- $legal := .Environment.Values | dig "legal" (dict) | default (dict) }}
@@ -28,6 +69,15 @@ extraEnv:
   # Each community's legal links and the terms gate (celine-webapp `legal.py`).
   - name: LEGAL_BASE_URL
     value: {{ . | quote }}
+  {{- end }}
+  {{- if or $sharing $onboardingUrlSet }}
+  # The Data sharing page forwards the member's own token to onboarding (celine-webapp `api/deps.py`).
+  - name: ONBOARDING_API_URL
+    value: {{ $onboardingUrl | quote }}
+  {{- end }}
+  {{- if or $sharing $sharingSet }}
+  - name: DATA_SHARING_ENABLED
+    value: {{ $sharing | toString | quote }}
   {{- end }}
 
 {{- with .Environment.Values | dig "webapp" "resources" nil }}
