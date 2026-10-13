@@ -163,6 +163,10 @@
   value: {{ $llm.baseUrl | quote }}
 - name: LLM_VISION_MODEL
   value: {{ $llm.visionModel | default "" | quote }}
+{{- if and (hasKey $llm "thinking") (ne (toString (get $llm "thinking")) "") }}
+- name: LLM_THINKING
+  value: {{ get $llm "thinking" | toString | quote }}
+{{- end }}
 {{- if $llm.apiKey }}
 - name: LLM_API_KEY
   valueFrom:

@@ -44,10 +44,6 @@ data:
     auth_opt_log_level {{ .Values.goAuth.logLevel }}
     auth_opt_log_dest  {{ .Values.goAuth.logDest }}
 
-    {{- if .Values.goAuth.disableSuperuser }}
-    auth_opt_disable_superuser true
-    {{- end }}
-
     # Backends tried in order: jwt first, files fallback for legacy clients
     auth_opt_backends {{ include "mosquitto-go-auth.backends" . }}
 

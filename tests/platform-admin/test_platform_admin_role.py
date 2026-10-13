@@ -202,18 +202,15 @@ def test_a_malformed_admin_role_stops_the_render(helmfile, release, role):
     assert "auth_setup.adminRole" in result.stderr
 
 
-def test_the_broker_has_no_superuser():
+def test_the_broker_sets_no_dead_superuser_switch():
+    # the plugin (3.3.0) ignores auth_opt_disable_superuser for the JWT backend and still
+    # calls /superuser; the guarantee is mqtt-auth's (test_mqtt_auth_is_given_no_superuser_scope)
     docs = render("0030-apps.yaml.gotmpl", "mosquitto-go-auth")
     conf = next(v for doc in docs if doc.get("kind") == "ConfigMap"
                 for v in (doc.get("data") or {}).values() if "auth_plugin" in v)
-    assert re.search(r"^\s*auth_opt_disable_superuser true\s*$", conf, re.M), conf
-
-
-def test_the_dead_jwt_disable_superuser_key_is_gone():
-    # the template reads goAuth.disableSuperuser; goAuth.jwt.disableSuperuser was never read
+    assert "auth_opt_disable_superuser" not in conf, conf
     values = (REPO / "defaults/0030-apps/mosquitto-go-auth/values.yaml.gotmpl").read_text()
-    jwt = values.split("\n  jwt:\n", 1)[1].split("\n  files:\n", 1)[0]
-    assert "disableSuperuser" not in jwt
+    assert "disableSuperuser" not in values
 
 
 def test_mqtt_auth_is_given_no_superuser_scope():

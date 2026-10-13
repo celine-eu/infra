@@ -33,9 +33,9 @@ listeners:
 goAuth:
   logLevel: {{ $goAuthLog }}
   logDest: stdout
-  # There is no MQTT superuser (celine-policies REQ-0014): mqtt-auth's /superuser always
-  # answers 403, and this stops the broker asking. Every client gets only its ACL.
-  disableSuperuser: true
+  # There is no MQTT superuser (celine-policies REQ-0014): mqtt-auth's /superuser never grants
+  # one, so every client gets only its ACL. The plugin (3.3.0) ignores
+  # auth_opt_disable_superuser for the JWT backend, so no such switch is set.
 
   jwt:
     host: "mqtt-auth"

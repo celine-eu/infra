@@ -450,8 +450,8 @@ no realm roles `admin`/`manager`/`editor`/`viewer`, and no top-level `groups` cl
 and Marquez ingresses admit `allowed_groups=role:platform-admin` only (oauth2-proxy's
 `keycloak-oidc` provider names realm roles `role:<name>`, client roles `role:<client>:<name>`).
 `auth_setup.adminRole` names a different role for both gates, `<client>:<role>` for a client
-role; an empty value, a list or anything else stops the render. The MQTT broker has no superuser
-(`goAuth.disableSuperuser`).
+role; an empty value, a list or anything else stops the render. The MQTT broker has no superuser:
+mqtt-auth's `/superuser` never grants one.
 
 `task keycloak:bootstrap:check:<env>` reports drift (exit 1). Do not run `bootstrap` by hand while
 the pod is starting. Rolling back is manual: put the platform-level keys back from the stored

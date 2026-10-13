@@ -38,9 +38,8 @@ mosquitto:
 goAuth:
   logLevel: info
   logDest: stdout
-  # auth_opt_disable_superuser: the broker never asks the backends for a superuser. The
-  # platform has none (celine-policies REQ-0014).
-  disableSuperuser: true
+  # No superuser switch: the plugin (3.3.0) ignores auth_opt_disable_superuser for the JWT
+  # backend and still calls /superuser. mqtt-auth never grants it (celine-policies REQ-0014).
 
   # ----------------------------------------------------------------------------
   # JWT backend — primary auth for new JWT clients

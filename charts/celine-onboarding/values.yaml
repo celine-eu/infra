@@ -150,6 +150,10 @@ onboarding:
     baseUrl: ""      # OpenAI-compatible, e.g. a self-hosted vLLM; no default
     visionModel: ""
     apiKey: ""       # [secret] only if the endpoint needs one
+    # LLM_THINKING: "false" asks the model to skip its reasoning phase (a reasoning
+    # model can spend the extractor's token cap on it). Empty: not set, the
+    # service's own default.
+    thinking: ""
 
   # Phone verification by SMS. The service's own default, `log`, is a
   # development provider: it prints the code to the pod log and the participant

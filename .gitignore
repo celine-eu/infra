@@ -10,3 +10,4 @@ envs/*/addons.yaml.gotmpl
 .dumpster
 .certs
 .claude
+__pycache__
