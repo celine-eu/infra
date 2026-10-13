@@ -11,6 +11,12 @@ data:
     oidc_issuer_url = "https://keycloak.{{ .Values.domain }}/realms/{{ .Values.realm | default "celine" }}"
     redirect_url = "https://sso.{{ .Values.domain }}/oauth2/callback"
     email_domains = [ "*" ]
+    # `organization:*`: every organization the user belongs to goes into the token's
+    # `organization` claim. Keycloak's default `organization` scope, requested without a
+    # value, leaves the claim EMPTY for a member of more than one organization (Keycloak 26),
+    # and every service that reads the claim (onboarding's member resolution, the community
+    # app) then sees no organization at all.
+    scope = "openid email profile organization:*"
     cookie_domains = [ ".{{ .Values.domain }}" ]
     whitelist_domains = [ ".{{ .Values.domain }}" ]
     skip_provider_button = true
