@@ -63,6 +63,9 @@ extraEnv:
     value: "http://nudging:8016"
   - name: FLEXIBILITY_API_URL
     value: "http://flexibility-api:8017"
+  # Unset, the app falls back to its docker-compose host, which does not resolve in the cluster.
+  - name: REC_REGISTRY_URL
+    value: "http://rec-registry:8004"
   - name: CORS_ORIGINS
     value: '["https://webapp.{{ .Values.domain }}"]'
   {{- with $legalBase }}
