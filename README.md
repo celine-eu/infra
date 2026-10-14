@@ -356,7 +356,9 @@ One host, two sites that never meet:
   and is not offered to them;
 - **`/draft/<revision>/`** (with `legal.draft`) serves the data as it is now, for the
   parties to review, every page marked not valid. The revision is the commit of the
-  deployment's data; the link is the access.
+  deployment's data; the link is the access. `/draft/<alias>/` redirects to the current
+  draft, so reviewers keep one link across commits: `legal.draft_alias`, default the
+  image's `latest`, which anyone can guess. Set your own where the draft is private.
 
 One container, non-root, read-only root filesystem, probed on `/healthz`. The data is a
 ConfigMap mounted at `/data`; a change to it restarts the pod.
@@ -366,6 +368,7 @@ ConfigMap mounted at `/data`; a change to it restarts the pod.
 | `legal.enabled` | installs the release |
 | `legal.image_tag` | **required** when enabled: a released celine-legal version, `vX.Y.Z` |
 | `legal.draft` | serves the draft at `/draft/<revision>/` |
+| `legal.draft_alias` | the name `/draft/<alias>/` redirects from to the current draft (a celine-legal image newer than v0.2.0; an older one ignores it). Empty: the image's default, `latest` |
 | `legal.release` | pins the stable site to `vX.Y.Z`; the pod refuses a release that is not the newest published |
 | `legal.features.<name>` | `true`/`false`: overrides a derived feature (below) |
 | `legal.host` | defaults to `legal.<domain>` |

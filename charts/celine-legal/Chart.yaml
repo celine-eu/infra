@@ -2,7 +2,7 @@ apiVersion: v2
 name: celine-legal
 description: The legal host — a deployment's legal documents from the generic celine-legal image and the deployment's data
 type: application
-version: 0.3.0
+version: 0.3.1
 appVersion: "v0.1.0"
 dependencies:
   - name: celine-services

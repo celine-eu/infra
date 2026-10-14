@@ -8,6 +8,8 @@
 #     image_tag: ""           # required: a released celine-legal version, vX.Y.Z
 #     host: legal.<domain>    # the public host
 #     draft: false            # serve the draft for review at /draft/<revision>/
+#     draft_alias: ""         # /draft/<alias>/ redirects to the current draft; empty: the
+#                             # image's default, `latest`, which anyone can guess
 #     release: ""             # pin the stable site to vX.Y.Z (refused unless the newest published)
 #     features: {}            # name -> true/false: overrides what is derived below
 #                             # (existing_members only on an image that knows it, see below)
@@ -107,6 +109,7 @@ image:
 
 draft:
   enabled: {{ $legal | dig "draft" false }}
+  alias: {{ $legal | dig "draft_alias" "" | quote }}
 
 release: {{ $legal | dig "release" "" | quote }}
 

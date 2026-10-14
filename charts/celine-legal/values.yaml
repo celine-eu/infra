@@ -33,9 +33,13 @@ data:
   files: {}
 
 # The draft for review, at /draft/<revision>/: the full 40-hex commit of the data.
+# `alias`: the stable name /draft/<alias>/ redirects from to the current draft
+# (LEGAL_DRAFT_ALIAS, one path segment). Empty: the image's default, `latest`, which anyone
+# can guess; a deployment whose draft is private sets its own.
 draft:
   enabled: false
   revision: ""
+  alias: ""
 
 # Pins the stable site to a release (vX.Y.Z): the pod does not start unless it is the newest
 # the data has published. Empty: whatever is published.

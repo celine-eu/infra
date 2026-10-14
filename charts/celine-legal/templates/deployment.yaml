@@ -44,6 +44,11 @@ spec:
             # The draft for review at /draft/<revision>/; the root serves releases only.
             - name: LEGAL_REVISION
               value: {{ .Values.draft.revision | quote }}
+            {{- with .Values.draft.alias }}
+            # /draft/<alias>/ redirects to the current draft (celine-legal newer than v0.2.0).
+            - name: LEGAL_DRAFT_ALIAS
+              value: {{ . | quote }}
+            {{- end }}
             {{- end }}
             {{- with .Values.release }}
             - name: LEGAL_RELEASE
