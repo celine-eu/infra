@@ -1,0 +1,67 @@
+# defaults/0010-core/traefik/values.yaml.gotmpl
+#
+# The ingress controller infra installs where an environment has none of its own
+# (helmfile.d/0010-core.yaml.gotmpl, `installed` on `ingress_controller.enabled`).
+# Traefik's NGINX provider serves the `nginx` IngressClass and reads the
+# nginx.ingress.kubernetes.io/* annotations every chart here already sets, so no Ingress
+# changes. Environment keys, all optional:
+#
+#   ingress_controller:
+#     enabled: false                    # install it at all
+#     namespace: ingress
+#     class: nginx                      # the IngressClass the charts use
+#     replicas: 2
+#     service:
+#       annotations: {}                 # provider-specific load-balancer annotations
+#       externalTrafficPolicy: Local    # keeps the client address (whitelist-source-range,
+#                                       # forwarded_allow_ips); Cluster spreads load instead
+#     resources:                        # requests are what some clusters bill by
+#       requests: { cpu: 250m, memory: 256Mi }
+#       limits: { memory: 512Mi }
+{{- $ic := .Values | dig "ingress_controller" (dict) }}
+{{- $class := $ic | dig "class" "nginx" }}
+{{- $svc := $ic | dig "service" (dict) }}
+
+deployment:
+  replicas: {{ $ic | dig "replicas" 2 }}
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# No Traefik IngressClass: the controller answers for `{{ $class }}` only, below.
+ingressClass:
+  enabled: false
+
+providers:
+  kubernetesCRD:
+    enabled: false
+  kubernetesIngress:
+    enabled: false
+  kubernetesIngressNGINX:
+    enabled: true
+    ingressClass: {{ $class | quote }}
+    controllerClass: "k8s.io/ingress-nginx"
+    publishService:
+      enabled: true
+
+ingressRoute:
+  dashboard:
+    enabled: false
+
+service:
+  annotations: {{ $svc | dig "annotations" (dict) | toJson }}
+  spec:
+    type: LoadBalancer
+    externalTrafficPolicy: {{ $svc | dig "externalTrafficPolicy" "Local" }}
+
+resources: {{ $ic | dig "resources" (dict "requests" (dict "cpu" "250m" "memory" "256Mi") "limits" (dict "memory" "512Mi")) | toJson }}
+
+# The IngressClass the charts reference, claimed by the NGINX provider's controller class.
+extraObjects:
+  - apiVersion: networking.k8s.io/v1
+    kind: IngressClass
+    metadata:
+      name: {{ $class | quote }}
+    spec:
+      controller: k8s.io/ingress-nginx

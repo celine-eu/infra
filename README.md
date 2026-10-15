@@ -290,6 +290,30 @@ Derived, not set:
 
 ---
 
+## Ingress controller
+
+Every chart here writes plain `Ingress` objects for the `nginx` class, with
+`nginx.ingress.kubernetes.io/*` annotations. Where the cluster already runs a controller for
+that class, infra installs none. Where it does not, the environment asks for one, and infra
+installs Traefik with its NGINX provider. That provider reads the same annotations, so no
+chart changes (ingress-nginx itself is retired upstream).
+
+| Value | Effect |
+|---|---|
+| `ingress_controller.enabled` | `false` unless set. `true` installs the `traefik` release (group `core`) |
+| `ingress_controller.namespace` | default `ingress` |
+| `ingress_controller.class` | the IngressClass it creates and serves, default `nginx` |
+| `ingress_controller.replicas` | default 2, with a PodDisruptionBudget of one |
+| `ingress_controller.service.annotations` | load-balancer annotations for the provider the cluster runs on |
+| `ingress_controller.service.externalTrafficPolicy` | default `Local`, which keeps the client address that `whitelist-source-range`, the rate limits and `forwarded_allow_ips` rely on |
+| `ingress_controller.resources` | default requests 250m / 256Mi, memory limit 512Mi |
+| `tls_setup.cert_manager.leader_election_namespace` | where cert-manager takes its leader-election lock. Default `kube-system`, the chart's own; set it to `cert-manager` on clusters that refuse writes to `kube-system` |
+
+Traefik differs from ingress-nginx on a few annotations: `auth-url` forward auth behaves
+differently (test the oauth2-proxy login end to end), `custom-headers` works but
+`global-allowed-response-headers` has no equivalent, and `configuration-snippet` is only partly
+supported. Overrides go in `envs/<env>/0010-core/traefik/values.yaml.gotmpl`.
+
 ## Security headers
 
 Outside dev, every public host - the frontends, the legal host and the API gateway - answers
