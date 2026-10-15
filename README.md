@@ -120,14 +120,28 @@ Plain `localhost` will not work due to OIDC issuer mismatch.
 
 ## Secrets Management (SOPS)
 
-All secrets are stored **encrypted at rest**.
+All secrets are stored **encrypted at rest**, in `envs/<env>/secrets.sops.yaml`, with the
+AGE key at `.sops/<env>/key.txt`.
 
-Typical workflows:
+They are edited in place, never through a plaintext copy:
 
 ```bash
-sops -e secrets.yaml > secrets.enc.yaml
-sops -d secrets.enc.yaml
+task secrets:edit:dev                    # sops edit in VS Code, re-encrypted on save
+task secrets:edit:dev SOPS_EDITOR=vim    # any other editor (an exported SOPS_EDITOR works too)
+task secrets:dump:dev | grep smtp        # read-only, to stdout
 ```
+
+`sops edit` keeps the file's data key, so only the values you change get new ciphertext
+and two edits of different keys merge. The `sops.lastmodified` / `sops.mac` lines always
+conflict: keep either side, then recompute the MAC without touching a value:
+
+```bash
+SOPS_EDITOR="sed -i '\$a zz_remac: x'" sops edit --ignore-mac envs/<env>/secrets.sops.yaml
+SOPS_EDITOR="sed -i '/^zz_remac/d'" sops edit envs/<env>/secrets.sops.yaml
+```
+
+`task sops:create-env -- <env>` and `task sops:copy-dev-keys` create an encrypted stub
+when the file is missing.
 
 Helmfile integrates with `helm-secrets` to decrypt secrets at deploy time.
 

@@ -198,65 +198,36 @@ tasks:
         echo "Admin console: $URL/admin/master/console/   (namespace $NS, Ctrl-C to stop)"
         kubectl port-forward -n "$NS" svc/{{ .STATEFULSET }}-http "$PORT:http"
 
-  sops:encrypt:
-    desc: Encrypt secrets.yaml -> secrets.sops.yaml (per-env key)
+  # Secrets are edited in place: `sops edit` keeps the file's data key, so only the values
+  # you change get new ciphertext and two edits of different keys merge. There is no
+  # plaintext working copy and no encrypt step. `dump` prints to stdout, read-only:
+  # `task secrets:dump:dev | grep smtp`.
+  secrets:edit:*:
+    desc: "Edit envs/<env>/secrets.sops.yaml in place, re-encrypted on save (VS Code by default; SOPS_EDITOR=vim to override)"
+    vars:
+      ENV: "{{ index .MATCH 0 }}"
+      SOPS_EDITOR: '{{ .SOPS_EDITOR | default "code --wait" }}'
+    env:
+      SOPS_AGE_KEY_FILE: "{{.TASKFILE_DIR}}/.sops/{{.ENV}}/key.txt"
+      SOPS_EDITOR: "{{.SOPS_EDITOR}}"
+    preconditions: &secrets_pre
+      - sh: '[ -f "envs/{{.ENV}}/secrets.sops.yaml" ]'
+        msg: "envs/{{.ENV}}/secrets.sops.yaml does not exist: task sops:create-env -- {{.ENV}} (dev: task sops:copy-dev-keys)"
+      - sh: '[ -f ".sops/{{.ENV}}/key.txt" ]'
+        msg: "Missing AGE key .sops/{{.ENV}}/key.txt"
+    interactive: true
     cmds:
-      - |
-        set -e
-        shopt -s nullglob
-        for f in envs/*/secrets.yaml; do
-          env=$(basename "$(dirname "$f")")
-          key=".sops/$env/key.txt"
-          out="${f%.yaml}.sops.yaml"
+      - sops edit "envs/{{.ENV}}/secrets.sops.yaml" || [ $? -eq 200 ]  # 200: closed without a change
 
-          if [ ! -f "$key" ]; then
-            echo "Missing key for $env ($key), skipping"
-            continue
-          fi
-
-          echo "Encrypting $f → $out"
-          SOPS_AGE_KEY_FILE="$key" sops --encrypt "$f" > "$out"
-        done
-        shopt -u nullglob
-
-  sops:decrypt:
-    desc: Decrypt secrets.sops.yaml -> secrets.yaml (per-env key)
+  secrets:dump:*:
+    desc: "Print envs/<env>/secrets.sops.yaml decrypted to stdout (nothing is written)"
+    vars:
+      ENV: "{{ index .MATCH 0 }}"
+    env:
+      SOPS_AGE_KEY_FILE: "{{.TASKFILE_DIR}}/.sops/{{.ENV}}/key.txt"
+    preconditions: *secrets_pre
     cmds:
-      - |
-        set -e
-        for f in envs/*/secrets.sops.yaml; do
-          env=$(basename "$(dirname "$f")")
-          key=".sops/$env/key.txt"
-          out="${f%.sops.yaml}.yaml"
-
-          if [ ! -f "$key" ]; then
-            echo "Missing key for $env ($key), skipping"
-            continue
-          fi
-
-          # --- Backup existing secrets.yaml if present ---
-          if [ -f "$out" ]; then
-            ts=$(date +"%Y%m%d%H%M")
-            backup="${out}.${ts}"
-            echo "Backing up existing $out -> $backup"
-            cp "$out" "$backup"
-
-            # Keep only last 5 backups
-            backups=( $(ls -1t "${out}".20* 2>/dev/null || true) )
-            if [ ${#backups[@]} -gt 5 ]; then
-              to_delete=( "${backups[@]:5}" )
-              echo "Pruning old backups:"
-              for del in "${to_delete[@]}"; do
-                echo "  removing $del"
-                rm -f "$del"
-              done
-            fi
-          fi
-
-
-          echo "Decrypting $f → $out"
-          SOPS_AGE_KEY_FILE="$key" sops --decrypt "$f" > "$out"
-        done
+      - sops --decrypt "envs/{{.ENV}}/secrets.sops.yaml"
 
   sops:create-env:
     desc: Create a new environment and AGE key (adds to .sops.yaml)
@@ -279,11 +250,6 @@ tasks:
 
         # create stub folder
         mkdir -p "./envs/$ENV"
-        SEC=./envs/$ENV/secrets.yaml
-        if [ ! -f $SEC ]; then
-          echo "---" > $SEC
-          echo "Created stub secret $SEC"
-        fi
         VAL=./envs/$ENV/values.yaml
         if [ ! -f $VAL ]; then
           cp ./envs/dev/values.yaml $VAL
@@ -293,12 +259,23 @@ tasks:
         pubkey=$(grep "public key" "$keyfile" | awk '{print $4}')
         echo "Public key for $ENV: $pubkey"
 
-        touch .sops.yaml
+        [ -s .sops.yaml ] || echo "creation_rules:" > .sops.yaml
         if ! grep -q "path_regex: envs/$ENV/secrets\\.ya" .sops.yaml 2>/dev/null; then
           printf "  - path_regex: envs/%s/secrets\\.ya?ml\$\n    age: %s\n" "$ENV" "$pubkey" >> .sops.yaml
         fi
 
         echo "Added creation rule for $ENV in .sops.yaml"
+
+        # The encrypted stub, edited with `task secrets:edit:$ENV`. The rule matches
+        # secrets.yaml, not secrets.sops.yaml, hence the override. helm-secrets refuses a
+        # file without keys, hence the placeholder.
+        SEC=./envs/$ENV/secrets.sops.yaml
+        if [ ! -f "$SEC" ]; then
+          printf 'unused_placeholder: x\n' | SOPS_AGE_KEY_FILE="$keyfile" sops --encrypt \
+            --filename-override "envs/$ENV/secrets.yaml" --input-type yaml --output-type yaml /dev/stdin > "$SEC.tmp"
+          mv "$SEC.tmp" "$SEC"
+          echo "Created encrypted stub $SEC"
+        fi
 
   sops:copy-dev-keys:
     desc: Copy dev sops keys
@@ -309,8 +286,13 @@ tasks:
           cp .sops.example.yaml .sops.yaml
         fi
       - |
-        if [ ! -f ./envs/dev/secrets.yaml ]; then 
-          cat "---" > ./envs/dev/secrets.yaml
+        set -e
+        SEC=./envs/dev/secrets.sops.yaml
+        if [ ! -f "$SEC" ]; then
+          printf 'unused_placeholder: x\n' | SOPS_AGE_KEY_FILE=.sops/dev/key.txt sops --encrypt \
+            --filename-override envs/dev/secrets.yaml --input-type yaml --output-type yaml /dev/stdin > "$SEC.tmp"
+          mv "$SEC.tmp" "$SEC"
+          echo "Created encrypted stub $SEC (task secrets:edit:dev)"
         fi
 
   dev:apply-local-image:*:
