@@ -15,6 +15,10 @@ oauth2Proxy:
   clientSecret: {{ .Environment.Values.auth_setup.clientSecret }}
   cookieSecret: {{ .Environment.Values.auth_setup.cookieSecret }}
 
+{{- with .Environment.Values | dig "auth_setup" "dashboard_resources" nil }}
+dashboard_resources: {{ toJson . }}
+{{- end }}
+
 dashboard_items:
   - name: Dashboards (Superset)
     host: superset

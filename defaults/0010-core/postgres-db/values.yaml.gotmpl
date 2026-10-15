@@ -29,12 +29,37 @@ cluster:
   name: postgis1
   image: ghcr.io/cloudnative-pg/postgis:17
   instances: 1
+  {{- /* Sizing, optional per environment: `postgres_db.resources` replaces the chart's
+         requests/limits, `postgres_db.parameters` overrides single Postgres parameters
+         (shared_buffers and effective_cache_size should follow the memory). */}}
+  {{- with .Environment.Values | dig "postgres_db" "resources" nil }}
+  resources: {{ toJson . }}
+  {{- end }}
   storage:
     size: {{ .Environment.Values | dig "postgres_db" "storage_size" "10Gi" }}
+  {{- $params := dict "log_statement" "ddl" "max_connections" "200" "idle_in_transaction_session_timeout" "30000" }}
+  {{- range $k, $v := .Environment.Values | dig "postgres_db" "parameters" (dict) }}
+  {{- $_ := set $params $k (toString $v) }}
+  {{- end }}
   parameters:
-    log_statement: ddl
-    max_connections: "200"
-    idle_in_transaction_session_timeout: "30000"
+    {{- range $k, $v := $params }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
+
+{{- /* `postgres_db.job_resources`: the post-deploy Jobs; `postgres_db.pooler_resources`:
+       each pgbouncer. Unset, the pods declare none. */}}
+{{- with .Environment.Values | dig "postgres_db" "job_resources" nil }}
+jobResources: {{ toJson . }}
+{{- end }}
+
+{{- /* `postgres_db.sync_environment` (dev | prod): the marker sync_tables requires on
+       `datasets`, written by its owner. No default: unset, no marker, every sync refused. */}}
+{{- with .Environment.Values | dig "postgres_db" "sync_environment" nil }}
+envMarker:
+  environment: {{ . | quote }}
+  database: datasets
+  secret: postgis1-datasets-connection-string
+{{- end }}
 
 roles:
   - name: datasets_owner
@@ -145,6 +170,9 @@ poolers:
       max_client_conn: "200"
       max_prepared_statements: "256"
       server_reset_query_always: "1"
+    {{- with .Environment.Values | dig "postgres_db" "pooler_resources" nil }}
+    resources: {{ toJson . }}
+    {{- end }}
 
 connection_strings:
   - database: datasets

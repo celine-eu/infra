@@ -314,6 +314,59 @@ differently (test the oauth2-proxy login end to end), `custom-headers` works but
 `global-allowed-response-headers` has no equivalent, and `configuration-snippet` is only partly
 supported. Overrides go in `envs/<env>/0010-core/traefik/values.yaml.gotmpl`.
 
+## Sizing
+
+Clusters that bill by resource request, or fill in a large default for pods that declare
+none, need every pod sized. These keys are optional; unset, the pods render as before.
+
+| Value | Effect |
+|---|---|
+| `postgres_db.resources` | the Postgres cluster's requests and limits. Default requests 2 CPU / 8Gi, limits 4 / 12Gi |
+| `postgres_db.parameters` | single Postgres parameters over the defaults. Move `shared_buffers` (default 2GB) and `effective_cache_size` (6GB) with the memory |
+| `postgres_db.pooler_resources` | each pgbouncer pod. Default none |
+| `postgres_db.job_resources` | the post-deploy Jobs (grants, table tuning). Default none |
+| `tls_setup.cert_manager.resources.<part>` | `controller`, `webhook`, `cainjector`, `startupapicheck`. Default none |
+| `auth_setup.dashboard_resources` | the dashboard Deployment. Default none |
+| `legal.resources` | the legal host. Default none |
+| `ingress_controller.resources` | see "Ingress controller" |
+
+The CELINE services default to requests 100m / 256Mi and limits 500m / 512Mi
+(`defaults/0050-celine-services/values.yaml.gotmpl`), overridden per service with
+`<service>.resources`.
+
+## Sync environment marker
+
+`sync_tables` (celine-eu/demo3) copies `datasets` from dev to local and from dev to prod,
+and only when both databases carry a marker naming their environment. Here the
+`postgres-db` release writes it: with `postgres_db.sync_environment` set to `dev` or `prod`,
+a Job runs `COMMENT ON DATABASE datasets IS 'celine:env=<value>'` as the database owner on
+every deploy. There is no default. Unset, the database carries no marker and every sync
+against it is refused. Any other value stops the render.
+
+## Table sync (sync_tables)
+
+`charts/sync-tables` runs sync_tables' exchange layer, with two roles enabled per
+environment (`sync_tables.sink.enabled`, `sync_tables.push_source.enabled`; the release is
+installed when either is on). The keys are listed in
+`defaults/0050-celine-services/sync-tables/values.yaml.gotmpl`.
+
+- **Sink:** a Deployment holding a database's write DSN (from an existing Secret), writing
+  only the schemas in `allow_schemas`. It is reached on one route, `sync.<domain>/sync/v1`,
+  through the ingress with mutual TLS: the ingress serves a certificate signed by a CA used
+  only for this sync and accepts only client certificates from that CA. Its NetworkPolicy
+  admits the ingress controller's namespace and lets it reach DNS and the database.
+- **Push source:** a CronJob that reads its database and dials a sink (`wss://` only),
+  trusting the sync CA alone. A run is not retried: the next one resumes. Its profile (the
+  table list) comes from the environment as YAML text.
+
+The sink refuses to start on a database without its environment marker (see "Sync
+environment marker"): it exits and restarts until the `postgres-db` release has written it.
+Its `/healthz` shows the process is up, not the database. The push source reads its
+`config.yaml` (parallelism, batch size) from the image's `/app`, so nothing is mounted there.
+
+The CA, certificates and token come from `sync-tables certs`. The image runs as uid 10001,
+under the `restricted` Pod Security profile.
+
 ## Security headers
 
 Outside dev, every public host - the frontends, the legal host and the API gateway - answers

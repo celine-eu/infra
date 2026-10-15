@@ -122,6 +122,18 @@ releases:
         global:
           leaderElection:
             namespace: {{ .Values | get "tls_setup.cert_manager.leader_election_namespace" "kube-system" }}
+        # Optional sizing, `tls_setup.cert_manager.resources.{controller,webhook,cainjector,startupapicheck}`.
+        # Unset, the pods declare none, as before.
+        {{- $cmr := .Values | get "tls_setup.cert_manager.resources" (dict) }}
+        {{- with index $cmr "controller" }}
+        resources: {{ toJson . }}
+        {{- end }}
+        {{- range $part := list "webhook" "cainjector" "startupapicheck" }}
+        {{- with index $cmr $part }}
+        {{ $part }}:
+          resources: {{ toJson . }}
+        {{- end }}
+        {{- end }}
     labels:
       group: core
     hooks:

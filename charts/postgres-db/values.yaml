@@ -2,6 +2,13 @@ cluster:
   name: postgis1
   image: ghcr.io/cloudnative-pg/postgis:17
   instances: 1
+  resources:
+    requests:
+      memory: "8Gi"
+      cpu: "2000m"
+    limits:
+      memory: "12Gi"
+      cpu: "4000m"
   storage:
     size: 10Gi
   parameters:
@@ -112,3 +119,14 @@ grants:
     image: ghcr.io/cloudnative-pg/postgis:17
     superuserSecret: datasets-owner-db-secret
     superuserKey: password
+
+# Resources for the post-deploy Jobs (grants, table tuning). Empty: none set.
+jobResources: {}
+
+# The sync environment marker on one database (templates/env-marker-job.yaml).
+# `environment` is dev or prod; empty, no Job runs and the database carries no marker.
+envMarker:
+  environment: ""
+  database: datasets
+  secret: ""              # the owner's connection-string Secret (username, password)
+  image: ghcr.io/cloudnative-pg/postgis:17

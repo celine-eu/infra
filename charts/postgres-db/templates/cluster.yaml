@@ -5,12 +5,7 @@ metadata:
 spec:
 
   resources:
-    requests:
-      memory: "8Gi"
-      cpu: "2000m"
-    limits:
-      memory: "12Gi"
-      cpu: "4000m"
+    {{- toYaml .Values.cluster.resources | nindent 4 }}
 
   instances: {{ .Values.cluster.instances }}
   imageName: {{ .Values.cluster.image }}

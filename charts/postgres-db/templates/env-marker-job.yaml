@@ -1,0 +1,47 @@
+{{- /* The sync environment marker: `COMMENT ON DATABASE <db> IS 'celine:env=<env>'`, which
+       sync_tables reads on both sides of a copy and refuses without (celine-eu/demo3
+       utils/sync_tables). Written by the database owner on every deploy, so a hand edit
+       does not survive. Without `envMarker.environment` there is no Job and no marker. */}}
+{{- with .Values.envMarker }}
+{{- if .environment }}
+{{- if not (has .environment (list "dev" "prod")) }}
+{{- fail (printf "envMarker.environment must be dev or prod, got %v" .environment) }}
+{{- end }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $.Values.cluster.name }}-env-marker
+spec:
+  ttlSecondsAfterFinished: 30
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: env-marker
+          image: {{ .image }}
+          {{- with $.Values.jobResources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: owner-creds
+              mountPath: /secrets/owner
+              readOnly: true
+          command:
+            - bash
+            - -c
+            - |
+              set -e
+              export PGHOST={{ $.Values.cluster.name }}-rw PGDATABASE={{ .database }}
+              export PGUSER=$(cat /secrets/owner/username)
+              export PGPASSWORD=$(cat /secrets/owner/password)
+              psql -v ON_ERROR_STOP=1 -c \
+                "COMMENT ON DATABASE {{ .database }} IS 'celine:env={{ .environment }}';"
+              psql -v ON_ERROR_STOP=1 -tAc \
+                "SELECT shobj_description(oid, 'pg_database') FROM pg_database WHERE datname = current_database();"
+      volumes:
+        - name: owner-creds
+          secret:
+            secretName: {{ .secret }}
+{{- end }}
+{{- end }}

@@ -11,6 +11,10 @@ spec:
       containers:
         - name: table-tuning
           image: {{ .Values.table_tuning.image }}
+          {{- with $.Values.jobResources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           volumeMounts:
             {{- range .Values.table_tuning.databases }}
             - name: {{ .name }}-creds

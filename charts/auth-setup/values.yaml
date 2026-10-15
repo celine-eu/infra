@@ -45,6 +45,9 @@ oauth2Proxy:
   cookieSecret: 411e509ecac4adca7be836fd8d337310
   clientCLISecret: 2e19c0fe82cbda7acbe509e88a52beb3
 
+# Resources for the dashboard Deployment. Empty: none set.
+dashboard_resources: {}
+
 dashboard_items:
   - name: Webapp
     host: webapp

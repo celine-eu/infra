@@ -1,0 +1,66 @@
+# defaults/0050-celine-services/sync-tables/values.yaml.gotmpl
+#
+# sync_tables' exchange layer (charts/sync-tables). Installed where `sync_tables.sink.enabled`
+# or `sync_tables.push_source.enabled` is true. Environment keys:
+#
+#   sync_tables:
+#     image: ""                         # required: the released image, by tag or digest
+#     sink:                             # the environment that receives (prod)
+#       enabled: false
+#       host: sync.<domain>
+#       dsn_secret: { name: "", key: connection-string }   # the mirror role's DSN, required
+#       allow_schemas: []               # required: the only schemas it writes
+#       allow_source_ranges: ""         # optional: the source's egress CIDRs
+#       ingress_namespace: ingress      # where the ingress controller runs (NetworkPolicy)
+#       token: ""                       # secret: the bearer token
+#       ca: ""                          # secret: PEM, the sync CA
+#       server_cert: ""                 # secret: PEM, the sink host's certificate (sync CA)
+#       server_key: ""                  # secret: PEM
+#       resources: {}
+#     push_source:                      # the environment that sends (staging)
+#       enabled: false
+#       schedule: "*/30 * * * *"
+#       sink_url: ""                    # required: wss://<sink host>/sync/v1
+#       source_secret: { name: postgis1-datasets-connection-string, key: connection-string }
+#       profile: ""                     # required: the table list, as YAML text (an
+#                                       # environment file reads it from the deployment)
+#       token: ""                       # secret
+#       ca: ""                          # secret: PEM, the sync CA
+#       client_cert: ""                 # secret: PEM
+#       client_key: ""                  # secret: PEM
+#       resources: {}
+#
+# The CA, certificates and token come from `sync-tables certs`.
+{{- $st := .Environment.Values | dig "sync_tables" (dict) }}
+{{- $sink := $st | dig "sink" (dict) }}
+{{- $push := $st | dig "push_source" (dict) }}
+
+image: {{ $st | dig "image" "" | quote }}
+imagePullSecrets:
+  - name: registry-secrets
+
+sink:
+  enabled: {{ $sink | dig "enabled" false }}
+  host: {{ $sink | dig "host" (printf "sync.%s" (.Environment.Values | dig "domain" "")) | quote }}
+  dsnSecret: {{ $sink | dig "dsn_secret" (dict "name" "" "key" "connection-string") | toJson }}
+  allowSchemas: {{ $sink | dig "allow_schemas" (list) | toJson }}
+  allowSourceRanges: {{ $sink | dig "allow_source_ranges" "" | quote }}
+  token: {{ $sink | dig "token" "" | quote }}
+  ca: {{ $sink | dig "ca" "" | toJson }}
+  serverCert: {{ $sink | dig "server_cert" "" | toJson }}
+  serverKey: {{ $sink | dig "server_key" "" | toJson }}
+  resources: {{ $sink | dig "resources" (dict) | toJson }}
+  networkPolicy:
+    ingressNamespace: {{ $sink | dig "ingress_namespace" "ingress" | quote }}
+
+pushSource:
+  enabled: {{ $push | dig "enabled" false }}
+  schedule: {{ $push | dig "schedule" "*/30 * * * *" | quote }}
+  sinkUrl: {{ $push | dig "sink_url" "" | quote }}
+  sourceSecret: {{ $push | dig "source_secret" (dict "name" "postgis1-datasets-connection-string" "key" "connection-string") | toJson }}
+  profile: {{ $push | dig "profile" "" | toJson }}
+  token: {{ $push | dig "token" "" | quote }}
+  ca: {{ $push | dig "ca" "" | toJson }}
+  clientCert: {{ $push | dig "client_cert" "" | toJson }}
+  clientKey: {{ $push | dig "client_key" "" | toJson }}
+  resources: {{ $push | dig "resources" (dict) | toJson }}

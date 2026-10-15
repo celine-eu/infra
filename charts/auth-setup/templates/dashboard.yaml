@@ -16,6 +16,10 @@ spec:
       containers:
         - name: dashboard
           image: nginx:alpine
+          {{- with .Values.dashboard_resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           ports:
             - containerPort: 80
           volumeMounts:
