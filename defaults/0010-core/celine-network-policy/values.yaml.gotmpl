@@ -1,0 +1,14 @@
+{{- /* The namespaces allowed into celine-<env> (README "Network perimeter"):
+       - the ingress controller's: `network_policy.ingress_namespace`, else infra's Traefik
+         (`ingress_controller.namespace`, default `ingress`) where infra installs it, else
+         `ingress-nginx`;
+       - `cnpg`, whose operator reaches the Postgres instance pods;
+       - `network_policy.allow_namespaces`, any others (a dataspace calling celine, ...). */}}
+{{- $np := .Values | dig "network_policy" (dict) }}
+{{- $ic := .Values | dig "ingress_controller" (dict) }}
+{{- $ingressNs := "ingress-nginx" }}
+{{- if $ic | dig "enabled" false }}
+{{- $ingressNs = $ic | dig "namespace" "ingress" }}
+{{- end }}
+{{- $ingressNs = $np | dig "ingress_namespace" $ingressNs }}
+allowNamespaces: {{ concat (list $ingressNs "cnpg") ($np | dig "allow_namespaces" (list)) | uniq | toJson }}

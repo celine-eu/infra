@@ -317,6 +317,25 @@ differently (test the oauth2-proxy login end to end), `custom-headers` works but
 `global-allowed-response-headers` has no equivalent, and `configuration-snippet` is only partly
 supported. Overrides go in `envs/<env>/0010-core/traefik/values.yaml.gotmpl`.
 
+## Network perimeter
+
+An environment can close its namespace `celine-<env>` to the rest of the cluster
+(release `celine-network-policy`, group `core`). Off unless asked, so an environment that
+does not set it renders unchanged.
+
+| Value | Effect |
+|---|---|
+| `network_policy.enabled` | `false` unless set. `true` installs two NetworkPolicies: every pod refuses incoming connections, except from the namespace itself, the ingress controller's namespace and `cnpg` |
+| `network_policy.ingress_namespace` | the ingress controller's namespace. Default: `ingress_controller.namespace` where infra installs Traefik, else `ingress-nginx` |
+| `network_policy.allow_namespaces` | further namespaces allowed in (a dataspace calling celine, a metrics scraper), default none |
+| `network_policy.pod_security.{enforce,warn,audit}` | Pod Security Admission level per mode (`privileged`, `baseline`, `restricted`), set as namespace labels by a presync hook; any other value stops the render |
+| `network_policy.pod_security.version` | the policy version the labels pin, default `latest` |
+
+Ingress only: egress stays open. The cluster's CNI must enforce NetworkPolicy (a default
+minikube does not, so `dev` renders it without effect).
+
+    task test:network-policy
+
 ## Sizing
 
 Clusters that bill by resource request, or fill in a large default for pods that declare

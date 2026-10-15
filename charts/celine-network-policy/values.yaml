@@ -1,0 +1,4 @@
+# Namespaces whose pods may open connections to every pod of this namespace, besides the
+# namespace itself (the ingress controller's, the CNPG operator's, ...). infra fills it from
+# `network_policy.*` (defaults/0010-core/celine-network-policy).
+allowNamespaces: []

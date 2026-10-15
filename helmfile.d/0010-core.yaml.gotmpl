@@ -190,6 +190,48 @@ releases:
     labels:
       group: core
 
+  # The namespace's network perimeter and pod-security level (README "Network perimeter"),
+  # only where the environment asks for it (`network_policy.enabled`). Off by default: an
+  # environment that does not ask renders unchanged.
+{{- $np := .Values | dig "network_policy" (dict) }}
+{{- $psa := $np | dig "pod_security" (dict) }}
+{{- $psaLabels := list }}
+{{- range $mode := list "enforce" "warn" "audit" }}
+{{- with $psa | dig $mode "" }}
+{{- if not (has . (list "privileged" "baseline" "restricted")) }}
+{{- fail (printf "network_policy.pod_security.%s must be privileged, baseline or restricted, got %v" $mode .) }}
+{{- end }}
+{{- $psaLabels = append $psaLabels (printf "pod-security.kubernetes.io/%s=%s" $mode .) }}
+{{- $psaLabels = append $psaLabels (printf "pod-security.kubernetes.io/%s-version=%s" $mode ($psa | dig "version" "latest")) }}
+{{- end }}
+{{- end }}
+  - name: celine-network-policy
+    namespace: celine-{{ .Environment.Name }}
+    chart: ../charts/celine-network-policy
+    version: 0.1.0
+    createNamespace: true
+    installed: {{ $np | dig "enabled" false }}
+    missingFileHandler: Warn
+    {{- if $psaLabels }}
+    # Pod Security Admission labels on the namespace, from a hook rather than a Namespace
+    # object: helm adopting an existing namespace would delete it on uninstall.
+    hooks:
+      - events: [presync]
+        showlogs: true
+        command: bash
+        args:
+          - -c
+          - |
+            set -euo pipefail
+            kubectl create namespace celine-{{ .Environment.Name }} --dry-run=client -o yaml | kubectl apply -f -
+            kubectl label namespace celine-{{ .Environment.Name }} --overwrite {{ join " " $psaLabels }}
+    {{- end }}
+    values:
+      - ../defaults/0010-core/celine-network-policy/values.yaml.gotmpl
+      - ../envs/{{ .Environment.Name }}/0010-core/celine-network-policy/values.yaml.gotmpl
+    labels:
+      group: core
+
   - name: registry-accounts
     namespace: celine-{{ .Environment.Name }}
     chart: ../charts/registry-accounts

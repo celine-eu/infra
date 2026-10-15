@@ -1,0 +1,7 @@
+apiVersion: v2
+name: celine-network-policy
+description: >-
+  The network perimeter of the celine-<env> namespace: deny every incoming connection,
+  then allow the namespace itself and the namespaces listed in values. Ingress only.
+type: application
+version: 0.1.0

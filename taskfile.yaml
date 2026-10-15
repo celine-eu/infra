@@ -62,6 +62,11 @@ tasks:
     cmds:
       - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/security-headers -v {{.CLI_ARGS}}
 
+  test:network-policy:
+    desc: "Render the namespace perimeter and check it: off unless asked, default-deny ingress plus the namespace, the ingress controller's and cnpg, no egress rule, pod-security labels from a presync hook"
+    cmds:
+      - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/network-policy -v {{.CLI_ARGS}}
+
   test:frontend-roi:
     desc: "Render the ROI host and check the page and calculator are public, the feedback paths need an existing SSO session (401, no redirect) and keep the API's limits and policy"
     cmds:
