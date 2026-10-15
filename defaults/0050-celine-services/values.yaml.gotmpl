@@ -70,3 +70,6 @@ resources:
   limits:
     cpu: 500m
     memory: 512Mi
+
+# IngressClass of every Ingress (`ingress_controller.class`, default nginx).
+ingressClassName: {{ .Values | dig "ingress_controller" "class" "nginx" | quote }}

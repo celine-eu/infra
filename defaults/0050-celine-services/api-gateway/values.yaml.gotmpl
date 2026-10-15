@@ -5,3 +5,6 @@ issuer: {{ .Values.tls_setup.issuer | default "celine-tls" }}
 # is self-signed in dev, ACME elsewhere).
 tls:
   enabled: true
+
+# IngressClass of every Ingress (`ingress_controller.class`, default nginx).
+ingressClassName: {{ .Values | dig "ingress_controller" "class" "nginx" | quote }}

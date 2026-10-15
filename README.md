@@ -296,13 +296,16 @@ Every chart here writes plain `Ingress` objects for the `nginx` class, with
 `nginx.ingress.kubernetes.io/*` annotations. Where the cluster already runs a controller for
 that class, infra installs none. Where it does not, the environment asks for one, and infra
 installs Traefik with its NGINX provider. That provider reads the same annotations, so no
-chart changes (ingress-nginx itself is retired upstream).
+chart changes (ingress-nginx itself is retired upstream). Where both run side by side,
+Traefik takes a class of its own (`ingress_controller.class` and `controller_class` below)
+and every chart follows it.
 
 | Value | Effect |
 |---|---|
 | `ingress_controller.enabled` | `false` unless set. `true` installs the `traefik` release (group `core`) |
 | `ingress_controller.namespace` | default `ingress` |
-| `ingress_controller.class` | the IngressClass it creates and serves, default `nginx` |
+| `ingress_controller.class` | the IngressClass it creates and serves, default `nginx`. Every chart's Ingresses, and the ACME HTTP-01 solver, use it |
+| `ingress_controller.controller_class` | the controller that IngressClass names, default `k8s.io/ingress-nginx`. Where the cluster also runs an ingress-nginx, set a class and a controller of Traefik's own: ingress-nginx answers every IngressClass that names `k8s.io/ingress-nginx`, so the two would otherwise share every Ingress |
 | `ingress_controller.replicas` | default 2, with a PodDisruptionBudget of one |
 | `ingress_controller.service.annotations` | load-balancer annotations for the provider the cluster runs on |
 | `ingress_controller.service.externalTrafficPolicy` | default `Local`, which keeps the client address that `whitelist-source-range`, the rate limits and `forwarded_allow_ips` rely on |

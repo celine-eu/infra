@@ -26,5 +26,11 @@ spec:
     solvers:
       - http01:
           ingress:
+            {{- if .Values.solverIngressClassName }}
+            # A dedicated IngressClass: set as the spec field, so no other controller
+            # that answers the `nginx` class annotation picks the solver up.
+            ingressClassName: {{ .Values.solverIngressClassName }}
+            {{- else }}
             class: nginx
+            {{- end }}
 {{- end }}

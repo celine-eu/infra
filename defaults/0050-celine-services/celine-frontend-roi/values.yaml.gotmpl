@@ -22,3 +22,6 @@ ingress:
   apiAnnotations:
     nginx.ingress.kubernetes.io/limit-rps: {{ $f | dig "edge_limit_rps" 2 | toString | quote }}
     nginx.ingress.kubernetes.io/limit-connections: {{ $f | dig "edge_limit_connections" 10 | toString | quote }}
+
+# IngressClass of every Ingress (`ingress_controller.class`, default nginx).
+ingressClassName: {{ .Values | dig "ingress_controller" "class" "nginx" | quote }}

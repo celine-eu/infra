@@ -3,3 +3,7 @@ caSecret: ""
 
 issuer: letsencrypt-prod
 email: issuer@celine.test
+
+# IngressClass of the ACME HTTP-01 solver (spec field). Empty: the `class: nginx`
+# annotation form.
+solverIngressClassName: ""

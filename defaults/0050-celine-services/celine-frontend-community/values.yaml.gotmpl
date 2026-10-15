@@ -6,3 +6,6 @@ image:
 ingress:
   host: community.{{ .Environment.Values.domain }}
   domain: {{ .Environment.Values.domain }}
+
+# IngressClass of every Ingress (`ingress_controller.class`, default nginx).
+ingressClassName: {{ .Values | dig "ingress_controller" "class" "nginx" | quote }}

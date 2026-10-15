@@ -10,6 +10,12 @@
 #     enabled: false                    # install it at all
 #     namespace: ingress
 #     class: nginx                      # the IngressClass the charts use
+#     controller_class: k8s.io/ingress-nginx
+#                                       # what the IngressClass names as its controller.
+#                                       # Any other ingress-nginx in the cluster answers
+#                                       # every class naming k8s.io/ingress-nginx: where
+#                                       # one runs, set a class and a controller of
+#                                       # Traefik's own, so the two never share an Ingress
 #     replicas: 2
 #     service:
 #       annotations: {}                 # provider-specific load-balancer annotations
@@ -20,6 +26,7 @@
 #       limits: { memory: 512Mi }
 {{- $ic := .Values | dig "ingress_controller" (dict) }}
 {{- $class := $ic | dig "class" "nginx" }}
+{{- $controller := $ic | dig "controller_class" "k8s.io/ingress-nginx" }}
 {{- $svc := $ic | dig "service" (dict) }}
 
 deployment:
@@ -41,7 +48,7 @@ providers:
   kubernetesIngressNGINX:
     enabled: true
     ingressClass: {{ $class | quote }}
-    controllerClass: "k8s.io/ingress-nginx"
+    controllerClass: {{ $controller | quote }}
     publishService:
       enabled: true
 
@@ -64,4 +71,4 @@ extraObjects:
     metadata:
       name: {{ $class | quote }}
     spec:
-      controller: k8s.io/ingress-nginx
+      controller: {{ $controller | quote }}

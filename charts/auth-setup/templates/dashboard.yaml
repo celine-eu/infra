@@ -61,7 +61,7 @@ metadata:
     nginx.ingress.kubernetes.io/auth-signin: "https://sso.{{ .Values.domain }}/oauth2/start?rd=$scheme://$host$request_uri"
     nginx.ingress.kubernetes.io/auth-response-headers: "Authorization, X-Auth-Request-Email, X-Auth-Request-User"
 spec:
-  ingressClassName: nginx
+  ingressClassName: {{ $.Values.ingressClassName | default "nginx" }}
   rules:
     - host: dashboard.{{ .Values.domain }}
       http:

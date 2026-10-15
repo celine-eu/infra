@@ -133,3 +133,6 @@ ingress:
 resources:
   {{- toYaml . | nindent 2 }}
 {{- end }}
+
+# IngressClass of every Ingress (`ingress_controller.class`, default nginx).
+ingressClassName: {{ .Values | dig "ingress_controller" "class" "nginx" | quote }}

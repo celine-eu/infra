@@ -25,6 +25,21 @@
 {{- end }}
 {{- end }}
 {{- end }}
+{{- /* The warehouse tools' roles and databases (superset, meltano, prefect, marquez):
+       `postgres_db.warehouse_tools` lists the ones this environment hosts, default all four.
+       An environment that runs none of them (prod, ADR-0001) sets an empty list and needs
+       none of their passwords; a listed tool's password is `postgres_db.<name>`, as mandatory
+       as every other role's. Turning one back on: list it and add its password. */}}
+{{- $knownTools := list "superset" "meltano" "prefect" "marquez" }}
+{{- $tools := .Environment.Values | dig "postgres_db" "warehouse_tools" $knownTools }}
+{{- if not (kindIs "slice" $tools) }}
+{{- fail (printf "postgres_db.warehouse_tools must be a list (an empty list for none), got %v" $tools) }}
+{{- end }}
+{{- range $tools }}
+{{- if not (has . $knownTools) }}
+{{- fail (printf "postgres_db.warehouse_tools: %v is not one of %s" . (join ", " $knownTools)) }}
+{{- end }}
+{{- end }}
 cluster:
   name: postgis1
   image: ghcr.io/cloudnative-pg/postgis:17
@@ -70,16 +85,24 @@ roles:
     password: {{ .Environment.Values.postgres_db.datasets_ro | quote }}
     comment: "Read-only access to datasets"
 
+{{- if has "meltano" $tools }}
   - name: meltano
     password: {{ .Environment.Values.postgres_db.meltano | quote }}
+{{- end }}
+{{- if has "prefect" $tools }}
   - name: prefect
     password: {{ .Environment.Values.postgres_db.prefect | quote }}
+{{- end }}
+{{- if has "superset" $tools }}
   - name: superset
     password: {{ .Environment.Values.postgres_db.superset | quote }}
+{{- end }}
   - name: keycloak
     password: {{ .Environment.Values.postgres_db.keycloak | quote }}
+{{- if has "marquez" $tools }}
   - name: marquez
     password: {{ .Environment.Values.postgres_db.marquez | quote }}
+{{- end }}
 
   - name: nudging
     password: {{ .Environment.Values.postgres_db.nudging | quote }}
@@ -122,17 +145,11 @@ databases:
   - name: keycloak
     owner: keycloak
 
-  - name: superset
-    owner: superset
+{{- range $tools }}
 
-  - name: meltano
-    owner: meltano
-
-  - name: prefect
-    owner: prefect
-
-  - name: marquez
-    owner: marquez
+  - name: {{ . }}
+    owner: {{ . }}
+{{- end }}
 
   - name: nudging
     owner: nudging
@@ -191,11 +208,16 @@ connection_strings:
   - database: dataset_api
     dialect: postgresql+asyncpg
 
+{{- if has "prefect" $tools }}
+
   - database: prefect
     dialect: postgresql+asyncpg
     host: postgis1-pooler-rw
+{{- end }}
+{{- if has "meltano" $tools }}
 
   - database: meltano
+{{- end }}
 
   - database: nudging
     dialect: postgresql+asyncpg
@@ -239,8 +261,9 @@ backup:
     accessKey: {{ .Environment.Values | dig "postgres_db" "backup" "s3" "accessKey" "" | quote }}
     secretKey: {{ .Environment.Values | dig "postgres_db" "backup" "s3" "secretKey" "" | quote }}
 
+{{- /* Tunes prefect's hot tables only: on where prefect's database is. */}}
 table_tuning:
-  enabled: true
+  enabled: {{ has "prefect" $tools }}
   image: ghcr.io/cloudnative-pg/postgis:17
   databases:
     - name: prefect
