@@ -368,7 +368,7 @@ ConfigMap mounted at `/data`; a change to it restarts the pod.
 | `legal.enabled` | installs the release |
 | `legal.image_tag` | **required** when enabled: a released celine-legal version, `vX.Y.Z` |
 | `legal.draft` | serves the draft at `/draft/<revision>/` |
-| `legal.draft_alias` | the name `/draft/<alias>/` redirects from to the current draft (a celine-legal image newer than v0.2.0; an older one ignores it). Empty: the image's default, `latest` |
+| `legal.draft_alias` | the name `/draft/<alias>/` redirects from to the current draft (celine-legal v0.3.0+; an older image ignores it). Empty: the image's default, `latest` |
 | `legal.release` | pins the stable site to `vX.Y.Z`; the pod refuses a release that is not the newest published |
 | `legal.features.<name>` | `true`/`false`: overrides a derived feature (below) |
 | `legal.host` | defaults to `legal.<domain>` |
