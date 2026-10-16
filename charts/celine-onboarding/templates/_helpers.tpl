@@ -215,8 +215,6 @@
   value: {{ .Values.templates.mountPath | quote }}
 - name: DATA_DIR
   value: {{ .Values.persistence.mountPath | quote }}
-- name: POLICIES_DIR
-  value: "/app/policies"
 {{- end }}
 
 {{/* The keys the chart's Secret carries besides the library's. */}}

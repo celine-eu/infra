@@ -62,8 +62,8 @@ oidc:
     audience: "svc-onboarding"
     clientSecret: "svc-onboarding" # [secret]
 
-# Read by the library only (CELINE_POLICIES_*). Onboarding evaluates its own
-# policies from the image (POLICIES_DIR, below).
+# The policy bundle (CELINE_POLICIES_*), rendered by the library. Onboarding reads
+# CELINE_POLICIES_DIR for its admin-console policies, as every service does.
 policies:
   dir: "/app/policies"
   dataDir: ""
