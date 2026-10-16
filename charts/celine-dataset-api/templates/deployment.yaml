@@ -1,9 +1,12 @@
-{{- /* extraEnvAppend: entries added after extraEnv, so an environment adds settings
-       without restating the chart's own list. Empty: the library Deployment as is. */}}
-{{- if .Values.extraEnvAppend }}
-{{- $v := deepCopy .Values }}
-{{- $_ := set $v "extraEnv" (concat (.Values.extraEnv | default list) .Values.extraEnvAppend) }}
-{{ include "celine-services.deployment" (dict "Values" $v "Release" .Release "Chart" .Chart "Capabilities" .Capabilities "Template" .Template) }}
-{{- else }}
-{{ include "celine-services.deployment" . }}
+{{- /* The env is DATASETS_DATABASE_URL (from `datasets`), then extraEnv, then
+       extraEnvAppend, so an environment adds settings without restating the chart's own
+       list. */}}
+{{- $env := list }}
+{{- with .Values.datasets }}
+{{- if .existingSecret }}
+{{- $env = append $env (dict "name" "DATASETS_DATABASE_URL" "valueFrom" (dict "secretKeyRef" (dict "name" .existingSecret "key" (.secretKey | default "connection-string")))) }}
 {{- end }}
+{{- end }}
+{{- $v := deepCopy .Values }}
+{{- $_ := set $v "extraEnv" (concat $env (.Values.extraEnv | default list) (.Values.extraEnvAppend | default list)) }}
+{{ include "celine-services.deployment" (dict "Values" $v "Release" .Release "Chart" .Chart "Capabilities" .Capabilities "Template" .Template) }}

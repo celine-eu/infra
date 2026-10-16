@@ -78,13 +78,15 @@ configMap:
 volumeMounts: []
 volumes: []
 
+# The database the datasets are queried from (DATASETS_DATABASE_URL): a connection-string
+# Secret. The service only reads it, so a read-only role is enough. Empty: no
+# DATASETS_DATABASE_URL, and the service queries its own catalogue database.
+datasets:
+  existingSecret: "postgis1-datasets-async-connection-string"
+  secretKey: "connection-string"
+
 logLevel: "INFO"
 extraEnv:
-  - name: DATASETS_DATABASE_URL
-    valueFrom:
-      secretKeyRef:
-        name: postgis1-datasets-async-connection-string
-        key: connection-string
   - name: REC_REGISTRY_URL
     value: "http://rec-registry:8004"
 # Further env entries, appended after extraEnv (which an environment would otherwise

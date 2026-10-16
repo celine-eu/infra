@@ -43,6 +43,15 @@ oidc:
 migrate:
   enabled: true
 
+{{- /* `dataset_api.datasets_secret`: the connection-string Secret the datasets are queried
+       through. Unset: the chart's default, the owner's. A read-only role's Secret is enough
+       when it can read every table the catalogue points at (postgres-db `grants`). */}}
+{{- with .Environment.Values | dig "dataset_api" "datasets_secret" "" }}
+
+datasets:
+  existingSecret: {{ . | quote }}
+{{- end }}
+
 
 {{- with .Environment.Values | dig "dataset_api" "resources" nil }}
 resources:
