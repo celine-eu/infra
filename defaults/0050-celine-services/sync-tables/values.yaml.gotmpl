@@ -29,11 +29,29 @@
 #       client_cert: ""                 # secret: PEM
 #       client_key: ""                  # secret: PEM
 #       resources: {}
+#     serve:                            # the environment developers pull from (staging):
+#                                       # `sync-tables serve` behind the ingress, mTLS
+#       enabled: false
+#       host: sync-source.<domain>
+#       dsn_secret: { name: postgis1-datasets-readonly-connection-string, key: connection-string }
+#                                       # the read-only role (postgres-db `datasets_ro`); any
+#                                       # Postgres URL works, the tool picks its own driver
+#       allow_schemas: []               # required: the only schemas it reads
+#       allow_source_ranges: ""         # optional: the developers' egress CIDRs
+#       ingress_namespace: ingress      # where the ingress controller runs (NetworkPolicy)
+#       token: ""                       # secret: the bearer token
+#       ca: ""                          # secret: PEM, the pull CA (signs the developers' client
+#                                       # certificate); never the push CA
+#       server_cert: ""                 # secret: PEM, the serving host's certificate (sync CA)
+#       server_key: ""                  # secret: PEM
+#       resources: {}
 #
-# The CA, certificates and token come from `sync-tables certs`.
+# The CA, certificates and token come from `sync-tables certs`. The IngressClass follows
+# `ingress_controller.class` (default nginx), as for every other release.
 {{- $st := .Environment.Values | dig "sync_tables" (dict) }}
 {{- $sink := $st | dig "sink" (dict) }}
 {{- $push := $st | dig "push_source" (dict) }}
+{{- $serve := $st | dig "serve" (dict) }}
 
 image: {{ $st | dig "image" "" | quote }}
 imagePullSecrets:
@@ -41,6 +59,7 @@ imagePullSecrets:
 
 sink:
   enabled: {{ $sink | dig "enabled" false }}
+  ingressClassName: {{ .Values | dig "ingress_controller" "class" "nginx" | quote }}
   host: {{ $sink | dig "host" (printf "sync.%s" (.Environment.Values | dig "domain" "")) | quote }}
   dsnSecret: {{ $sink | dig "dsn_secret" (dict "name" "" "key" "connection-string") | toJson }}
   allowSchemas: {{ $sink | dig "allow_schemas" (list) | toJson }}
@@ -52,6 +71,21 @@ sink:
   resources: {{ $sink | dig "resources" (dict) | toJson }}
   networkPolicy:
     ingressNamespace: {{ $sink | dig "ingress_namespace" "ingress" | quote }}
+
+serve:
+  enabled: {{ $serve | dig "enabled" false }}
+  ingressClassName: {{ .Values | dig "ingress_controller" "class" "nginx" | quote }}
+  host: {{ $serve | dig "host" (printf "sync-source.%s" (.Environment.Values | dig "domain" "")) | quote }}
+  dsnSecret: {{ $serve | dig "dsn_secret" (dict "name" "postgis1-datasets-readonly-connection-string" "key" "connection-string") | toJson }}
+  allowSchemas: {{ $serve | dig "allow_schemas" (list) | toJson }}
+  allowSourceRanges: {{ $serve | dig "allow_source_ranges" "" | quote }}
+  token: {{ $serve | dig "token" "" | quote }}
+  ca: {{ $serve | dig "ca" "" | toJson }}
+  serverCert: {{ $serve | dig "server_cert" "" | toJson }}
+  serverKey: {{ $serve | dig "server_key" "" | toJson }}
+  resources: {{ $serve | dig "resources" (dict) | toJson }}
+  networkPolicy:
+    ingressNamespace: {{ $serve | dig "ingress_namespace" "ingress" | quote }}
 
 pushSource:
   enabled: {{ $push | dig "enabled" false }}

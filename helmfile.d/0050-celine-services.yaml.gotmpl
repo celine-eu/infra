@@ -328,13 +328,14 @@ releases:
       group: celine-services
 
   # sync_tables' exchange layer: the sink where an environment receives copied tables (prod),
-  # the push source where one sends them (staging). Off unless either role is enabled. See
+  # the push source where one sends them (staging), the serving source developers pull from
+  # (staging). Off unless a role is enabled. See
   # defaults/0050-celine-services/sync-tables/values.yaml.gotmpl.
   - name: sync-tables
     namespace: celine-{{ .Environment.Name }}
     chart: ../charts/sync-tables
     createNamespace: true
-    installed: {{ or (.Environment.Values | dig "sync_tables" "sink" "enabled" false) (.Environment.Values | dig "sync_tables" "push_source" "enabled" false) }}
+    installed: {{ or (.Environment.Values | dig "sync_tables" "sink" "enabled" false) (.Environment.Values | dig "sync_tables" "push_source" "enabled" false) (.Environment.Values | dig "sync_tables" "serve" "enabled" false) }}
     missingFileHandler: Warn
     values:
       - ../defaults/0050-celine-services/sync-tables/values.yaml.gotmpl

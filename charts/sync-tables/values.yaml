@@ -5,6 +5,8 @@
 # - sink: holds a database and applies what a source sends. Served behind the ingress
 #   controller on one route, with mutual TLS against a CA used only for this sync.
 # - pushSource: a CronJob that reads its database and dials a sink.
+# - serve: a serving source that reads its database and answers pulls from developers'
+#   machines (dev -> local), behind the ingress with mutual TLS against the sync CA.
 
 # The sync_tables image, as one reference (registry/name:tag or @digest). Required.
 image: ""
@@ -54,6 +56,34 @@ sink:
     enabled: true
     ingressNamespace: ingress     # where the ingress controller's pods run
     # Pods the sink may reach on 5432: the database it writes.
+    databasePodSelector:
+      cnpg.io/cluster: postgis1
+
+serve:
+  enabled: false
+  host: ""                        # required: the public host of the serving source
+  path: /sync/v1
+  ingressClassName: nginx
+  # The source database URL (SYNC_SOURCE_DSN), from an existing Secret. Required.
+  dsnSecret:
+    name: ""
+    key: connection-string
+  token: ""                       # required: the bearer token the developers present
+  ca: ""                          # required: PEM, the sync CA that signed the client certificates
+  serverCert: ""                  # required: PEM, signed by the sync CA (served by the ingress)
+  serverKey: ""                   # required: PEM
+  allowSchemas: []                # required: the only schemas it reads, one per entry
+  allowSourceRanges: ""           # optional: CIDRs allowed to reach the route, comma-separated
+  proxyTimeoutSeconds: 3600       # one table per transaction can run long
+  proxyBodySize: 16m
+  listenPort: 8443                # plain HTTP behind the ingress (--tls-terminated-upstream)
+  healthPort: 8081
+  replicas: 1
+  resources: {}
+  networkPolicy:
+    enabled: true
+    ingressNamespace: ingress     # where the ingress controller's pods run
+    # Pods the serving source may reach on 5432: the database it reads.
     databasePodSelector:
       cnpg.io/cluster: postgis1
 

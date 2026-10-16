@@ -1,0 +1,208 @@
+{{- /* The serving source: answers pulls (dev -> local) from developers' machines, which
+cannot be reached and so dial in. It reads its database in a read-only session, only inside
+allowSchemas; each developer holds a client certificate from the sync CA and the token. */}}
+{{- if .Values.serve.enabled }}
+{{- $s := .Values.serve }}
+{{- $name := printf "%s-serve" .Release.Name }}
+{{- if not $s.allowSchemas }}
+{{- fail "sync-tables: serve.allowSchemas must name at least one schema" }}
+{{- end }}
+---
+# The sync CA, which the ingress verifies client certificates against.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $name }}-ca
+  labels:
+    {{- include "sync-tables.labels" . | nindent 4 }}
+type: Opaque
+stringData:
+  ca.crt: {{ required "sync-tables: serve.ca is required" $s.ca | quote }}
+---
+# The serving host's certificate, signed by the sync CA: served by the ingress, not by
+# cert-manager, so the source can trust the sync CA alone.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $name }}-tls
+  labels:
+    {{- include "sync-tables.labels" . | nindent 4 }}
+type: kubernetes.io/tls
+stringData:
+  tls.crt: {{ required "sync-tables: serve.serverCert is required" $s.serverCert | quote }}
+  tls.key: {{ required "sync-tables: serve.serverKey is required" $s.serverKey | quote }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $name }}-token
+  labels:
+    {{- include "sync-tables.labels" . | nindent 4 }}
+type: Opaque
+stringData:
+  token: {{ required "sync-tables: serve.token is required" $s.token | quote }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}-allow-schemas
+  labels:
+    {{- include "sync-tables.labels" . | nindent 4 }}
+data:
+  allow-schemas: |
+    {{- range $s.allowSchemas }}
+    {{ . }}
+    {{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "sync-tables.labels" . | nindent 4 }}
+    app.kubernetes.io/component: serve
+spec:
+  replicas: {{ $s.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: sync-tables
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: serve
+  template:
+    metadata:
+      labels:
+        {{- include "sync-tables.labels" . | nindent 8 }}
+        app.kubernetes.io/component: serve
+      annotations:
+        checksum/token: {{ $s.token | sha256sum }}
+        checksum/allow-schemas: {{ toJson $s.allowSchemas | sha256sum }}
+    spec:
+      {{- include "sync-tables.podSpecCommon" . | nindent 6 }}
+      containers:
+        - name: serve
+          image: {{ include "sync-tables.image" . }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          args: ["serve", "--tls-terminated-upstream"]
+          env:
+            - name: SYNC_SOURCE_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "sync-tables: serve.dsnSecret.name is required" $s.dsnSecret.name }}
+                  key: {{ $s.dsnSecret.key }}
+            - name: SYNC_TOKEN_FILE
+              value: /run/sync/token
+            - name: SYNC_ALLOW_SCHEMAS_FILE
+              value: /etc/sync/allow-schemas
+            - name: SYNC_LISTEN
+              value: {{ printf "0.0.0.0:%v" $s.listenPort | quote }}
+            - name: SYNC_HEALTH_PORT
+              value: {{ $s.healthPort | quote }}
+          ports:
+            - { name: sync, containerPort: {{ $s.listenPort }} }
+            - { name: health, containerPort: {{ $s.healthPort }} }
+          readinessProbe:
+            httpGet: { path: /healthz, port: health }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthz, port: health }
+            periodSeconds: 30
+            failureThreshold: 4
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          {{- with $s.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - { name: token, mountPath: /run/sync, readOnly: true }
+            - { name: allow-schemas, mountPath: /etc/sync, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: token
+          secret:
+            secretName: {{ $name }}-token
+            defaultMode: 0440
+        - name: allow-schemas
+          configMap:
+            name: {{ $name }}-allow-schemas
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "sync-tables.labels" . | nindent 4 }}
+spec:
+  selector:
+    app.kubernetes.io/name: sync-tables
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: serve
+  ports:
+    - { name: sync, port: {{ $s.listenPort }}, targetPort: sync }
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "sync-tables.labels" . | nindent 4 }}
+  annotations:
+    nginx.ingress.kubernetes.io/auth-tls-secret: {{ printf "%s/%s-ca" .Release.Namespace $name | quote }}
+    nginx.ingress.kubernetes.io/auth-tls-verify-client: "on"
+    nginx.ingress.kubernetes.io/auth-tls-verify-depth: "1"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: {{ $s.proxyTimeoutSeconds | quote }}
+    nginx.ingress.kubernetes.io/proxy-send-timeout: {{ $s.proxyTimeoutSeconds | quote }}
+    nginx.ingress.kubernetes.io/proxy-body-size: {{ $s.proxyBodySize | quote }}
+    {{- with $s.allowSourceRanges }}
+    nginx.ingress.kubernetes.io/whitelist-source-range: {{ . | quote }}
+    {{- end }}
+spec:
+  ingressClassName: {{ $s.ingressClassName }}
+  tls:
+    - hosts: [{{ required "sync-tables: serve.host is required" $s.host | quote }}]
+      secretName: {{ $name }}-tls
+  rules:
+    - host: {{ $s.host | quote }}
+      http:
+        paths:
+          - path: {{ $s.path }}
+            pathType: Exact
+            backend:
+              service:
+                name: {{ $name }}
+                port: { name: sync }
+{{- if $s.networkPolicy.enabled }}
+---
+# In: the ingress controller only. Out: DNS and the database it reads.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "sync-tables.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: sync-tables
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: serve
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $s.networkPolicy.ingressNamespace }}
+      ports:
+        - { protocol: TCP, port: {{ $s.listenPort }} }
+  egress:
+    {{- include "sync-tables.dnsEgress" . | nindent 4 }}
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- toYaml $s.networkPolicy.databasePodSelector | nindent 14 }}
+      ports:
+        - { protocol: TCP, port: 5432 }
+{{- end }}
+{{- end }}
