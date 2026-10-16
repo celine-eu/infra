@@ -22,7 +22,7 @@ metadata:
     {{- toYaml . | nindent 4 }}
     {{- end }}
 spec:
-  ingressClassName: nginx
+  ingressClassName: {{ $.Values.ingressClassName | default "nginx" }}
   rules:
     - host: {{ .Values.ingress.host }}
       http:
@@ -62,7 +62,7 @@ metadata:
     nginx.ingress.kubernetes.io/permanent-redirect: "https://sso.{{ .Values.ingress.domain }}/oauth2/sign_out?rd=https://{{ .Values.ingress.host }}/keycloak-logout"
     nginx.ingress.kubernetes.io/permanent-redirect-code: "302"
 spec:
-  ingressClassName: nginx
+  ingressClassName: {{ $.Values.ingressClassName | default "nginx" }}
   rules:
     - host: {{ .Values.ingress.host }}
       http:
@@ -93,7 +93,7 @@ metadata:
     nginx.ingress.kubernetes.io/permanent-redirect: "https://keycloak.{{ .Values.ingress.domain }}/realms/celine/protocol/openid-connect/logout?client_id=oauth2_proxy&post_logout_redirect_uri=https://{{ .Values.ingress.host }}/"
     nginx.ingress.kubernetes.io/permanent-redirect-code: "302"
 spec:
-  ingressClassName: nginx
+  ingressClassName: {{ $.Values.ingressClassName | default "nginx" }}
   rules:
     - host: {{ .Values.ingress.host }}
       http:
@@ -133,7 +133,7 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-buffer-size: "32k"
     {{- end }}
 spec:
-  ingressClassName: nginx
+  ingressClassName: {{ $.Values.ingressClassName | default "nginx" }}
   rules:
     - host: {{ .Values.ingress.host }}
       http:

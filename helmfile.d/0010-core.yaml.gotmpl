@@ -35,6 +35,8 @@ repositories:
     url: https://seaweedfs.github.io/seaweedfs/helm
   - name: cert-manager
     url: https://charts.jetstack.io
+  - name: traefik
+    url: https://traefik.github.io/charts
 
 releases:
   - name: cnpg
@@ -115,6 +117,23 @@ releases:
     values:
       - crds:
             enabled: true
+        # Where cert-manager takes its leader-election lock. The chart's default,
+        # kube-system, is not writable on every cluster (GKE Autopilot refuses it).
+        global:
+          leaderElection:
+            namespace: {{ .Values | get "tls_setup.cert_manager.leader_election_namespace" "kube-system" }}
+        # Optional sizing, `tls_setup.cert_manager.resources.{controller,webhook,cainjector,startupapicheck}`.
+        # Unset, the pods declare none, as before.
+        {{- $cmr := .Values | get "tls_setup.cert_manager.resources" (dict) }}
+        {{- with index $cmr "controller" }}
+        resources: {{ toJson . }}
+        {{- end }}
+        {{- range $part := list "webhook" "cainjector" "startupapicheck" }}
+        {{- with index $cmr $part }}
+        {{ $part }}:
+          resources: {{ toJson . }}
+        {{- end }}
+        {{- end }}
     labels:
       group: core
     hooks:
@@ -127,6 +146,23 @@ releases:
             echo "⏳ Waiting for cert-manager webhook..."
             kubectl rollout status deployment/cert-manager-webhook \
               -n cert-manager --timeout=120s
+
+  # The ingress controller, only where the environment asks for one
+  # (`ingress_controller.enabled`). Off by default: a cluster that already runs a
+  # controller (staging's) keeps it. Traefik with its NGINX provider serves the `nginx`
+  # class and the nginx.ingress.kubernetes.io/* annotations the charts already use.
+  - name: traefik
+    namespace: {{ .Values | get "ingress_controller.namespace" "ingress" }}
+    chart: traefik/traefik
+    version: 41.7.1
+    createNamespace: true
+    missingFileHandler: Warn
+    installed: {{ .Values | get "ingress_controller.enabled" false }}
+    values:
+      - ../defaults/0010-core/traefik/values.yaml.gotmpl
+      - ../envs/{{ .Environment.Name }}/0010-core/traefik/values.yaml.gotmpl
+    labels:
+      group: core
 
   - name: tls-setup
     namespace: celine-{{ .Environment.Name }}
@@ -151,6 +187,48 @@ releases:
     values:
       - ../defaults/0010-core/tls-setup/values.yaml.gotmpl
       - ../envs/{{ .Environment.Name }}/0010-core/tls-setup/values.yaml.gotmpl
+    labels:
+      group: core
+
+  # The namespace's network perimeter and pod-security level (README "Network perimeter"),
+  # only where the environment asks for it (`network_policy.enabled`). Off by default: an
+  # environment that does not ask renders unchanged.
+{{- $np := .Values | dig "network_policy" (dict) }}
+{{- $psa := $np | dig "pod_security" (dict) }}
+{{- $psaLabels := list }}
+{{- range $mode := list "enforce" "warn" "audit" }}
+{{- with $psa | dig $mode "" }}
+{{- if not (has . (list "privileged" "baseline" "restricted")) }}
+{{- fail (printf "network_policy.pod_security.%s must be privileged, baseline or restricted, got %v" $mode .) }}
+{{- end }}
+{{- $psaLabels = append $psaLabels (printf "pod-security.kubernetes.io/%s=%s" $mode .) }}
+{{- $psaLabels = append $psaLabels (printf "pod-security.kubernetes.io/%s-version=%s" $mode ($psa | dig "version" "latest")) }}
+{{- end }}
+{{- end }}
+  - name: celine-network-policy
+    namespace: celine-{{ .Environment.Name }}
+    chart: ../charts/celine-network-policy
+    version: 0.1.0
+    createNamespace: true
+    installed: {{ $np | dig "enabled" false }}
+    missingFileHandler: Warn
+    {{- if $psaLabels }}
+    # Pod Security Admission labels on the namespace, from a hook rather than a Namespace
+    # object: helm adopting an existing namespace would delete it on uninstall.
+    hooks:
+      - events: [presync]
+        showlogs: true
+        command: bash
+        args:
+          - -c
+          - |
+            set -euo pipefail
+            kubectl create namespace celine-{{ .Environment.Name }} --dry-run=client -o yaml | kubectl apply -f -
+            kubectl label namespace celine-{{ .Environment.Name }} --overwrite {{ join " " $psaLabels }}
+    {{- end }}
+    values:
+      - ../defaults/0010-core/celine-network-policy/values.yaml.gotmpl
+      - ../envs/{{ .Environment.Name }}/0010-core/celine-network-policy/values.yaml.gotmpl
     labels:
       group: core
 

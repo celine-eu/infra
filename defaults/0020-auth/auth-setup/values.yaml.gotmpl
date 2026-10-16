@@ -3,6 +3,8 @@ secure: true
 realm: celine
 domain: "{{ .Environment.Values.domain }}"
 issuer: {{ .Environment.Values.tls_setup.issuer }}
+# IngressClass of every Ingress (`ingress_controller.class`, default nginx).
+ingressClassName: {{ .Values | dig "ingress_controller" "class" "nginx" | quote }}
 
 realmAdmin:
   username: {{ .Environment.Values | dig "auth_setup" "realmAdminUser" "celine-admin" }}
@@ -14,6 +16,10 @@ oauth2Proxy:
   # openssl rand -hex 16
   clientSecret: {{ .Environment.Values.auth_setup.clientSecret }}
   cookieSecret: {{ .Environment.Values.auth_setup.cookieSecret }}
+
+{{- with .Environment.Values | dig "auth_setup" "dashboard_resources" nil }}
+dashboard_resources: {{ toJson . }}
+{{- end }}
 
 dashboard_items:
   - name: Dashboards (Superset)

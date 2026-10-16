@@ -120,14 +120,28 @@ Plain `localhost` will not work due to OIDC issuer mismatch.
 
 ## Secrets Management (SOPS)
 
-All secrets are stored **encrypted at rest**.
+All secrets are stored **encrypted at rest**, in `envs/<env>/secrets.sops.yaml`, with the
+AGE key at `.sops/<env>/key.txt`.
 
-Typical workflows:
+They are edited in place, never through a plaintext copy:
 
 ```bash
-sops -e secrets.yaml > secrets.enc.yaml
-sops -d secrets.enc.yaml
+task secrets:edit:dev                    # sops edit in VS Code, re-encrypted on save
+task secrets:edit:dev SOPS_EDITOR=vim    # any other editor (an exported SOPS_EDITOR works too)
+task secrets:dump:dev | grep smtp        # read-only, to stdout
 ```
+
+`sops edit` keeps the file's data key, so only the values you change get new ciphertext
+and two edits of different keys merge. The `sops.lastmodified` / `sops.mac` lines always
+conflict: keep either side, then recompute the MAC without touching a value:
+
+```bash
+SOPS_EDITOR="sed -i '\$a zz_remac: x'" sops edit --ignore-mac envs/<env>/secrets.sops.yaml
+SOPS_EDITOR="sed -i '/^zz_remac/d'" sops edit envs/<env>/secrets.sops.yaml
+```
+
+`task sops:create-env -- <env>` and `task sops:copy-dev-keys` create an encrypted stub
+when the file is missing.
 
 Helmfile integrates with `helm-secrets` to decrypt secrets at deploy time.
 
@@ -276,6 +290,105 @@ Derived, not set:
 
 ---
 
+## Ingress controller
+
+Every chart here writes plain `Ingress` objects for the `nginx` class, with
+`nginx.ingress.kubernetes.io/*` annotations. Where the cluster already runs a controller for
+that class, infra installs none. Where it does not, the environment asks for one, and infra
+installs Traefik with its NGINX provider. That provider reads the same annotations, so no
+chart changes (ingress-nginx itself is retired upstream). Where both run side by side,
+Traefik takes a class of its own (`ingress_controller.class` and `controller_class` below)
+and every chart follows it.
+
+| Value | Effect |
+|---|---|
+| `ingress_controller.enabled` | `false` unless set. `true` installs the `traefik` release (group `core`) |
+| `ingress_controller.namespace` | default `ingress` |
+| `ingress_controller.class` | the IngressClass it creates and serves, default `nginx`. Every chart's Ingresses, and the ACME HTTP-01 solver, use it |
+| `ingress_controller.controller_class` | the controller that IngressClass names, default `k8s.io/ingress-nginx`. Where the cluster also runs an ingress-nginx, set a class and a controller of Traefik's own: ingress-nginx answers every IngressClass that names `k8s.io/ingress-nginx`, so the two would otherwise share every Ingress |
+| `ingress_controller.replicas` | default 2, with a PodDisruptionBudget of one |
+| `ingress_controller.service.annotations` | load-balancer annotations for the provider the cluster runs on |
+| `ingress_controller.service.externalTrafficPolicy` | default `Local`, which keeps the client address that `whitelist-source-range`, the rate limits and `forwarded_allow_ips` rely on |
+| `ingress_controller.resources` | default requests 250m / 256Mi, memory limit 512Mi |
+| `tls_setup.cert_manager.leader_election_namespace` | where cert-manager takes its leader-election lock. Default `kube-system`, the chart's own; set it to `cert-manager` on clusters that refuse writes to `kube-system` |
+
+Traefik differs from ingress-nginx on a few annotations: `auth-url` forward auth behaves
+differently (test the oauth2-proxy login end to end), `custom-headers` works but
+`global-allowed-response-headers` has no equivalent, and `configuration-snippet` is only partly
+supported. Overrides go in `envs/<env>/0010-core/traefik/values.yaml.gotmpl`.
+
+## Network perimeter
+
+An environment can close its namespace `celine-<env>` to the rest of the cluster
+(release `celine-network-policy`, group `core`). Off unless asked, so an environment that
+does not set it renders unchanged.
+
+| Value | Effect |
+|---|---|
+| `network_policy.enabled` | `false` unless set. `true` installs two NetworkPolicies: every pod refuses incoming connections, except from the namespace itself, the ingress controller's namespace and `cnpg` |
+| `network_policy.ingress_namespace` | the ingress controller's namespace. Default: `ingress_controller.namespace` where infra installs Traefik, else `ingress-nginx` |
+| `network_policy.allow_namespaces` | further namespaces allowed in (a dataspace calling celine, a metrics scraper), default none |
+| `network_policy.pod_security.{enforce,warn,audit}` | Pod Security Admission level per mode (`privileged`, `baseline`, `restricted`), set as namespace labels by a presync hook; any other value stops the render |
+| `network_policy.pod_security.version` | the policy version the labels pin, default `latest` |
+
+Ingress only: egress stays open. The cluster's CNI must enforce NetworkPolicy (a default
+minikube does not, so `dev` renders it without effect).
+
+    task test:network-policy
+
+## Sizing
+
+Clusters that bill by resource request, or fill in a large default for pods that declare
+none, need every pod sized. These keys are optional; unset, the pods render as before.
+
+| Value | Effect |
+|---|---|
+| `postgres_db.resources` | the Postgres cluster's requests and limits. Default requests 2 CPU / 8Gi, limits 4 / 12Gi |
+| `postgres_db.parameters` | single Postgres parameters over the defaults. Move `shared_buffers` (default 2GB) and `effective_cache_size` (6GB) with the memory |
+| `postgres_db.pooler_resources` | each pgbouncer pod. Default none |
+| `postgres_db.job_resources` | the post-deploy Jobs (grants, table tuning). Default none |
+| `tls_setup.cert_manager.resources.<part>` | `controller`, `webhook`, `cainjector`, `startupapicheck`. Default none |
+| `auth_setup.dashboard_resources` | the dashboard Deployment. Default none |
+| `legal.resources` | the legal host. Default none |
+| `ingress_controller.resources` | see "Ingress controller" |
+
+The CELINE services default to requests 100m / 256Mi and limits 500m / 512Mi
+(`defaults/0050-celine-services/values.yaml.gotmpl`), overridden per service with
+`<service>.resources`.
+
+## Sync environment marker
+
+`sync_tables` (celine-eu/demo3) copies `datasets` from dev to local and from dev to prod,
+and only when both databases carry a marker naming their environment. Here the
+`postgres-db` release writes it: with `postgres_db.sync_environment` set to `dev` or `prod`,
+a Job runs `COMMENT ON DATABASE datasets IS 'celine:env=<value>'` as the database owner on
+every deploy. There is no default. Unset, the database carries no marker and every sync
+against it is refused. Any other value stops the render.
+
+## Table sync (sync_tables)
+
+`charts/sync-tables` runs sync_tables' exchange layer, with two roles enabled per
+environment (`sync_tables.sink.enabled`, `sync_tables.push_source.enabled`; the release is
+installed when either is on). The keys are listed in
+`defaults/0050-celine-services/sync-tables/values.yaml.gotmpl`.
+
+- **Sink:** a Deployment holding a database's write DSN (from an existing Secret), writing
+  only the schemas in `allow_schemas`. It is reached on one route, `sync.<domain>/sync/v1`,
+  through the ingress with mutual TLS: the ingress serves a certificate signed by a CA used
+  only for this sync and accepts only client certificates from that CA. Its NetworkPolicy
+  admits the ingress controller's namespace and lets it reach DNS and the database.
+- **Push source:** a CronJob that reads its database and dials a sink (`wss://` only),
+  trusting the sync CA alone. A run is not retried: the next one resumes. Its profile (the
+  table list) comes from the environment as YAML text.
+
+The sink refuses to start on a database without its environment marker (see "Sync
+environment marker"): it exits and restarts until the `postgres-db` release has written it.
+Its `/healthz` shows the process is up, not the database. The push source reads its
+`config.yaml` (parallelism, batch size) from the image's `/app`, so nothing is mounted there.
+
+The CA, certificates and token come from `sync-tables certs`. The image runs as uid 10001,
+under the `restricted` Pod Security profile.
+
 ## Security headers
 
 Outside dev, every public host - the frontends, the legal host and the API gateway - answers
@@ -368,7 +481,7 @@ ConfigMap mounted at `/data`; a change to it restarts the pod.
 | `legal.enabled` | installs the release |
 | `legal.image_tag` | **required** when enabled: a released celine-legal version, `vX.Y.Z` |
 | `legal.draft` | serves the draft at `/draft/<revision>/` |
-| `legal.draft_alias` | the name `/draft/<alias>/` redirects from to the current draft (a celine-legal image newer than v0.2.0; an older one ignores it). Empty: the image's default, `latest` |
+| `legal.draft_alias` | the name `/draft/<alias>/` redirects from to the current draft (celine-legal v0.3.0+; an older image ignores it). Empty: the image's default, `latest` |
 | `legal.release` | pins the stable site to `vX.Y.Z`; the pod refuses a release that is not the newest published |
 | `legal.features.<name>` | `true`/`false`: overrides a derived feature (below) |
 | `legal.host` | defaults to `legal.<domain>` |

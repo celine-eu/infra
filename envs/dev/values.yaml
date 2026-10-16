@@ -58,7 +58,10 @@ postgres_db:
 
   # celine services
   nudging: nudging
-  datasets_api: datasets_api
+  dataset_api: dataset_api
+  flexibility_api: flexibility_api
+  onboarding: onboarding
+  roi: roi
   rec_registry: rec_registry
   ai_assistant: ai_assistant
   webapp: webapp

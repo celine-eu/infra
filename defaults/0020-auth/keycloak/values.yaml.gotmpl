@@ -67,7 +67,7 @@ ingress:
   # If `true`, an Ingress is created
   enabled: true
   # The name of the Ingress Class associated with this ingress
-  ingressClassName: "nginx"
+  ingressClassName: {{ .Values | dig "ingress_controller" "class" "nginx" | quote }}
   # The Service port targeted by the Ingress
   servicePort: http
   # Ingress annotations

@@ -68,3 +68,6 @@ resources:
 nodeSelector: {}
 tolerations: []
 affinity: {}
+
+# IngressClass of this chart's Ingresses. infra sets it from `ingress_controller.class`.
+ingressClassName: nginx

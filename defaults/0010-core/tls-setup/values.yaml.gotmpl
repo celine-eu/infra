@@ -3,3 +3,7 @@ caSecret: {{ .Environment.Values.tls_setup.ca_secret | default "" | quote }}
 
 issuer: {{ .Environment.Values.tls_setup.issuer }}
 email: {{ .Environment.Values.tls_setup.email }}
+
+# IngressClass of the ACME HTTP-01 solver, only when `ingress_controller.class` is set;
+# unset, the solver keeps the `class: nginx` annotation form.
+solverIngressClassName: {{ .Values | dig "ingress_controller" "class" "" | quote }}

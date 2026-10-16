@@ -20,3 +20,6 @@ extraEnv:
   - name: PUBLIC_LEGAL_BASE_URL
     value: {{ . | quote }}
 {{- end }}
+
+# IngressClass of every Ingress (`ingress_controller.class`, default nginx).
+ingressClassName: {{ .Values | dig "ingress_controller" "class" "nginx" | quote }}

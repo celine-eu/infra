@@ -1,0 +1,80 @@
+# sync_tables (celine-eu/demo3 utils/sync_tables): copies warehouse tables between
+# environments, only along the edges the tool compiles in, and only between databases that
+# carry an environment marker (postgres-db `envMarker`). Two roles, each enabled on its own:
+#
+# - sink: holds a database and applies what a source sends. Served behind the ingress
+#   controller on one route, with mutual TLS against a CA used only for this sync.
+# - pushSource: a CronJob that reads its database and dials a sink.
+
+# The sync_tables image, as one reference (registry/name:tag or @digest). Required.
+image: ""
+imagePullPolicy: IfNotPresent
+imagePullSecrets: []
+
+# The image runs as uid 10001; fsGroup lets it read the mounted key and token (0440).
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+# DNS for the NetworkPolicies' egress rules (port 53 to any destination when empty).
+dnsSelector: {}
+
+sink:
+  enabled: false
+  host: ""                        # required: the public host of the sink
+  path: /sync/v1
+  ingressClassName: nginx
+  # The mirror role's DSN (SYNC_SINK_DSN), from an existing Secret. Required.
+  dsnSecret:
+    name: ""
+    key: connection-string
+  token: ""                       # required: the bearer token the source presents
+  ca: ""                          # required: PEM, the sync CA that signed the client certificate
+  serverCert: ""                  # required: PEM, signed by the sync CA (served by the ingress)
+  serverKey: ""                   # required: PEM
+  allowSchemas: []                # required: the only schemas the sink writes, one per entry
+  allowSourceRanges: ""           # optional: CIDRs allowed to reach the route, comma-separated
+  proxyTimeoutSeconds: 3600       # one table per transaction can run long
+  proxyBodySize: 16m
+  listenPort: 8443                # plain HTTP behind the ingress (--tls-terminated-upstream)
+  healthPort: 8081
+  replicas: 1
+  resources: {}
+  networkPolicy:
+    enabled: true
+    ingressNamespace: ingress     # where the ingress controller's pods run
+    # Pods the sink may reach on 5432: the database it writes.
+    databasePodSelector:
+      cnpg.io/cluster: postgis1
+
+pushSource:
+  enabled: false
+  schedule: "*/30 * * * *"
+  from: dev
+  to: prod
+  sinkUrl: ""                     # required: wss://<sink host>/sync/v1
+  # The source database URL (DB_DEV), from an existing Secret. Required.
+  sourceSecret:
+    name: ""
+    key: connection-string
+  token: ""                       # required
+  ca: ""                          # required: PEM, the sync CA (the only CA the source trusts)
+  clientCert: ""                  # required: PEM, signed by the sync CA
+  clientKey: ""                   # required: PEM
+  profile: ""                     # required: the profile YAML (the table list), as a string
+  activeDeadlineSeconds: 7200
+  resources: {}
+  networkPolicy:
+    enabled: true
+    databasePodSelector:
+      cnpg.io/cluster: postgis1
