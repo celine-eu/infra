@@ -107,18 +107,21 @@ table_tuning:
     #     - name: deployment
     #       options: "fillfactor = 50, autovacuum_vacuum_scale_factor = 0.01, autovacuum_vacuum_cost_delay = 0"
 
+# Read-only grants on one database (templates/grants-job.yaml): USAGE, SELECT and the
+# default for future tables on `schemas`, to `role`. Run by the database owner through
+# `secret`; schemas that are missing or not the owner's are skipped.
 grants:
   enabled: false
+  database: datasets
+  role: datasets_ro
+  secret: ""              # the owner's connection-string Secret (username, password)
   schemas:
     - ds_dev_gold
     - ds_dev_raw
     - ds_dev_silver
     - ds_dev_staging
     - raw
-  job:
-    image: ghcr.io/cloudnative-pg/postgis:17
-    superuserSecret: datasets-owner-db-secret
-    superuserKey: password
+  image: ghcr.io/cloudnative-pg/postgis:17
 
 # Resources for the post-deploy Jobs (grants, table tuning). Empty: none set.
 jobResources: {}

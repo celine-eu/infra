@@ -280,13 +280,12 @@ table_tuning:
 
 grants:
   enabled: true
+  database: datasets
+  role: datasets_ro
+  secret: postgis1-datasets-connection-string
   schemas:
     - ds_dev_gold
     - ds_dev_raw
     - ds_dev_silver
     - ds_dev_staging
     - raw
-  job:
-    image: ghcr.io/cloudnative-pg/postgis:17
-    superuserSecret: datasets-owner-db-secret
-    superuserKey: password

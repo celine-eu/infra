@@ -1,49 +1,105 @@
-{{- if .Values.grants.enabled }}
+{{- /* Read-only grants: USAGE, SELECT on every table and the default for future tables, on
+       `grants.schemas` of `grants.database`, to `grants.role`. Run by the database owner
+       (the schemas' owner), so no superuser is needed. A schema that does not exist, or
+       that the owner does not own, is skipped with a warning; tables another role owns
+       are counted in a warning and left as they are. One transaction, bounded by lock and
+       statement timeouts, so a busy table makes the Job retry instead of queueing writers. */}}
+{{- with .Values.grants }}
+{{- if .enabled }}
+{{- if not .secret }}
+{{- fail "grants.secret is required: the owner's connection-string Secret of grants.database" }}
+{{- end }}
+{{- range (concat (list .database .role) .schemas) }}
+{{- if not (regexMatch "^[a-z_][a-z0-9_]*$" .) }}
+{{- fail (printf "grants: %q is not a plain lower-case identifier" .) }}
+{{- end }}
+{{- end }}
+{{- $schemas := list }}
+{{- range .schemas }}{{ $schemas = append $schemas (squote .) }}{{ end }}
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ .Values.cluster.name }}-grants
+  name: {{ $.Values.cluster.name }}-grants
 spec:
   ttlSecondsAfterFinished: 30
+  backoffLimit: 3
+  activeDeadlineSeconds: 600
   template:
     spec:
       restartPolicy: OnFailure
       containers:
-        - name: grant-datasets-ro
-          image: {{ .Values.grants.job.image }}
+        - name: grants
+          image: {{ .image }}
           {{- with $.Values.jobResources }}
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+          volumeMounts:
+            - name: owner-creds
+              mountPath: /secrets/owner
+              readOnly: true
           command:
             - bash
             - -c
             - |
               set -e
-              echo "Applying read-only grants..."
-              PGPASSWORD=$(cat /tmp/password)
-              {{- range .Values.databases }}
-              {{- if and .grants (hasKey .grants "readonly") }}
-              {{- if .grants.readonly }}
-              echo " - {{ .name }}"
-              {{- $username := .username }}
-              {{- $dbname := .name }}
-              {{- range (.grants.schemas | default (list "public")) }}
-              psql "postgresql://app:${PGPASSWORD}@{{ $.Values.cluster.name }}-rw:5432/{{ $dbname }}" -v ON_ERROR_STOP=1 -c "
-                GRANT USAGE ON SCHEMA {{ . }} TO {{ $username }};
-                GRANT SELECT ON ALL TABLES IN SCHEMA {{ . }} TO {{ $username }};
-                ALTER DEFAULT PRIVILEGES IN SCHEMA {{ . }} GRANT SELECT ON TABLES TO {{ $username }};
-              "
-              {{- end }}
-              {{- end }}
-              {{- end }}
-              {{- end }}
-          volumeMounts:
-            - name: super-pass
-              mountPath: /tmp/password
-              subPath: {{ .Values.grants.job.superuserKey }}
+              export PGHOST={{ $.Values.cluster.name }}-rw PGDATABASE={{ .database }}
+              export PGUSER=$(cat /secrets/owner/username)
+              export PGPASSWORD=$(cat /secrets/owner/password)
+              export PGOPTIONS="-c lock_timeout=5s -c statement_timeout=120s"
+              psql -v ON_ERROR_STOP=1 <<'SQL'
+              DO $grants$
+              DECLARE
+                r text := '{{ .role }}';
+                me oid := (SELECT oid FROM pg_roles WHERE rolname = current_user);
+                s text;
+                t regclass;
+                n int;
+                other int;
+              BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r) THEN
+                  RAISE EXCEPTION 'grants: role % does not exist', r;
+                END IF;
+                FOREACH s IN ARRAY ARRAY[{{ join ", " $schemas }}]::text[] LOOP
+                  IF NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = s) THEN
+                    RAISE WARNING 'grants: schema % does not exist, skipped', s;
+                    CONTINUE;
+                  END IF;
+                  IF NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = s AND nspowner = me) THEN
+                    RAISE WARNING 'grants: schema % is not owned by %, skipped', s, current_user;
+                    CONTINUE;
+                  END IF;
+                  EXECUTE format('GRANT USAGE ON SCHEMA %I TO %I', s, r);
+                  -- Table by table: GRANT ... ON ALL TABLES fails outright on a table
+                  -- another role owns.
+                  n := 0;
+                  FOR t IN SELECT c.oid FROM pg_class c JOIN pg_namespace ns ON ns.oid = c.relnamespace
+                           WHERE ns.nspname = s AND c.relowner = me AND c.relkind IN ('r', 'p', 'v', 'm', 'f') LOOP
+                    EXECUTE format('GRANT SELECT ON %s TO %I', t, r);
+                    n := n + 1;
+                  END LOOP;
+                  SELECT count(*) INTO other FROM pg_class c JOIN pg_namespace ns ON ns.oid = c.relnamespace
+                   WHERE ns.nspname = s AND c.relowner <> me AND c.relkind IN ('r', 'p', 'v', 'm', 'f');
+                  EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA %I GRANT SELECT ON TABLES TO %I', s, r);
+                  RAISE NOTICE 'grants: schema %: % table(s) granted', s, n;
+                  IF other > 0 THEN
+                    RAISE WARNING 'grants: schema %: % table(s) owned by another role, not granted', s, other;
+                  END IF;
+                END LOOP;
+              END
+              $grants$;
+              SQL
+              psql -v ON_ERROR_STOP=1 -c "
+                SELECT n.nspname AS schema,
+                       count(c.oid) AS tables,
+                       count(c.oid) FILTER (WHERE has_table_privilege('{{ .role }}', c.oid, 'SELECT')) AS readable
+                FROM pg_namespace n
+                LEFT JOIN pg_class c ON c.relnamespace = n.oid AND c.relkind IN ('r', 'p', 'v', 'm', 'f')
+                WHERE n.nspname = ANY (ARRAY[{{ join ", " $schemas }}])
+                GROUP BY 1 ORDER BY 1;"
       volumes:
-        - name: super-pass
+        - name: owner-creds
           secret:
-            secretName: {{ .Values.grants.job.superuserSecret }}
+            secretName: {{ .secret }}
+{{- end }}
 {{- end }}

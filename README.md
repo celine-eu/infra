@@ -365,6 +365,16 @@ a Job runs `COMMENT ON DATABASE datasets IS 'celine:env=<value>'` as the databas
 every deploy. There is no default. Unset, the database carries no marker and every sync
 against it is refused. Any other value stops the render.
 
+## Read-only role on `datasets`
+
+The `postgres-db` release grants `datasets_ro` read access to the schemas in `grants.schemas`
+(`defaults/0010-core/postgres-db/values.yaml.gotmpl`): USAGE, SELECT on every table, and
+SELECT on tables created later. A Job runs it as the database owner on every deploy, in one
+transaction with a 5 s lock timeout; if a table is busy, the Job rolls back and retries.
+Schemas that are missing or not the owner's are skipped with a warning. So are tables
+another role owns, which also never get the future-tables default. The Job's log ends with
+a per-schema count of tables and of readable tables.
+
 ## Table sync (sync_tables)
 
 `charts/sync-tables` runs sync_tables' exchange layer, with two roles enabled per
