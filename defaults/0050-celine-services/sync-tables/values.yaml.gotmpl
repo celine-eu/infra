@@ -10,11 +10,14 @@
 #       host: sync.<domain>
 #       dsn_secret: { name: "", key: connection-string }   # the mirror role's DSN, required
 #       allow_schemas: []               # required: the only schemas it writes
-#       allow_source_ranges: ""         # optional: the source's egress CIDRs
+#       ingress_flavor: ""              # required: traefik (native IngressRoute + TLSOption,
+#                                       # needs ingress_controller.crd_provider) or nginx
+#       allow_source_ranges: ""         # the source's egress CIDRs; required with traefik
 #       ingress_namespace: ingress      # where the ingress controller runs (NetworkPolicy)
-#       token: ""                       # secret: the bearer token
-#       ca: ""                          # secret: PEM, the sync CA
-#       server_cert: ""                 # secret: PEM, the sink host's certificate (sync CA)
+#       auth_limits: {}                 # optional: failMax, failWindow, lockout, failGlobalMax
+#       tokens: {}                      # secret: {holder: token}, e.g. {push: …}
+#       ca: ""                          # secret: PEM, the push CA
+#       server_cert: ""                 # secret: PEM, the sink host's certificate (push CA)
 #       server_key: ""                  # secret: PEM
 #       resources: {}
 #     push_source:                      # the environment that sends (staging)
@@ -24,8 +27,8 @@
 #       source_secret: { name: postgis1-datasets-connection-string, key: connection-string }
 #       profile: ""                     # required: the table list, as YAML text (an
 #                                       # environment file reads it from the deployment)
-#       token: ""                       # secret
-#       ca: ""                          # secret: PEM, the sync CA
+#       token: ""                       # secret: the sink's token for this source
+#       ca: ""                          # secret: PEM, the push CA
 #       client_cert: ""                 # secret: PEM
 #       client_key: ""                  # secret: PEM
 #       resources: {}
@@ -39,14 +42,17 @@
 #       allow_schemas: []               # required: the only schemas it reads
 #       allow_source_ranges: ""         # optional: the developers' egress CIDRs
 #       ingress_namespace: ingress      # where the ingress controller runs (NetworkPolicy)
-#       token: ""                       # secret: the bearer token
-#       ca: ""                          # secret: PEM, the pull CA (signs the developers' client
-#                                       # certificate); never the push CA
-#       server_cert: ""                 # secret: PEM, the serving host's certificate (sync CA)
+#       client_certs: true              # false: server TLS only, for a host reachable only
+#                                       # from a private network (the network is the gate)
+#       auth_limits: {}                 # optional: failMax, failWindow, lockout, failGlobalMax
+#       tokens: {}                      # secret: {holder: token}, one per developer
+#       ca: ""                          # secret: PEM, the pull CA, with client_certs; never
+#                                       # the push CA
+#       server_cert: ""                 # secret: PEM, the serving host's certificate (pull CA)
 #       server_key: ""                  # secret: PEM
 #       resources: {}
 #
-# The CA, certificates and token come from `sync-tables certs`. The IngressClass follows
+# The CAs, certificates and tokens come from `sync-tables certs` (one CA per purpose). The IngressClass follows
 # `ingress_controller.class` (default nginx), as for every other release.
 {{- $st := .Environment.Values | dig "sync_tables" (dict) }}
 {{- $sink := $st | dig "sink" (dict) }}
@@ -61,9 +67,12 @@ sink:
   enabled: {{ $sink | dig "enabled" false }}
   ingressClassName: {{ .Values | dig "ingress_controller" "class" "nginx" | quote }}
   host: {{ $sink | dig "host" (printf "sync.%s" (.Environment.Values | dig "domain" "")) | quote }}
+  ingressFlavor: {{ $sink | dig "ingress_flavor" "" | quote }}
   dsnSecret: {{ $sink | dig "dsn_secret" (dict "name" "" "key" "connection-string") | toJson }}
   allowSchemas: {{ $sink | dig "allow_schemas" (list) | toJson }}
   allowSourceRanges: {{ $sink | dig "allow_source_ranges" "" | quote }}
+  authLimits: {{ $sink | dig "auth_limits" (dict) | toJson }}
+  tokens: {{ $sink | dig "tokens" (dict) | toJson }}
   token: {{ $sink | dig "token" "" | quote }}
   ca: {{ $sink | dig "ca" "" | toJson }}
   serverCert: {{ $sink | dig "server_cert" "" | toJson }}
@@ -79,6 +88,11 @@ serve:
   dsnSecret: {{ $serve | dig "dsn_secret" (dict "name" "postgis1-datasets-readonly-connection-string" "key" "connection-string") | toJson }}
   allowSchemas: {{ $serve | dig "allow_schemas" (list) | toJson }}
   allowSourceRanges: {{ $serve | dig "allow_source_ranges" "" | quote }}
+  clientCerts: {{ $serve | dig "client_certs" true }}
+  {{- with $serve | dig "auth_limits" nil }}
+  authLimits: {{ . | toJson }}
+  {{- end }}
+  tokens: {{ $serve | dig "tokens" (dict) | toJson }}
   token: {{ $serve | dig "token" "" | quote }}
   ca: {{ $serve | dig "ca" "" | toJson }}
   serverCert: {{ $serve | dig "server_cert" "" | toJson }}

@@ -24,6 +24,11 @@
 #     resources:                        # requests are what some clusters bill by
 #       requests: { cpu: 250m, memory: 256Mi }
 #       limits: { memory: 512Mi }
+#     crd_provider: false               # also serve Traefik's own resources (IngressRoute,
+#                                       # TLSOption, Middleware), for what the NGINX
+#                                       # provider cannot express (client certificates
+#                                       # checked per host). Only those carrying the
+#                                       # class's annotation, and only in their namespace.
 {{- $ic := .Values | dig "ingress_controller" (dict) }}
 {{- $class := $ic | dig "class" "nginx" }}
 {{- $controller := $ic | dig "controller_class" "k8s.io/ingress-nginx" }}
@@ -42,7 +47,10 @@ ingressClass:
 
 providers:
   kubernetesCRD:
-    enabled: false
+    enabled: {{ $ic | dig "crd_provider" false }}
+    ingressClass: {{ $class | quote }}
+    allowCrossNamespace: false
+    allowExternalNameServices: false
   kubernetesIngress:
     enabled: false
   kubernetesIngressNGINX:

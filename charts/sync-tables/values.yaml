@@ -6,7 +6,13 @@
 #   controller on one route, with mutual TLS against a CA used only for this sync.
 # - pushSource: a CronJob that reads its database and dials a sink.
 # - serve: a serving source that reads its database and answers pulls from developers'
-#   machines (dev -> local), behind the ingress with mutual TLS against the sync CA.
+#   machines (dev -> local), behind the ingress. Client certificates are optional there
+#   (`serve.clientCerts`): where the host is reachable only from a private network, the
+#   network is the gate and each developer holds a named token.
+#
+# Tokens: `tokens` maps a holder's name to its token (one Secret key each, mounted as a
+# directory the tool re-reads, so removing a holder revokes it without a restart). The
+# names appear in the listener's log of accepted connections; the tokens never do.
 
 # The sync_tables image, as one reference (registry/name:tag or @digest). Required.
 image: ""
@@ -36,22 +42,35 @@ sink:
   host: ""                        # required: the public host of the sink
   path: /sync/v1
   ingressClassName: nginx
+  # How the ingress checks client certificates; required, no default:
+  # - traefik: a native IngressRoute, a TLSOption requiring a client certificate from
+  #   the push CA, an ipAllowList (allowSourceRanges, required) and passTLSClientCert. Needs
+  #   Traefik's kubernetesCRD provider. Use it on Traefik even where the NGINX provider is
+  #   on: that provider is not relied on for client certificates.
+  # - nginx: an Ingress with ingress-nginx's auth-tls-* annotations.
+  # Either way the ingress forwards the client certificate it verified and the sink checks
+  # it again against the push CA (--require-upstream-client-cert): an ingress that stops
+  # verifying makes every push fail with `client_cert_unverified`, never open the route.
+  ingressFlavor: ""
+  traefik:
+    entryPoint: websecure
   # The mirror role's DSN (SYNC_SINK_DSN), from an existing Secret. Required.
   dsnSecret:
     name: ""
     key: connection-string
-  token: ""                       # required: the bearer token the source presents
-  ca: ""                          # required: PEM, the sync CA that signed the client certificate
+  tokens: {}                      # required: {holder: token}, e.g. {push: …}
+  ca: ""                          # required: PEM, the push CA that signed the client certificate
   serverCert: ""                  # required: PEM, signed by the sync CA (served by the ingress)
   serverKey: ""                   # required: PEM
   allowSchemas: []                # required: the only schemas the sink writes, one per entry
-  allowSourceRanges: ""           # optional: CIDRs allowed to reach the route, comma-separated
+  allowSourceRanges: ""           # CIDRs allowed to reach the route, comma-separated; required with traefik
   proxyTimeoutSeconds: 3600       # one table per transaction can run long
   proxyBodySize: 16m
   listenPort: 8443                # plain HTTP behind the ingress (--tls-terminated-upstream)
   healthPort: 8081
   replicas: 1
   resources: {}
+  authLimits: {}                  # optional: failMax, failWindow, lockout, failGlobalMax (tool defaults)
   networkPolicy:
     enabled: true
     ingressNamespace: ingress     # where the ingress controller's pods run
@@ -68,9 +87,12 @@ serve:
   dsnSecret:
     name: ""
     key: connection-string
-  token: ""                       # required: the bearer token the developers present
-  ca: ""                          # required: PEM, the sync CA that signed the client certificates
-  serverCert: ""                  # required: PEM, signed by the sync CA (served by the ingress)
+  tokens: {}                      # required: {holder: token}, one per developer
+  # Require a client certificate from `ca` at the ingress. Off: server TLS only, and the
+  # network the host is reachable from is the gate (an internal-only host).
+  clientCerts: true
+  ca: ""                          # PEM, the pull CA; required with clientCerts
+  serverCert: ""                  # required: PEM, signed by the pull CA (served by the ingress)
   serverKey: ""                   # required: PEM
   allowSchemas: []                # required: the only schemas it reads, one per entry
   allowSourceRanges: ""           # optional: CIDRs allowed to reach the route, comma-separated
@@ -80,6 +102,11 @@ serve:
   healthPort: 8081
   replicas: 1
   resources: {}
+  # Behind NAT every developer arrives from one address, so a per-address lockout is a
+  # team-wide one: keep it short. Keys: failMax, failWindow, lockout, failGlobalMax.
+  authLimits:
+    failMax: 20
+    lockout: 60
   networkPolicy:
     enabled: true
     ingressNamespace: ingress     # where the ingress controller's pods run

@@ -2,5 +2,5 @@ apiVersion: v2
 name: sync-tables
 description: sync_tables exchange layer — a sink beside a database, a push source that dials it, and a serving source developers pull from, over WSS with mutual TLS
 type: application
-version: 0.2.0
-appVersion: "0.1.0"
+version: 0.3.0
+appVersion: "0.4.0"
