@@ -35,7 +35,8 @@
 #                                       # pod keeps serving meanwhile. 0: no sleep
 #
 # The pods are never evicted for node scale-down (safe-to-evict "false"): on GKE Autopilot
-# that moved a Traefik pod and refused about half the connections for a minute.
+# that moved a Traefik pod and refused about half the connections for a minute. They are
+# spread one per node: two replicas on one node are no redundancy.
 {{- $ic := .Values | dig "ingress_controller" (dict) }}
 {{- $class := $ic | dig "class" "nginx" }}
 {{- $controller := $ic | dig "controller_class" "k8s.io/ingress-nginx" }}
@@ -58,6 +59,18 @@ deployment:
 podDisruptionBudget:
   enabled: true
   minAvailable: 1
+
+# One pod per node; each rollout's pods counted on their own (pod-template-hash), so the
+# old ones do not block the new.
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: DoNotSchedule
+    matchLabelKeys: [pod-template-hash]
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: traefik
+        app.kubernetes.io/instance: traefik-{{ $ic | dig "namespace" "ingress" }}
 
 # No Traefik IngressClass: the controller answers for `{{ $class }}` only, below.
 ingressClass:

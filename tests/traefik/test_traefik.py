@@ -109,3 +109,38 @@ def test_drain_seconds_zero_turns_the_sleep_off():
     assert "preStop" not in (container(objects).get("lifecycle") or {})
     annotations = pod_spec(objects)["metadata"].get("annotations", {})
     assert annotations.get("cluster-autoscaler.kubernetes.io/safe-to-evict") == "false"
+
+
+# ---------------------------------------------------------------------------
+# one pod per node: two replicas on one node are no redundancy
+# ---------------------------------------------------------------------------
+
+
+def spread(objects: dict[str, dict]) -> dict:
+    (constraint,) = pod_spec(objects)["spec"]["topologySpreadConstraints"]
+    return constraint
+
+
+def test_pods_spread_one_per_node(default):
+    constraint = spread(default)
+    assert constraint["topologyKey"] == "kubernetes.io/hostname"
+    assert constraint["maxSkew"] == 1
+    assert constraint["whenUnsatisfiable"] == "DoNotSchedule"
+
+
+def test_spread_selects_traefiks_own_pods(default):
+    selector = spread(default)["labelSelector"]["matchLabels"]
+    labels = pod_spec(default)["metadata"]["labels"]
+    assert selector and all(labels.get(k) == v for k, v in selector.items())
+
+
+def test_spread_counts_each_rollout_on_its_own(default):
+    # Old and new pods of a rolling update would otherwise count together and block it.
+    assert spread(default)["matchLabelKeys"] == ["pod-template-hash"]
+
+
+def test_spread_follows_the_namespace():
+    objects = render(ON + "  namespace: edge\n")
+    selector = spread(objects)["labelSelector"]["matchLabels"]
+    labels = pod_spec(objects)["metadata"]["labels"]
+    assert all(labels.get(k) == v for k, v in selector.items())
