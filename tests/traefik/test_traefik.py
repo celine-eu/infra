@@ -112,35 +112,40 @@ def test_drain_seconds_zero_turns_the_sleep_off():
 
 
 # ---------------------------------------------------------------------------
-# one pod per node: two replicas on one node are no redundancy
+# one pod per node: two replicas on one node are no redundancy. A required anti-affinity,
+# not a topology spread: on GKE Autopilot safe-to-evict pods get a node affinity of their
+# own, and a spread over the one node that matches it is always satisfied, so both pods
+# stayed on it. The anti-affinity leaves the second pod pending until a node is added.
 # ---------------------------------------------------------------------------
 
 
-def spread(objects: dict[str, dict]) -> dict:
-    (constraint,) = pod_spec(objects)["spec"]["topologySpreadConstraints"]
-    return constraint
+def anti_affinity(objects: dict[str, dict]) -> dict:
+    affinity = pod_spec(objects)["spec"]["affinity"]["podAntiAffinity"]
+    (term,) = affinity["requiredDuringSchedulingIgnoredDuringExecution"]
+    return term
 
 
-def test_pods_spread_one_per_node(default):
-    constraint = spread(default)
-    assert constraint["topologyKey"] == "kubernetes.io/hostname"
-    assert constraint["maxSkew"] == 1
-    assert constraint["whenUnsatisfiable"] == "DoNotSchedule"
+def test_pods_never_share_a_node(default):
+    assert anti_affinity(default)["topologyKey"] == "kubernetes.io/hostname"
 
 
-def test_spread_selects_traefiks_own_pods(default):
-    selector = spread(default)["labelSelector"]["matchLabels"]
+def test_no_topology_spread(default):
+    assert not pod_spec(default)["spec"].get("topologySpreadConstraints")
+
+
+def test_anti_affinity_selects_traefiks_own_pods(default):
+    selector = anti_affinity(default)["labelSelector"]["matchLabels"]
     labels = pod_spec(default)["metadata"]["labels"]
     assert selector and all(labels.get(k) == v for k, v in selector.items())
 
 
-def test_spread_counts_each_rollout_on_its_own(default):
-    # Old and new pods of a rolling update would otherwise count together and block it.
-    assert spread(default)["matchLabelKeys"] == ["pod-template-hash"]
+def test_anti_affinity_counts_each_rollout_on_its_own(default):
+    # A rolling update's new pod may sit beside an old one instead of waiting for a node.
+    assert anti_affinity(default)["matchLabelKeys"] == ["pod-template-hash"]
 
 
-def test_spread_follows_the_namespace():
+def test_anti_affinity_follows_the_namespace():
     objects = render(ON + "  namespace: edge\n")
-    selector = spread(objects)["labelSelector"]["matchLabels"]
+    selector = anti_affinity(objects)["labelSelector"]["matchLabels"]
     labels = pod_spec(objects)["metadata"]["labels"]
     assert all(labels.get(k) == v for k, v in selector.items())
