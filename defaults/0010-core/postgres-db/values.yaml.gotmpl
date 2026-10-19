@@ -260,6 +260,7 @@ backup:
     endpointURL: {{ .Environment.Values | dig "postgres_db" "backup" "s3" "endpointURL" "" | quote }}
     accessKey: {{ .Environment.Values | dig "postgres_db" "backup" "s3" "accessKey" "" | quote }}
     secretKey: {{ .Environment.Values | dig "postgres_db" "backup" "s3" "secretKey" "" | quote }}
+    checksums: {{ .Environment.Values | dig "postgres_db" "backup" "s3" "checksums" "" | quote }}
 
 {{- /* Tunes prefect's hot tables only: on where prefect's database is. */}}
 table_tuning:

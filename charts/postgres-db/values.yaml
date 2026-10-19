@@ -96,6 +96,11 @@ backup:
     endpointURL: ""             # omit for native AWS S3
     accessKey: ""
     secretKey: ""
+    # boto3 request/response checksums for barman's S3 client. "" keeps boto3's default;
+    # "when_required" for stores that refuse the newer checksums (GCS's XML API answers
+    # SignatureDoesNotMatch). Sets AWS_REQUEST_CHECKSUM_CALCULATION and
+    # AWS_RESPONSE_CHECKSUM_VALIDATION on the Postgres pods.
+    checksums: ""
 
 table_tuning:
   enabled: false

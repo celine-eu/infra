@@ -67,6 +67,11 @@ tasks:
     cmds:
       - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/network-policy -v {{.CLI_ARGS}}
 
+  test:postgres-db:
+    desc: "Render postgres-db and check the S3 backup checksum switch: unset leaves the Cluster unchanged, when_required sets both AWS checksum variables, nothing without backups"
+    cmds:
+      - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/postgres-db -v {{.CLI_ARGS}}
+
   test:traefik:
     desc: "Render infra's Traefik and check it keeps serving while its pods move: never evicted for node scale-down, a preStop sleep (drain_seconds) inside the grace period, the client address kept"
     cmds:

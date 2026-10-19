@@ -8,6 +8,14 @@ spec:
     {{- toYaml .Values.cluster.resources | nindent 4 }}
 
   instances: {{ .Values.cluster.instances }}
+  {{- /* barman's S3 client: checksums only where the store requires them (backup.s3.checksums). */}}
+  {{- with (and .Values.backup.enabled .Values.backup.s3.checksums) }}
+  env:
+    - name: AWS_REQUEST_CHECKSUM_CALCULATION
+      value: {{ . | quote }}
+    - name: AWS_RESPONSE_CHECKSUM_VALIDATION
+      value: {{ . | quote }}
+  {{- end }}
   imageName: {{ .Values.cluster.image }}
   storage:
     size: {{ .Values.cluster.storage.size }}
