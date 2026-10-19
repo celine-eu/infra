@@ -157,6 +157,8 @@
   value: {{ $o.corsOrigins | quote }}
 - name: EXTRACTION_ENABLED
   value: {{ $o.extractionEnabled | toString | quote }}
+- name: ID_DOCUMENT_ENABLED
+  value: {{ ternary true $o.idDocumentEnabled (kindIs "invalid" $o.idDocumentEnabled) | toString | quote }}
 {{- $llm := $o.llm | default dict }}
 {{- if $llm.baseUrl }}
 - name: LLM_BASE_URL

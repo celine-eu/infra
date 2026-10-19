@@ -25,6 +25,9 @@
 #     extraction_enabled: false          # read bills and identity documents with a vision model;
 #                                        # on only with llm.base_url and llm.vision_model too.
 #                                        # Uploads need persistence
+#     id_document_enabled: true          # false: no identity-document upload or scan for any
+#                                        # community (ID_DOCUMENT_ENABLED); true leaves it to each
+#                                        # template's `id_document.enabled`. The bill is unaffected
 #     llm:                               # an OpenAI-compatible endpoint (as ai_assistant.llm)
 #       base_url: ""
 #       vision_model: ""
@@ -197,6 +200,7 @@ onboarding:
   otpHmacKey: {{ . | quote }}
   {{- end }}
   extractionEnabled: {{ eq (toString ($o | dig "extraction_enabled" false)) "true" }}
+  idDocumentEnabled: {{ ne (toString ($o | dig "id_document_enabled" true)) "false" }}
   llm:
     baseUrl: {{ $o | dig "llm" "base_url" "" | quote }}
     visionModel: {{ $o | dig "llm" "vision_model" "" | quote }}

@@ -154,6 +154,11 @@ onboarding:
     # model can spend the extractor's token cap on it). Empty: not set, the
     # service's own default.
     thinking: ""
+  # ID_DOCUMENT_ENABLED: the deployment's kill switch for the identity-document
+  # upload and scan, apart from the bill. false switches it off for every
+  # community, whatever a template says; true leaves it to each template
+  # (`id_document.enabled`) and to extractionEnabled above.
+  idDocumentEnabled: true
 
   # Phone verification by SMS. The service's own default, `log`, is a
   # development provider: it prints the code to the pod log and the participant
