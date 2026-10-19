@@ -29,13 +29,31 @@
 #                                       # provider cannot express (client certificates
 #                                       # checked per host). Only those carrying the
 #                                       # class's annotation, and only in their namespace.
+#     drain_seconds: 45                 # preStop sleep: with externalTrafficPolicy Local a
+#                                       # node whose pod is gone refuses connections until
+#                                       # the load balancer's health check drops it; the
+#                                       # pod keeps serving meanwhile. 0: no sleep
+#
+# The pods are never evicted for node scale-down (safe-to-evict "false"): on GKE Autopilot
+# that moved a Traefik pod and refused about half the connections for a minute.
 {{- $ic := .Values | dig "ingress_controller" (dict) }}
 {{- $class := $ic | dig "class" "nginx" }}
 {{- $controller := $ic | dig "controller_class" "k8s.io/ingress-nginx" }}
 {{- $svc := $ic | dig "service" (dict) }}
+{{- $drain := $ic | dig "drain_seconds" 45 | int }}
 
 deployment:
   replicas: {{ $ic | dig "replicas" 2 }}
+  podAnnotations:
+    cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
+  # The sleep plus Traefik's own shutdown (graceTimeOut, 10 s by default).
+  terminationGracePeriodSeconds: {{ max 60 (add $drain 30) }}
+  {{- if gt $drain 0 }}
+  lifecycle:
+    preStop:
+      sleep:
+        seconds: {{ $drain }}
+  {{- end }}
 
 podDisruptionBudget:
   enabled: true

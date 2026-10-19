@@ -67,6 +67,11 @@ tasks:
     cmds:
       - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/network-policy -v {{.CLI_ARGS}}
 
+  test:traefik:
+    desc: "Render infra's Traefik and check it keeps serving while its pods move: never evicted for node scale-down, a preStop sleep (drain_seconds) inside the grace period, the client address kept"
+    cmds:
+      - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/traefik -v {{.CLI_ARGS}}
+
   test:frontend-roi:
     desc: "Render the ROI host and check the page and calculator are public, the feedback paths need an existing SSO session (401, no redirect) and keep the API's limits and policy"
     cmds:
