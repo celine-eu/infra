@@ -574,17 +574,27 @@ tasks:
         kubectl exec -it deploy/ai-assistant-shell -n celine-{{ .DEPLOYMENT_ENV }} -- celine-assistant kb {{ .CLI_ARGS }}
 
   import:dataset-sync:*:
-    desc: "Export governance.yaml files from pipeline repos and import into the dataset-api catalogue. Usage: task import:dataset-sync:staging"
+    desc: "Export governance.yaml files from pipeline repos and import into the dataset-api catalogue. Usage: task import:dataset-sync:staging KUBE_CONTEXT=<context>"
+    # **The cluster is named, never assumed.** Every kubectl below takes `--context`, so
+    # the sync cannot land on whatever context happens to be current (a prod context may
+    # exist on the same machine). No default on purpose.
+    requires:
+      vars: [KUBE_CONTEXT]
     vars:
       DEPLOYMENT_ENV: "{{ index .MATCH 0 }}"
+      # The owners registry the overlays below belong to — one registry, the
+      # deployment's: the ownership rule resolves every name against it.
+      OWNERS: '{{ .OWNERS | default (printf "%s/../recs/owners.yaml" .TASKFILE_DIR) }}'
     cmds:
       - |
         set -e
+        KUBECTL="kubectl --context {{ .KUBE_CONTEXT }} -n celine-{{ .DEPLOYMENT_ENV }}"
+        test -f "{{ .OWNERS }}" || { echo "owners registry not found: {{ .OWNERS }}"; exit 1; }
 
-        POD=$(kubectl get pod -n celine-{{ .DEPLOYMENT_ENV }} \
+        POD=$($KUBECTL get pod \
           -l app.kubernetes.io/name=celine-dataset-api-shell \
           -o jsonpath='{.items[0].metadata.name}')
-        test -n "$POD" || { echo "No dataset-api-shell pod found in celine-{{ .DEPLOYMENT_ENV }}"; exit 1; }
+        test -n "$POD" || { echo "No dataset-api-shell pod found in celine-{{ .DEPLOYMENT_ENV }} ({{ .KUBE_CONTEXT }})"; exit 1; }
 
         TMPDIR=$(mktemp -d)
         trap "rm -rf $TMPDIR" EXIT
@@ -599,17 +609,25 @@ tasks:
           mkdir -p "$TMPDIR/gov/$app"
           cp "$f" "$TMPDIR/gov/$app/governance.yaml"
           echo "Copied $f"
-          # copy deployer override if present (merged by dataset-cli automatically)
+
           if [ -f "$GOV_OVERRIDES/governance.${app}.yaml" ]; then
             cp "$GOV_OVERRIDES/governance.${app}.yaml" "$TMPDIR/gov/$app/"
             echo "Copied override for $app"
           fi
         done
 
-        kubectl exec -n celine-{{ .DEPLOYMENT_ENV }} "$POD" -- rm -rf /tmp/governance_src
-        kubectl cp "$TMPDIR/gov" "$POD":/tmp/governance_src -n celine-{{ .DEPLOYMENT_ENV }}
+        $KUBECTL exec "$POD" -- rm -rf /tmp/governance_src /tmp/governance_owners.yaml
+        $KUBECTL cp "$TMPDIR/gov" "$POD":/tmp/governance_src
+        $KUBECTL cp "{{ .OWNERS }}" "$POD":/tmp/governance_owners.yaml
 
-        kubectl exec -n celine-{{ .DEPLOYMENT_ENV }} -it "$POD" -- sh -c '
+        # **The gate, before anything is exported or imported.** The image's own
+        # celine-utils checks the staged trees as the export will read them — each
+        # overlay sits beside its base under the app's directory, so it is merged in
+        # (materialized) — strictly, with the deployment's owners. A finding fails the
+        # task here; nothing reaches the catalogue.
+        $KUBECTL exec -it "$POD" -- sh -c '
+          celine-governance validate --strict /tmp/governance_src \
+            --owners /tmp/governance_owners.yaml &&
           rm -rf /tmp/export && mkdir -p /tmp/export &&
           dataset-cli export governance "/tmp/governance_src/**/governance.yaml" -o /tmp/export --verbose &&
           dataset-cli import catalogue \
