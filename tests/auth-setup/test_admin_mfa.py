@@ -31,11 +31,13 @@ REPO = Path(__file__).resolve().parents[2]
 FORMS = ["true", "{enabled: true}", "false", "{enabled: false}", None]
 
 
-def render(admin_mfa: str | None) -> subprocess.CompletedProcess:
+def render(admin_mfa: str | None, extra: str = "") -> subprocess.CompletedProcess:
+    """Render auth-setup; `extra` is more top-level YAML for the override."""
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
         override = tmp / "override.yaml"
-        override.write_text(f"keycloak:\n  admin_mfa: {admin_mfa}\n" if admin_mfa is not None else "{}\n")
+        mfa = f"keycloak:\n  admin_mfa: {admin_mfa}\n" if admin_mfa is not None else ""
+        override.write_text(mfa + extra or "{}\n")
         values = [REPO / "envs/dev/values.yaml", override]
         if admin_mfa is None:
             # the key absent altogether: drop it from a copy of the dev values

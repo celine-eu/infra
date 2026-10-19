@@ -303,9 +303,14 @@ class FakeMaster:
 
     PUBLIC_ISSUER = "https://keycloak.example.org/realms/master"
 
-    def __init__(self, attributes: dict, secret: str):
+    def __init__(self, attributes: dict, secret: str, stale_reads: int = 0):
         self.attributes = dict(attributes)
         self.secret = secret
+        # realm reads right after a write that still return the map from before it, as prod's
+        # Keycloak 26.7.3 did once on 2026-10-19 (the next run found the value set)
+        self.stale_reads = stale_reads
+        self.stale_left = 0
+        self.before_write: dict = {}
         self.calls: list[tuple[str, str, object]] = []
         fake = self
 
@@ -341,7 +346,11 @@ class FakeMaster:
                     front = fake.attributes.get("frontendUrl")
                     self.reply(200, {"issuer": f"{front}/realms/master" if front else fake.PUBLIC_ISSUER})
                 elif self.path == "/admin/realms/master" and self.authorized():
-                    self.reply(200, {"realm": "master", "attributes": dict(fake.attributes)})
+                    seen = fake.attributes
+                    if fake.stale_left > 0:
+                        fake.stale_left -= 1
+                        seen = fake.before_write
+                    self.reply(200, {"realm": "master", "attributes": dict(seen)})
                 else:
                     self.reply(403)
 
@@ -349,6 +358,8 @@ class FakeMaster:
                 rep = json.loads(self.body())
                 fake.calls.append(("PUT", self.path, rep))
                 if self.path == "/admin/realms/master" and self.authorized():
+                    fake.before_write = dict(fake.attributes)
+                    fake.stale_left = fake.stale_reads
                     fake.attributes = rep["attributes"]  # Keycloak replaces the map whole
                     self.reply(204)
                 else:
@@ -372,8 +383,8 @@ class FakeMaster:
 def fake_master():
     masters = []
 
-    def make(attributes: dict, secret: str = SECRET) -> FakeMaster:
-        masters.append(FakeMaster(attributes, secret))
+    def make(attributes: dict, secret: str = SECRET, stale_reads: int = 0) -> FakeMaster:
+        masters.append(FakeMaster(attributes, secret, stale_reads))
         return masters[-1]
 
     yield make
@@ -399,6 +410,22 @@ def test_the_step_writes_nothing_when_frontend_url_is_already_right(shell_dev, f
     result = master.run(frontend_url_step(shell_dev), "http://localhost:18080", SECRET)
     assert result.returncode == 0, result.stdout + result.stderr
     assert "no change" in result.stdout and master.puts() == []
+
+
+def test_a_write_read_back_stale_a_few_times_still_passes(shell_dev, fake_master):
+    master = fake_master({"frontendUrl": "https://keycloak.example.org"}, stale_reads=2)
+    result = master.run(frontend_url_step(shell_dev), "http://localhost:18080", SECRET)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert master.attributes["frontendUrl"] == "http://localhost:18080"
+    assert len(master.puts()) == 1
+
+
+def test_a_write_that_never_takes_still_fails(shell_dev, fake_master):
+    master = fake_master({"frontendUrl": "https://keycloak.example.org"}, stale_reads=1000)
+    result = master.run(frontend_url_step(shell_dev), "http://localhost:18080", SECRET)
+    assert result.returncode == 1 and "did not take" in result.stdout
+    reads = [c for c in master.calls if c == ("GET", "/admin/realms/master", None)]
+    assert len(reads) <= 12  # bounded: one read before the write, a few after
 
 
 def test_without_the_bootstrap_client_secret_master_is_left_alone(shell_dev, fake_master):

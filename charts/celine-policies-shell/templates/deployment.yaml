@@ -96,7 +96,7 @@ spec:
               if [ "$reachable" -eq 1 ] && [ -n "$MASTER_FRONTEND_URL" ]; then
                 frc=0
                 python - > $D/frontend-url.txt 2>&1 <<'PY' || frc=$?
-              import os, sys
+              import os, sys, time
               import httpx
 
               url = os.environ["MASTER_FRONTEND_URL"].rstrip("/")
@@ -110,6 +110,15 @@ spec:
               def fail(message):
                   print(f"master frontendUrl: {message}")
                   sys.exit(1)
+
+              def settled(read, ok, attempts=10, pause=1.0):
+                  """True once `ok(read())` holds, trying `attempts` times `pause` seconds apart."""
+                  for attempt in range(attempts):
+                      if ok(read()):
+                          return True
+                      if attempt < attempts - 1:
+                          time.sleep(pause)
+                  return False
 
               with httpx.Client(timeout=30) as http:
                   r = http.post(f"{base}/realms/master/protocol/openid-connect/token",
@@ -130,13 +139,16 @@ spec:
                       r = http.put(realm_url, headers=headers, json={"attributes": attributes})
                       if r.status_code not in (200, 204):
                           fail(f"writing master: HTTP {r.status_code}")
-                      r = http.get(realm_url, headers=headers)
-                      if r.status_code != 200 or (r.json().get("attributes") or {}).get("frontendUrl") != url:
+                      # A read right after the write can still return the old map (prod,
+                      # Keycloak 26.7.3, 2026-10-19): read again for a few seconds.
+                      if not settled(lambda: http.get(realm_url, headers=headers),
+                                     lambda r: r.status_code == 200 and (r.json().get("attributes") or {}).get("frontendUrl") == url):
                           fail(f"master accepted {url} but it did not take")
                       print(f"master frontendUrl: {current or '<unset>'} -> {url}")
-                  issuer = http.get(f"{base}/realms/master/.well-known/openid-configuration").json().get("issuer")
-                  if issuer != f"{url}/realms/master":
-                      fail(f"master's issuer is {issuer}, not {url}/realms/master")
+                  discovery = f"{base}/realms/master/.well-known/openid-configuration"
+                  if not settled(lambda: http.get(discovery),
+                                 lambda r: r.status_code == 200 and r.json().get("issuer") == f"{url}/realms/master"):
+                      fail(f"master's issuer is {http.get(discovery).json().get('issuer')}, not {url}/realms/master")
               PY
                 cat $D/frontend-url.txt
                 [ "$rc" -eq 0 ] && rc=$frc

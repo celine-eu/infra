@@ -17,6 +17,7 @@ oauth2Proxy:
   clientSecret: {{ .Environment.Values.auth_setup.clientSecret }}
   cookieSecret: {{ .Environment.Values.auth_setup.cookieSecret }}
 
+dashboard_enabled: {{ .Environment.Values | dig "auth_setup" "dashboard_enabled" true }}
 {{- with .Environment.Values | dig "auth_setup" "dashboard_resources" nil }}
 dashboard_resources: {{ toJson . }}
 {{- end }}

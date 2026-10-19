@@ -1,3 +1,4 @@
+{{- if .Values.dashboard_enabled }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -77,3 +78,4 @@ spec:
     - hosts:
         - dashboard.{{ .Values.domain }}
       secretName: dashboard-tls
+{{- end }}
