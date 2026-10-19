@@ -22,8 +22,6 @@ dashboard_resources: {{ toJson . }}
 {{- end }}
 
 dashboard_items:
-  - name: Dashboards (Superset)
-    host: superset
   - name: Data Lineage (Marquez)
     host: marquez
   # The public Keycloak host serves the platform realm only; the admin console is reached

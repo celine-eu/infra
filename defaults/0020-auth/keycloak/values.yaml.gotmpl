@@ -158,6 +158,13 @@ extraVolumes: |
     configMap:
       name: keycloak-realm-celine
 
+# The chart's pod anti-affinity (required per node, preferred per zone) stays unless the
+# environment sets `keycloak.pod_anti_affinity: false`: GKE Autopilot rejects anti-affinity
+# below 500m CPU requested, and with one replica it spreads nothing.
+{{- if not (.Environment.Values | dig "keycloak" "pod_anti_affinity" true) }}
+affinity: ""
+{{- end }}
+
 # JVM app using 722Mi actual — needs a ceiling to prevent unbounded growth
 resources:
   requests:

@@ -34,11 +34,11 @@
 #                                       # the load balancer's health check drops it; the
 #                                       # pod keeps serving meanwhile. 0: no sleep
 #
-# The pods are never evicted for node scale-down (safe-to-evict "false"): on GKE Autopilot
-# that moved a Traefik pod and refused about half the connections for a minute. Never two
-# on one node (two replicas on one node are no redundancy): a required anti-affinity, since
-# Autopilot gives safe-to-evict pods a node affinity of their own and a topology spread
-# over the one node matching it is always satisfied.
+# On GKE Autopilot a node scale-down moved a Traefik pod and refused about half the
+# connections for a minute; the preStop sleep drains a moving pod instead. Neither
+# safe-to-evict "false" (Autopilot makes such pods extended-duration pods: 500m CPU / 512Mi
+# each, on a node pool of their own) nor a pod anti-affinity (500m CPU minimum there). Never
+# two on one node (two replicas on one node are no redundancy): a topology spread.
 {{- $ic := .Values | dig "ingress_controller" (dict) }}
 {{- $class := $ic | dig "class" "nginx" }}
 {{- $controller := $ic | dig "controller_class" "k8s.io/ingress-nginx" }}
@@ -47,8 +47,6 @@
 
 deployment:
   replicas: {{ $ic | dig "replicas" 2 }}
-  podAnnotations:
-    cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
   # The sleep plus Traefik's own shutdown (graceTimeOut, 10 s by default).
   terminationGracePeriodSeconds: {{ max 60 (add $drain 30) }}
   {{- if gt $drain 0 }}
@@ -62,16 +60,17 @@ podDisruptionBudget:
   enabled: true
   minAvailable: 1
 
-# One pod per node; a rollout's new pod may sit beside an old one (pod-template-hash).
-affinity:
-  podAntiAffinity:
-    requiredDuringSchedulingIgnoredDuringExecution:
-      - topologyKey: kubernetes.io/hostname
-        matchLabelKeys: [pod-template-hash]
-        labelSelector:
-          matchLabels:
-            app.kubernetes.io/name: traefik
-            app.kubernetes.io/instance: traefik-{{ $ic | dig "namespace" "ingress" }}
+# One pod per node; each rollout's pods counted on their own (pod-template-hash), so the
+# old ones do not block the new.
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: DoNotSchedule
+    matchLabelKeys: [pod-template-hash]
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: traefik
+        app.kubernetes.io/instance: traefik-{{ $ic | dig "namespace" "ingress" }}
 
 # No Traefik IngressClass: the controller answers for `{{ $class }}` only, below.
 ingressClass:

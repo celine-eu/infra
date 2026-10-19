@@ -53,8 +53,6 @@ dashboard_items:
     host: webapp
   - name: AI Assistant
     host: assistant
-  - name: BI Dashboards (Superset)
-    host: superset
   - name: Data Lineage (Marquez)
     host: marquez
   # The public Keycloak host serves the platform realm only; the admin console is reached

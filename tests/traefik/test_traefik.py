@@ -6,12 +6,14 @@ allowlists), so a node whose Traefik pod is gone refuses connections until the c
 balancer's health check drops it. On GKE Autopilot that happened on node scale-down: about
 half the connections refused for a minute. Hence:
 
-- The pods carry `cluster-autoscaler.kubernetes.io/safe-to-evict: "false"`: the autoscaler
-  does not evict them to remove a node.
 - A `preStop` sleep of `ingress_controller.drain_seconds` (default 45): the endpoint turns
   terminating, the node's health check fails and the load balancer drops the node while the
   pod still serves. `0` turns the sleep off. The grace period covers the sleep plus
-  Traefik's own shutdown.
+  Traefik's own shutdown. Node scale-down may still move a pod; it drains the same way.
+- No `safe-to-evict: "false"`: on Autopilot it makes the pods extended-duration pods,
+  raised to 500m CPU / 512Mi each and pinned to their own node pool.
+- One pod per node by a topology spread, not an anti-affinity (Autopilot wants 500m CPU
+  for anti-affinity).
 
     task test:traefik
 
@@ -80,9 +82,9 @@ def default() -> dict[str, dict]:
     return render(ON)
 
 
-def test_pods_are_not_evicted_for_node_scale_down(default):
-    annotations = pod_spec(default)["metadata"].get("annotations", {})
-    assert annotations.get("cluster-autoscaler.kubernetes.io/safe-to-evict") == "false"
+def test_pods_are_not_extended_duration_pods(default):
+    annotations = pod_spec(default)["metadata"].get("annotations") or {}
+    assert "cluster-autoscaler.kubernetes.io/safe-to-evict" not in annotations
 
 
 def test_pre_stop_sleeps_45_seconds_by_default(default):
@@ -107,45 +109,42 @@ def test_drain_seconds_sets_the_sleep_and_the_grace_period():
 def test_drain_seconds_zero_turns_the_sleep_off():
     objects = render(ON + "  drain_seconds: 0\n")
     assert "preStop" not in (container(objects).get("lifecycle") or {})
-    annotations = pod_spec(objects)["metadata"].get("annotations", {})
-    assert annotations.get("cluster-autoscaler.kubernetes.io/safe-to-evict") == "false"
 
 
 # ---------------------------------------------------------------------------
-# one pod per node: two replicas on one node are no redundancy. A required anti-affinity,
-# not a topology spread: on GKE Autopilot safe-to-evict pods get a node affinity of their
-# own, and a spread over the one node that matches it is always satisfied, so both pods
-# stayed on it. The anti-affinity leaves the second pod pending until a node is added.
+# one pod per node: two replicas on one node are no redundancy
 # ---------------------------------------------------------------------------
 
 
-def anti_affinity(objects: dict[str, dict]) -> dict:
-    affinity = pod_spec(objects)["spec"]["affinity"]["podAntiAffinity"]
-    (term,) = affinity["requiredDuringSchedulingIgnoredDuringExecution"]
-    return term
+def spread(objects: dict[str, dict]) -> dict:
+    (constraint,) = pod_spec(objects)["spec"]["topologySpreadConstraints"]
+    return constraint
 
 
-def test_pods_never_share_a_node(default):
-    assert anti_affinity(default)["topologyKey"] == "kubernetes.io/hostname"
+def test_pods_spread_one_per_node(default):
+    constraint = spread(default)
+    assert constraint["topologyKey"] == "kubernetes.io/hostname"
+    assert constraint["maxSkew"] == 1
+    assert constraint["whenUnsatisfiable"] == "DoNotSchedule"
 
 
-def test_no_topology_spread(default):
-    assert not pod_spec(default)["spec"].get("topologySpreadConstraints")
+def test_no_pod_anti_affinity(default):
+    assert "podAntiAffinity" not in (pod_spec(default)["spec"].get("affinity") or {})
 
 
-def test_anti_affinity_selects_traefiks_own_pods(default):
-    selector = anti_affinity(default)["labelSelector"]["matchLabels"]
+def test_spread_selects_traefiks_own_pods(default):
+    selector = spread(default)["labelSelector"]["matchLabels"]
     labels = pod_spec(default)["metadata"]["labels"]
     assert selector and all(labels.get(k) == v for k, v in selector.items())
 
 
-def test_anti_affinity_counts_each_rollout_on_its_own(default):
-    # A rolling update's new pod may sit beside an old one instead of waiting for a node.
-    assert anti_affinity(default)["matchLabelKeys"] == ["pod-template-hash"]
+def test_spread_counts_each_rollout_on_its_own(default):
+    # Old and new pods of a rolling update would otherwise count together and block it.
+    assert spread(default)["matchLabelKeys"] == ["pod-template-hash"]
 
 
-def test_anti_affinity_follows_the_namespace():
+def test_spread_follows_the_namespace():
     objects = render(ON + "  namespace: edge\n")
-    selector = anti_affinity(objects)["labelSelector"]["matchLabels"]
+    selector = spread(objects)["labelSelector"]["matchLabels"]
     labels = pod_spec(objects)["metadata"]["labels"]
     assert all(labels.get(k) == v for k, v in selector.items())
