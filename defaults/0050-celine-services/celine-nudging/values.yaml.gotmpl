@@ -9,8 +9,13 @@ oidc:
 extraEnv:
   - name: VAPID_PUBLIC_KEY
     value: {{ .Environment.Values | dig "nudging" "vapid_public_key" "" | quote }}
+  # The private key is read from nudging-secrets: a plain value would sit in the Deployment
+  # and in `helmfile diff` output.
   - name: VAPID_PRIVATE_KEY
-    value: {{ .Environment.Values | dig "nudging" "vapid_private_key" "" | quote }}
+    valueFrom:
+      secretKeyRef:
+        name: nudging-secrets
+        key: VAPID_PRIVATE_KEY
   - name: VAPID_SUBJECT
     value: {{ .Environment.Values | dig "nudging" "vapid_subject" "" | quote }}
   {{- if $clickTrackingSecret }}
@@ -22,8 +27,11 @@ extraEnv:
       secretKeyRef:
         name: nudging-secrets
         key: CLICK_TRACKING_SECRET
+  {{- end }}
 
 extraSecrets:
+  VAPID_PRIVATE_KEY: {{ .Environment.Values | dig "nudging" "vapid_private_key" "" | quote }}
+  {{- if $clickTrackingSecret }}
   CLICK_TRACKING_SECRET: {{ $clickTrackingSecret | quote }}
   {{- end }}
 
