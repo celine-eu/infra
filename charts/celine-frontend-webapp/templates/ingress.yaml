@@ -74,8 +74,10 @@ spec:
     - host: {{ .Values.ingress.host }}
       http:
         paths:
+          # Prefix, not Exact: Traefik ranks routers by rule length and writes a Prefix
+          # longer, so an Exact path here lost to /oauth2 (tests/ingress-routing).
           - path: /oauth2/sign_out
-            pathType: Exact
+            pathType: Prefix
             backend:
               service:
                 name: {{ include "celine-services.fullname" . }}

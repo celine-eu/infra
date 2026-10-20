@@ -82,6 +82,16 @@ tasks:
     cmds:
       - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/api-gateway -v {{.CLI_ARGS}}
 
+  test:ai-assistant:
+    desc: "Render the AI assistant and its shell and check the LLM API keys come only from ai-assistant-secrets (secretKeyRef), never a plain env value; endpoints and models stay plain; KB_GIT_TOKEN and QDRANT_API_KEY unchanged"
+    cmds:
+      - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/ai-assistant -v {{.CLI_ARGS}}
+
+  test:ingress-routing:
+    desc: "Render the frontends and check Traefik's NGINX provider (routers ranked by rule length) sends every path to the Ingress ingress-nginx would (Exact first, then the longest Prefix)"
+    cmds:
+      - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/ingress-routing -v {{.CLI_ARGS}}
+
   test:traefik:
     desc: "Render infra's Traefik and check it keeps serving while its pods move: never evicted for node scale-down, a preStop sleep (drain_seconds) inside the grace period, the client address kept"
     cmds:

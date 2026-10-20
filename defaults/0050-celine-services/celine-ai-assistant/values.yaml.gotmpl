@@ -39,11 +39,16 @@ extraEnv:
   {{- end }}
   {{- $llm := .Environment.Values | dig "ai_assistant" "llm" dict }}
   # Where members' messages and the data the tools fetch for them are sent. No default:
-  # the assistant refuses to start without a base URL and the two models.
+  # the assistant refuses to start without a base URL and the two models. The two API keys
+  # are read from ai-assistant-secrets: a plain value would sit in the Deployment and in
+  # `helmfile diff` output. The shell reads the same Secret.
   - name: LLM_BASE_URL
     value: {{ $llm | dig "base_url" "" | quote }}
   - name: LLM_API_KEY
-    value: {{ $llm | dig "api_key" "" | quote }}
+    valueFrom:
+      secretKeyRef:
+        name: ai-assistant-secrets
+        key: LLM_API_KEY
   - name: LLM_CHAT_MODEL
     value: {{ $llm | dig "chat_model" "" | quote }}
   - name: LLM_VISION_MODEL
@@ -51,7 +56,10 @@ extraEnv:
   - name: LLM_EMBED_BASE_URL
     value: {{ $llm | dig "embed_base_url" "" | quote }}
   - name: LLM_EMBED_API_KEY
-    value: {{ $llm | dig "embed_api_key" "" | quote }}
+    valueFrom:
+      secretKeyRef:
+        name: ai-assistant-secrets
+        key: LLM_EMBED_API_KEY
   - name: LLM_EMBED_MODEL
     value: {{ $llm | dig "embed_model" "" | quote }}
   - name: LLM_EMBED_DIMENSIONS
@@ -94,17 +102,18 @@ extraEnv:
   - name: FLEXIBILITY_API_URL
     value: "http://flexibility-api:8017"
 
-{{- if or ($kb | dig "git_token" "") $qdrantApiKey }}
 
-# Keep these out of the Deployment spec: a token for private knowledge sources, Qdrant's key.
+# Keep these out of the Deployment spec: the LLM keys, a token for private knowledge
+# sources, Qdrant's key.
 extraSecrets:
+  LLM_API_KEY: {{ $llm | dig "api_key" "" | quote }}
+  LLM_EMBED_API_KEY: {{ $llm | dig "embed_api_key" "" | quote }}
   {{- with $kb | dig "git_token" "" }}
   KB_GIT_TOKEN: {{ . | quote }}
   {{- end }}
   {{- with $qdrantApiKey }}
   QDRANT_API_KEY: {{ . | quote }}
   {{- end }}
-{{- end }}
 
 {{- with .Environment.Values | dig "ai_assistant" "resources" nil }}
 resources:
