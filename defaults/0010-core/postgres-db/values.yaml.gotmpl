@@ -40,6 +40,30 @@
 {{- fail (printf "postgres_db.warehouse_tools: %v is not one of %s" . (join ", " $knownTools)) }}
 {{- end }}
 {{- end }}
+{{- /* The mirror for sync_tables' sink (README, "Mirror schemas for the sync sink"): with
+       `postgres_db.mirror.enabled`, the role `mirror_writer` (its password
+       `postgres_db.mirror_writer`, then mandatory), the owner's membership in it, its
+       connection string and the Job that creates `postgres_db.mirror.schemas` owned by it,
+       readable by `datasets_ro`. Off, nothing of it renders. */}}
+{{- $mirrorOn := .Environment.Values | dig "postgres_db" "mirror" "enabled" false }}
+{{- if not (kindIs "bool" $mirrorOn) }}
+{{- fail (printf "postgres_db.mirror.enabled must be true or false, got %v" $mirrorOn) }}
+{{- end }}
+{{- $mirrorSchemas := list }}
+{{- if $mirrorOn }}
+{{- $mirrorSchemas = .Environment.Values | dig "postgres_db" "mirror" "schemas" nil }}
+{{- if not (and (kindIs "slice" $mirrorSchemas) $mirrorSchemas) }}
+{{- fail "postgres_db.mirror.enabled is true: postgres_db.mirror.schemas must be a non-empty list of schema names" }}
+{{- end }}
+{{- range $mirrorSchemas }}
+{{- if or (not (kindIs "string" .)) (not (regexMatch "^[a-z_][a-z0-9_]{0,62}$" (toString .))) (eq (toString .) "public" "information_schema") (hasPrefix "pg_" (toString .)) }}
+{{- fail (printf "postgres_db.mirror.schemas: %v is not a schema the mirror may own (lower-case letters, digits and _; not public, information_schema or pg_*)" .) }}
+{{- end }}
+{{- end }}
+{{- if not (.Environment.Values | dig "postgres_db" "mirror_writer" "") }}
+{{- fail "postgres_db.mirror.enabled is true: postgres_db.mirror_writer (its role password) is required in the environment's secrets" }}
+{{- end }}
+{{- end }}
 cluster:
   name: postgis1
   image: ghcr.io/cloudnative-pg/postgis:17
@@ -80,10 +104,19 @@ roles:
   - name: datasets_owner
     password: {{ .Environment.Values.postgres_db.datasets_owner | quote }}
     comment: "User owning the datasets schema"
+{{- if $mirrorOn }}
+    inRoles: [mirror_writer]
+{{- end }}
 
   - name: datasets_ro
     password: {{ .Environment.Values.postgres_db.datasets_ro | quote }}
     comment: "Read-only access to datasets"
+{{- if $mirrorOn }}
+
+  - name: mirror_writer
+    password: {{ .Environment.Values.postgres_db.mirror_writer | quote }}
+    comment: "sync_tables sink: owns the mirror schemas, nothing else"
+{{- end }}
 
 {{- if has "meltano" $tools }}
   - name: meltano
@@ -204,6 +237,12 @@ connection_strings:
     user: datasets_owner
     name: datasets-async
     dialect: postgresql+asyncpg
+{{- if $mirrorOn }}
+
+  - database: datasets
+    user: mirror_writer
+    name: mirror-writer
+{{- end }}
 
   - database: dataset_api
     dialect: postgresql+asyncpg
@@ -290,3 +329,11 @@ grants:
     - ds_dev_silver
     - ds_dev_staging
     - raw
+
+mirror:
+  enabled: {{ $mirrorOn }}
+  database: datasets
+  role: mirror_writer
+  secret: postgis1-datasets-connection-string
+  schemas: {{ toJson $mirrorSchemas }}
+  readers: [datasets_ro]

@@ -128,6 +128,19 @@ grants:
     - raw
   image: ghcr.io/cloudnative-pg/postgis:17
 
+# The mirror schemas sync_tables' sink writes (templates/mirror-schemas-job.yaml): created
+# owned by `role`, which has no CREATE on the database, by the database owner through
+# `secret` (the owner needs `inRoles: [<role>]` in `roles`); `readers` get USAGE, SELECT and
+# the default for future tables. A schema another role owns is refused.
+mirror:
+  enabled: false
+  database: datasets
+  role: mirror_writer
+  secret: ""              # the owner's connection-string Secret (username, password)
+  schemas: []
+  readers: []
+  image: ghcr.io/cloudnative-pg/postgis:17
+
 # Resources for the post-deploy Jobs (grants, table tuning). Empty: none set.
 jobResources: {}
 

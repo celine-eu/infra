@@ -1,0 +1,109 @@
+{{- /* The mirror schemas for sync_tables' sink: each schema in `mirror.schemas` of
+       `mirror.database` is created owned by `mirror.role`, which has no CREATE on the
+       database and so cannot create them itself. Run by the database owner, who must be a
+       member of `mirror.role` (`roles[].inRoles`), since `CREATE SCHEMA ... AUTHORIZATION`
+       needs it; until CNPG has reconciled that membership the Job fails and retries. A schema
+       that already exists under another owner is refused, never taken over. Each reader in
+       `mirror.readers` gets USAGE, SELECT on the tables and views there and the default for
+       the ones the sink creates later. One transaction, bounded by lock and statement
+       timeouts. */}}
+{{- with .Values.mirror }}
+{{- if .enabled }}
+{{- if not .secret }}
+{{- fail "mirror.secret is required: the owner's connection-string Secret of mirror.database" }}
+{{- end }}
+{{- if not .schemas }}
+{{- fail "mirror.schemas is required: the schemas the sync sink writes" }}
+{{- end }}
+{{- range (concat (list .database .role) .schemas .readers) }}
+{{- if not (regexMatch "^[a-z_][a-z0-9_]*$" .) }}
+{{- fail (printf "mirror: %q is not a plain lower-case identifier" .) }}
+{{- end }}
+{{- end }}
+{{- $schemas := list }}
+{{- range .schemas }}{{ $schemas = append $schemas (squote .) }}{{ end }}
+{{- $readers := list }}
+{{- range .readers }}{{ $readers = append $readers (squote .) }}{{ end }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $.Values.cluster.name }}-mirror-schemas
+spec:
+  ttlSecondsAfterFinished: 30
+  backoffLimit: 6
+  activeDeadlineSeconds: 600
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: mirror-schemas
+          image: {{ .image }}
+          {{- with $.Values.jobResources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: owner-creds
+              mountPath: /secrets/owner
+              readOnly: true
+          command:
+            - bash
+            - -c
+            - |
+              set -e
+              export PGHOST={{ $.Values.cluster.name }}-rw PGDATABASE={{ .database }}
+              export PGUSER=$(cat /secrets/owner/username)
+              export PGPASSWORD=$(cat /secrets/owner/password)
+              export PGOPTIONS="-c lock_timeout=5s -c statement_timeout=120s"
+              psql -v ON_ERROR_STOP=1 <<'SQL'
+              DO $mirror$
+              DECLARE
+                w text := '{{ .role }}';
+                s text;
+                rd text;
+                owner text;
+                t regclass;
+              BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = w) THEN
+                  RAISE EXCEPTION 'mirror: role % does not exist (not reconciled yet?)', w;
+                END IF;
+                IF NOT pg_has_role(current_user, w, 'SET') THEN
+                  RAISE EXCEPTION 'mirror: % cannot act as % (membership not reconciled yet?)', current_user, w;
+                END IF;
+                FOREACH rd IN ARRAY ARRAY[{{ join ", " $readers }}]::text[] LOOP
+                  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = rd) THEN
+                    RAISE EXCEPTION 'mirror: reader % does not exist', rd;
+                  END IF;
+                END LOOP;
+                FOREACH s IN ARRAY ARRAY[{{ join ", " $schemas }}]::text[] LOOP
+                  SELECT nspowner::regrole::text INTO owner FROM pg_namespace WHERE nspname = s;
+                  IF owner IS NULL THEN
+                    EXECUTE format('CREATE SCHEMA %I AUTHORIZATION %I', s, w);
+                    RAISE NOTICE 'mirror: schema % created, owned by %', s, w;
+                  ELSIF owner <> w THEN
+                    RAISE EXCEPTION 'mirror: schema % exists, owned by %, not %; refused', s, owner, w;
+                  END IF;
+                  FOREACH rd IN ARRAY ARRAY[{{ join ", " $readers }}]::text[] LOOP
+                    EXECUTE format('GRANT USAGE ON SCHEMA %I TO %I', s, rd);
+                    FOR t IN SELECT c.oid FROM pg_class c JOIN pg_namespace ns ON ns.oid = c.relnamespace
+                             WHERE ns.nspname = s AND c.relkind IN ('r', 'p', 'v', 'm', 'f') LOOP
+                      EXECUTE format('GRANT SELECT ON %s TO %I', t, rd);
+                    END LOOP;
+                    EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA %I GRANT SELECT ON TABLES TO %I', w, s, rd);
+                  END LOOP;
+                END LOOP;
+              END
+              $mirror$;
+              SQL
+              psql -v ON_ERROR_STOP=1 -c "
+                SELECT n.nspname AS schema, n.nspowner::regrole AS owner, count(c.oid) AS tables
+                FROM pg_namespace n
+                LEFT JOIN pg_class c ON c.relnamespace = n.oid AND c.relkind IN ('r', 'p', 'v', 'm', 'f')
+                WHERE n.nspname = ANY (ARRAY[{{ join ", " $schemas }}])
+                GROUP BY 1, 2 ORDER BY 1;"
+      volumes:
+        - name: owner-creds
+          secret:
+            secretName: {{ .secret }}
+{{- end }}
+{{- end }}

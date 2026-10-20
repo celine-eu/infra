@@ -59,6 +59,9 @@ spec:
         comment: {{ default "" .comment | quote }}
         login: true
         superuser: false
+        {{- with .inRoles }}
+        inRoles: {{ toJson . }}
+        {{- end }}
         passwordSecret:
           name: {{ printf "%s-db-secret" .name | replace "_" "-"  }}
       {{- end }}

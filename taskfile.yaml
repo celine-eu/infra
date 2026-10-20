@@ -68,7 +68,7 @@ tasks:
       - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/network-policy -v {{.CLI_ARGS}}
 
   test:postgres-db:
-    desc: "Render postgres-db and check the S3 backup checksum switch: unset leaves the Cluster unchanged, when_required sets both AWS checksum variables, nothing without backups"
+    desc: "Render postgres-db and check the S3 backup checksum switch and the sync mirror (mirror_writer owns the mirror schemas only, datasets_ro reads them; off renders nothing; its Job's SQL runs against a throwaway Postgres 17 in docker)"
     cmds:
       - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/postgres-db -v {{.CLI_ARGS}}
 

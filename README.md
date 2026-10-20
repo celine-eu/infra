@@ -396,6 +396,27 @@ Schemas that are missing or not the owner's are skipped with a warning. So are t
 another role owns, which also never get the future-tables default. The Job's log ends with
 a per-schema count of tables and of readable tables.
 
+## Mirror schemas for the sync sink
+
+Where a database receives copied tables, the sink writes them as `mirror_writer`, a role
+that owns the mirror schemas and nothing else: no CREATE on the database, no other schema.
+With `postgres_db.mirror.enabled: true` the `postgres-db` release adds:
+
+| Key | Meaning |
+|---|---|
+| `postgres_db.mirror.enabled` | `true` or `false` (default). Anything else stops the render |
+| `postgres_db.mirror.schemas` | **required when on**: the schemas the sink writes, the same as `sync_tables.sink.allow_schemas`. Not `public`, `information_schema` or `pg_*` |
+| `postgres_db.mirror_writer` | **required when on**, secret: the role's password. It goes into a connection URI unescaped, so use a URL-safe value |
+
+It renders the role, its connection string Secret `postgis1-mirror-writer-connection-string`
+(the sink's `dsn_secret`), the database owner's membership in `mirror_writer`, and a Job
+that runs as the owner on every deploy. The Job creates each missing schema owned by
+`mirror_writer` (`CREATE SCHEMA ... AUTHORIZATION` is why the owner needs the membership),
+refuses a schema that already exists under another owner, and gives `datasets_ro` USAGE,
+SELECT on what is there and the default for what the sink creates later. Until CNPG has
+reconciled the new role and membership, the Job fails and retries. The read-only grants
+above skip these schemas with a warning, since the owner does not own them.
+
 ## Table sync (sync_tables)
 
 `charts/sync-tables` runs sync_tables' exchange layer, with two roles enabled per
