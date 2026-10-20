@@ -77,6 +77,11 @@ tasks:
     cmds:
       - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/nudging -v {{.CLI_ARGS}}
 
+  test:api-gateway:
+    desc: "Render the API gateway and check every route points at a port its Service exposes (each backend's chart, by release name)"
+    cmds:
+      - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/api-gateway -v {{.CLI_ARGS}}
+
   test:traefik:
     desc: "Render infra's Traefik and check it keeps serving while its pods move: never evicted for node scale-down, a preStop sleep (drain_seconds) inside the grace period, the client address kept"
     cmds:

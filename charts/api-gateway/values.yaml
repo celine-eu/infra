@@ -53,7 +53,7 @@ services:
 
   - name: digital-twin
     service: digital-twin
-    port: 8005
+    port: 8002
 
   - name: flexibility
     service: flexibility-api
@@ -61,7 +61,7 @@ services:
 
   - name: roi
     service: roi
-    port: 8018
+    port: 8000
 
   # - name: frontend-assistant
   #   service: frontend-assistant

@@ -33,6 +33,12 @@
 #                                       # node whose pod is gone refuses connections until
 #                                       # the load balancer's health check drops it; the
 #                                       # pod keeps serving meanwhile. 0: no sleep
+#     allowed_response_headers: []      # added to the security headers below, which the
+#                                       # charts' custom-headers ConfigMaps set
+#
+# The NGINX provider sets a custom-headers header only if it is allowed
+# (ingress-nginx's global-allowed-response-headers); otherwise it answers 503 on every path
+# of that Ingress. Allowed by default: the README's "Security headers" list.
 #
 # On GKE Autopilot a node scale-down moved a Traefik pod and refused about half the
 # connections for a minute; the preStop sleep drains a moving pod instead. Neither
@@ -44,6 +50,8 @@
 {{- $controller := $ic | dig "controller_class" "k8s.io/ingress-nginx" }}
 {{- $svc := $ic | dig "service" (dict) }}
 {{- $drain := $ic | dig "drain_seconds" 45 | int }}
+{{- $headers := list "X-Content-Type-Options" "Referrer-Policy" "X-Frame-Options" "Permissions-Policy" "Strict-Transport-Security" "Content-Security-Policy" "Content-Security-Policy-Report-Only" }}
+{{- $headers = concat $headers ($ic | dig "allowed_response_headers" (list)) | uniq }}
 
 deployment:
   replicas: {{ $ic | dig "replicas" 2 }}
@@ -88,6 +96,7 @@ providers:
     enabled: true
     ingressClass: {{ $class | quote }}
     controllerClass: {{ $controller | quote }}
+    globalAllowedResponseHeaders: {{ $headers | toJson }}
     publishService:
       enabled: true
 

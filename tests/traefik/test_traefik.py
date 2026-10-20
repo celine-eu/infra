@@ -148,3 +148,30 @@ def test_spread_follows_the_namespace():
     selector = spread(objects)["labelSelector"]["matchLabels"]
     labels = pod_spec(objects)["metadata"]["labels"]
     assert all(labels.get(k) == v for k, v in selector.items())
+
+
+# ---------------------------------------------------------------------------
+# custom-headers: the NGINX provider refuses a header it is not allowed to set, and then
+# answers 503 on every path of the Ingress that names the ConfigMap (prod, 2026-10-20)
+# ---------------------------------------------------------------------------
+
+SECURITY_HEADERS = {
+    "X-Content-Type-Options", "Referrer-Policy", "X-Frame-Options", "Permissions-Policy",
+    "Strict-Transport-Security", "Content-Security-Policy", "Content-Security-Policy-Report-Only",
+}
+ALLOWED_FLAG = "--providers.kubernetesingressnginx.globalallowedresponseheaders="
+
+
+def allowed_headers(objects: dict[str, dict]) -> set[str]:
+    # Traefik's flags ignore case; the chart writes this one in camelCase.
+    (arg,) = [a for a in container(objects)["args"] if a.lower().startswith(ALLOWED_FLAG)]
+    return set(arg[len(ALLOWED_FLAG):].split(","))
+
+
+def test_security_headers_are_allowed_by_default(default):
+    assert allowed_headers(default) == SECURITY_HEADERS
+
+
+def test_allowed_response_headers_can_be_extended():
+    objects = render(ON + "  allowed_response_headers: [X-Extra]\n")
+    assert allowed_headers(objects) == SECURITY_HEADERS | {"X-Extra"}

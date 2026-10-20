@@ -314,9 +314,11 @@ and every chart follows it.
 | `tls_setup.cert_manager.leader_election_namespace` | where cert-manager takes its leader-election lock. Default `kube-system`, the chart's own; set it to `cert-manager` on clusters that refuse writes to `kube-system` |
 
 Traefik differs from ingress-nginx on a few annotations: `auth-url` forward auth behaves
-differently (test the oauth2-proxy login end to end), `custom-headers` works but
-`global-allowed-response-headers` has no equivalent, and `configuration-snippet` is only partly
-supported. Overrides go in `envs/<env>/0010-core/traefik/values.yaml.gotmpl`.
+differently (test the oauth2-proxy login end to end), `custom-headers` works once its header
+names are allowed (`globalAllowedResponseHeaders`, ingress-nginx's
+`global-allowed-response-headers`: infra allows the "Security headers" list below, and
+`ingress_controller.allowed_response_headers` adds more; any other header turns every path of
+the Ingress into a 503), and `configuration-snippet` is only partly supported. Overrides go in `envs/<env>/0010-core/traefik/values.yaml.gotmpl`.
 
 ## Network perimeter
 
