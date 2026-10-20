@@ -339,6 +339,24 @@ minikube does not, so `dev` renders it without effect).
 
     task test:network-policy
 
+## Redis
+
+One Redis (release `redis`, group `core`) holds the oauth2-proxy sessions, and on
+environments that run them, Prefect's messaging and Superset's broker and cache.
+
+| Value | Effect |
+|---|---|
+| `redis.password` | secret (`secrets.sops.yaml`). Set: Redis requires it (`requirepass`); it lives only in the Secret `redis-auth` (key `password`), which oauth2-proxy reads as `OAUTH2_PROXY_REDIS_PASSWORD`. A changed password restarts both through a `checksum/redis-auth` annotation. Unset: Redis is open, as before. `prod` refuses to render without it |
+
+| Database | Client |
+|---|---|
+| `0` | oauth2-proxy (sessions); today also Prefect and Superset's Celery broker |
+
+Prefect and Superset do not read the password yet: an environment that runs them keeps
+`redis.password` unset until they do.
+
+    task test:redis
+
 ## Sizing
 
 Clusters that bill by resource request, or fill in a large default for pods that declare

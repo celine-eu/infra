@@ -12,12 +12,23 @@ sessionStorage:
   # Can be one of the supported session storage cookie|redis
   type: redis
   redis:
-    # existingSecret: ""
-    # passwordKey: "redis-password"
+    {{- /* With `redis.password`, the password comes from the redis release's Secret as
+           OAUTH2_PROXY_REDIS_PASSWORD (secretKeyRef), never from the cfg ConfigMap. */}}
+    {{- if .Environment.Values | dig "redis" "password" "" }}
+    existingSecret: redis-auth
+    passwordKey: password
+    {{- end }}
     clientType: "standalone"
     standalone:
       # URL of redis standalone server for redis session storage (e.g. `redis://HOST[:PORT]`). Automatically generated if not set
       connectionUrl: "redis://redis:6379"
+
+{{- with .Environment.Values | dig "redis" "password" "" }}
+
+# A changed Redis password restarts oauth2-proxy (Redis carries the same annotation).
+podAnnotations:
+  checksum/redis-auth: {{ . | toString | sha256sum | quote }}
+{{- end }}
 
 extraEnv:
 {{- if .Environment.Values.tls_setup.self_signed }}

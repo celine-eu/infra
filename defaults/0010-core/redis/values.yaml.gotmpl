@@ -1,2 +1,32 @@
+{{- /* Redis requires a password where `redis.password` is set (store plan
+       redis-requires-a-password): one requirepass, kept in the Secret `redis-auth` that this
+       release renders; oauth2-proxy reads the same Secret. The chart's own Secret is not used:
+       it keeps the first password it finds in the cluster, so a rotation would not reach it.
+       Prod refuses to render without a password. Elsewhere no password leaves Redis open, as
+       before, until Prefect and Superset read one too (plan, phase 1). */}}
+{{- $password := .Environment.Values | dig "redis" "password" "" | toString }}
+{{- if and (eq .Environment.Name "prod") (eq $password "") }}
+{{- fail "redis.password is required on prod: Redis holds every user's oauth2-proxy session" }}
+{{- end }}
+{{- if $password }}
+auth:
+  enabled: true
+  existingSecret: redis-auth
+  existingSecretPasswordKey: password
+
+# A changed password restarts Redis (oauth2-proxy carries the same annotation).
+podAnnotations:
+  checksum/redis-auth: {{ $password | sha256sum | quote }}
+
+extraObjects:
+  - apiVersion: v1
+    kind: Secret
+    metadata:
+      name: redis-auth
+    type: Opaque
+    stringData:
+      password: {{ $password | quote }}
+{{- else }}
 auth:
   enabled: false
+{{- end }}
