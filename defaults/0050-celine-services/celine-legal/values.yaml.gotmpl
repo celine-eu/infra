@@ -17,6 +17,12 @@
 #                             # when enabled. Set it alone to use a legal host served elsewhere;
 #                             # set it to "" to keep the applications off this host while it
 #                             # only serves a draft (nothing published yet).
+#     applications_read_draft: false  # the applications read the draft instead of the root:
+#                             # https://<host>/draft/<draft_revision>. Needs enabled and draft.
+#                             # For an environment that reviews the texts in the applications
+#                             # themselves (acceptances are then given on draft versions)
+#     draft_revision: ""      # the draft's 40-hex commit, the same `draft.revision` the release's
+#                             # environment file gives the host; required by applications_read_draft
 #     resources: {}
 #
 # The deployment's legal data (`data.files`) and the draft's revision (`draft.revision`) come
@@ -51,8 +57,10 @@
 #
 # The same base URL reaches celine-webapp and celine-onboarding (`LEGAL_BASE_URL`), the
 # standalone assistant (`PUBLIC_LEGAL_BASE_URL`) and Keycloak's theme (`TERMS_URL`,
-# `PRIVACY_URL`), each computed the same way in its own defaults file. It is the host's root:
-# the published releases, never a draft.
+# `PRIVACY_URL`), each computed the same way in its own defaults file. It is the host's root,
+# the published releases, unless `applications_read_draft` points them all at the draft. The
+# draft's address changes with its revision: after a change to the data, apply `legal` first,
+# then the applications.
 {{- $legal := .Environment.Values | dig "legal" (dict) | default (dict) }}
 {{- $o := .Environment.Values | dig "onboarding" (dict) | default (dict) }}
 {{- $oe := $o | dig "env" (dict) | default (dict) }}

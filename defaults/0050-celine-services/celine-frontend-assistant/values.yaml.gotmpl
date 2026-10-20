@@ -3,6 +3,15 @@
 {{- $legal := .Environment.Values | dig "legal" (dict) | default (dict) }}
 {{- $legalHost := $legal | dig "host" (printf "legal.%s" .Environment.Values.domain) }}
 {{- $legalBase := $legal | dig "base_url" (ternary (printf "https://%s" $legalHost) "" ($legal | dig "enabled" false)) | trimSuffix "/" }}
+{{- /* `legal.applications_read_draft`: the draft at `legal.draft_revision` instead, for an
+       environment whose applications review the texts before any release. */}}
+{{- if eq (toString ($legal | dig "applications_read_draft" false)) "true" }}
+{{- $draftRevision := $legal | dig "draft_revision" "" | toString }}
+{{- if not (and (eq (toString ($legal | dig "enabled" false)) "true") (eq (toString ($legal | dig "draft" false)) "true") (regexMatch "^[0-9a-f]{40}$" $draftRevision)) }}
+{{- fail "legal.applications_read_draft needs legal.enabled, legal.draft and legal.draft_revision (the draft's 40-hex commit)" }}
+{{- end }}
+{{- $legalBase = printf "https://%s/draft/%s" $legalHost $draftRevision }}
+{{- end }}
 
 
 image:

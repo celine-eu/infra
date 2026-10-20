@@ -538,6 +538,8 @@ ConfigMap mounted at `/data`; a change to it restarts the pod.
 | `legal.features.<name>` | `true`/`false`: overrides a derived feature (below) |
 | `legal.host` | defaults to `legal.<domain>` |
 | `legal.base_url` | where applications find the legal host: defaults to `https://<legal.host>` when the release is installed. Set it alone to use a legal host served elsewhere. Set it to `""` while nothing is published: the applications keep their own documents, and the host serves the draft only |
+| `legal.applications_read_draft` | every application below reads the draft, `https://<legal.host>/draft/<legal.draft_revision>`, instead of the base URL: for an environment that reviews the texts in the applications, before any release. Needs `legal.enabled` and `legal.draft`. Acceptances are then given on draft versions |
+| `legal.draft_revision` | the draft's 40-hex commit, the same one the release's environment file gives the host; required by `applications_read_draft`. The address changes with it: after a change to the data, apply `legal` first, then the applications |
 
 **The data** comes from the release's environment file,
 `envs/<env>/0050-celine-services/celine-legal/values.yaml.gotmpl`, which belongs to the
