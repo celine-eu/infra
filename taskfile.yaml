@@ -72,6 +72,21 @@ tasks:
     cmds:
       - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/postgres-db -v {{.CLI_ARGS}}
 
+  test:sync-tables:
+    desc: "Render sync-tables' sink and check it can be kept through a push: pod annotations, a PodDisruptionBudget (maxUnavailable 0) and explicit resources, all off by default"
+    cmds:
+      - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/sync-tables -v {{.CLI_ARGS}}
+
+  test:pod-security:
+    desc: "Render the releases the audit named (shells, postgres-db Jobs, keycloak, redis, the app broker, qdrant) and check every pod template against Pod Security restricted (seccomp aside: Autopilot sets it)"
+    cmds:
+      - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/pod-security -v {{.CLI_ARGS}}
+
+  test:image-digest:
+    desc: "Render the releases prod runs with `image_digests` and check each listed repository:tag renders as repository:tag@sha256 (keycloakx: repository@sha256), the version label keeps the tag, an unlisted tag stays unpinned, a non-digest stops the render, and the postgis Cluster is pinned only on request"
+    cmds:
+      - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/image-digest -v {{.CLI_ARGS}}
+
   test:redis:
     desc: "Render redis and oauth2-proxy and check the Redis password comes only from the redis-auth Secret (secretKeyRef), a rotation restarts both, no password changes nothing outside prod, and prod refuses to render without one"
     cmds:

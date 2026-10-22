@@ -78,6 +78,7 @@ securityContext:
   runAsNonRoot: true
   runAsUser: 1883
   readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
   capabilities:
     drop: [ALL]
 
@@ -88,3 +89,7 @@ resources:
   limits:
     cpu: 100m
     memory: 32Mi
+
+# Images pinned by digest where the environment lists them (`image_digests`,
+# {repository: {tag: sha256:…}}; celine-services.imageRef). Empty: images by tag.
+imageDigests: {{ .Values | dig "image_digests" (dict) | toJson }}

@@ -76,6 +76,7 @@ poolers: []
   # - type: rw
   #   instances: 2
   #   poolMode: transaction
+  #   image: ghcr.io/cloudnative-pg/pgbouncer:1.24.1@sha256:…   # optional: the operator's otherwise
   #   parameters:
   #     default_pool_size: "25"
   #     max_client_conn: "200"
@@ -143,6 +144,17 @@ mirror:
 
 # Resources for the post-deploy Jobs (grants, table tuning). Empty: none set.
 jobResources: {}
+
+# The post-deploy Jobs' security contexts: Pod Security `restricted`. They run psql only, as
+# the postgis image's postgres user (uid 26, as the CNPG instances do), not as root.
+jobPodSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 26
+  runAsGroup: 26
+jobSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: [ALL]
 
 # The sync environment marker on one database (templates/env-marker-job.yaml).
 # `environment` is dev or prod; empty, no Job runs and the database carries no marker.

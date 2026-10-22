@@ -53,6 +53,23 @@
 {{- $headers := list "X-Content-Type-Options" "Referrer-Policy" "X-Frame-Options" "Permissions-Policy" "Strict-Transport-Security" "Content-Security-Policy" "Content-Security-Policy-Report-Only" }}
 {{- $headers = concat $headers ($ic | dig "allowed_response_headers" (list)) | uniq }}
 
+{{- /* `ingress_controller.image_tag` names the Traefik tag (else the chart's appVersion);
+       with it, `image_digests` can pin it: `tag@digest`, which the chart strips for its
+       version checks. */}}
+{{- $repo := "docker.io/traefik" }}
+{{- $tag := $ic | dig "image_tag" "" | toString }}
+{{- $digest := "" }}
+{{- if $tag }}
+{{- $digest = .Values | dig "image_digests" $repo $tag "" }}
+{{- if and $digest (not (regexMatch "^sha256:[a-f0-9]{64}$" $digest)) }}
+{{- fail (printf "image_digests.%s.%s must be a sha256 digest (sha256:<64 hex>), got %q" $repo $tag $digest) }}
+{{- end }}
+image:
+  registry: docker.io
+  repository: traefik
+  tag: {{ ternary (printf "%s@%s" $tag $digest) $tag (ne $digest "") | quote }}
+{{- end }}
+
 deployment:
   replicas: {{ $ic | dig "replicas" 2 }}
   # The sleep plus Traefik's own shutdown (graceTimeOut, 10 s by default).

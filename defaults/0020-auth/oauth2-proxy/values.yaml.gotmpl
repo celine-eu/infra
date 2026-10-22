@@ -1,3 +1,17 @@
+{{- /* `oauth2_proxy.image_tag` names the tag (else the chart's v<appVersion>); with it,
+       `image_digests` can pin it as `tag@digest` (the chart's labels use its appVersion). */}}
+{{- $repo := "quay.io/oauth2-proxy/oauth2-proxy" }}
+{{- $tag := .Environment.Values | dig "oauth2_proxy" "image_tag" "" | toString }}
+{{- if $tag }}
+{{- $digest := .Environment.Values | dig "image_digests" $repo $tag "" }}
+{{- if and $digest (not (regexMatch "^sha256:[a-f0-9]{64}$" $digest)) }}
+{{- fail (printf "image_digests.%s.%s must be a sha256 digest (sha256:<64 hex>), got %q" $repo $tag $digest) }}
+{{- end }}
+image:
+  repository: {{ $repo }}
+  tag: {{ ternary (printf "%s@%s" $tag $digest) $tag (ne $digest "") | quote }}
+{{- end }}
+
 # Oauth client configuration specifics
 config:
   existingSecret: oauth2-proxy-secret

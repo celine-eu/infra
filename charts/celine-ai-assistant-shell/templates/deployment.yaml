@@ -30,7 +30,7 @@ spec:
         {{- end }}
       containers:
         - name: shell
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default "latest" }}"
+          image: {{ include "celine-services.image" . | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
           command:
             - /bin/sh

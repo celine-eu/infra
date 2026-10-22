@@ -9,6 +9,10 @@ image:
   tag: "3.3.0-mosquitto_2.0.22"
   pullPolicy: IfNotPresent
 
+# The environment's `image_digests` ({repository: {tag: sha256:…}}): a listed image renders
+# as `repository:tag@sha256:…`. Empty: images by tag.
+imageDigests: {}
+
 replicaCount: 1
 
 # ------------------------------------------------------------------------------
@@ -127,6 +131,7 @@ securityContext:
   runAsNonRoot: true
   runAsUser: 1883
   readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
   capabilities:
     drop: [ALL]
 

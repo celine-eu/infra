@@ -27,6 +27,10 @@ image:
   tag: "latest"
   pullPolicy: IfNotPresent
 
+# The environment's `image_digests` ({repository: {tag: sha256:…}}): a listed image renders
+# as `repository:tag@sha256:…`. Empty: images by tag.
+imageDigests: {}
+
 imagePullSecrets: []
 nameOverride: ""
 
@@ -192,6 +196,13 @@ podAnnotations: {}
 podSecurityContext:
   runAsNonRoot: true
   runAsUser: 1000
+
+# Every container's security context (bootstrap, bootstrap-record, shell): Pod Security
+# `restricted` (no privilege escalation, no capabilities).
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: [ALL]
 
 resources:
   requests:

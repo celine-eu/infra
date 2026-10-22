@@ -18,3 +18,7 @@ resources:
 
 # IngressClass of every Ingress (`ingress_controller.class`, default nginx).
 ingressClassName: {{ .Values | dig "ingress_controller" "class" "nginx" | quote }}
+
+# Images pinned by digest where the environment lists them (`image_digests`,
+# {repository: {tag: sha256:…}}; celine-services.imageRef). Empty: images by tag.
+imageDigests: {{ .Values | dig "image_digests" (dict) | toJson }}

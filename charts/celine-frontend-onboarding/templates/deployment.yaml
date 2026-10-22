@@ -23,7 +23,7 @@ spec:
         runAsUser: {{ .Values.podSecurityContext.runAsUser | default 1000 }}
       containers:
         - name: {{ include "celine-services.name" . }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default "latest" }}"
+          image: {{ include "celine-services.image" . | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
           securityContext:
             allowPrivilegeEscalation: false

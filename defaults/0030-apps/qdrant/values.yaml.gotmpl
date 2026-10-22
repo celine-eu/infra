@@ -10,6 +10,21 @@ image:
   tag: ""
   useUnprivilegedImage: false
 
+# Pod Security `restricted`. No root `chown` init container: the pod's fsGroup (3000, the
+# chart's) has the kubelet give the volume to that group, and the files already on it
+# were chowned to 1000:3000 by the init container of earlier releases. Plus no
+# capabilities on top of the chart's container context.
+updateVolumeFsOwnership: false
+containerSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 2000
+  allowPrivilegeEscalation: false
+  privileged: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: [ALL]
+
 env: []
   # - name: QDRANT_ALLOW_RECOVERY_MODE
   #   value: true

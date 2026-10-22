@@ -18,12 +18,17 @@ spec:
       {{- range $key, $value := .parameters }}
       {{ $key }}: {{ $value | quote }}
       {{- end }}
-  {{- with .resources }}
+  {{- if or .resources .image }}
   template:
     spec:
       containers:
         - name: pgbouncer
+          {{- with .image }}
+          image: {{ . }}
+          {{- end }}
+          {{- with .resources }}
           resources:
             {{- toYaml . | nindent 12 }}
+          {{- end }}
   {{- end }}
 {{- end }}

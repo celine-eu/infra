@@ -64,9 +64,27 @@
 {{- fail "postgres_db.mirror.enabled is true: postgres_db.mirror_writer (its role password) is required in the environment's secrets" }}
 {{- end }}
 {{- end }}
+{{- /* Images pinned from `image_digests` ({repository: {tag: sha256:…}}). The Jobs take the
+       postgis digest as soon as it is listed. The Cluster only with
+       `postgres_db.pin_cluster_image: true`: a changed imageName restarts Postgres (one
+       instance: every service loses its database for a minute or two), so it waits for a
+       window. The pooler's pgbouncer only where `postgres_db.pgbouncer_image_tag` names the
+       tag the operator would pick (the pooler rolls its two instances). */}}
+{{- $digests := .Environment.Values | dig "image_digests" (dict) }}
+{{- $pg := .Environment.Values | dig "postgres_db" (dict) }}
+{{- $postgisDigest := $digests | dig "ghcr.io/cloudnative-pg/postgis" "17" "" }}
+{{- $pgbTag := $pg | dig "pgbouncer_image_tag" "" | toString }}
+{{- $pgbDigest := "" }}
+{{- if $pgbTag }}{{ $pgbDigest = $digests | dig "ghcr.io/cloudnative-pg/pgbouncer" $pgbTag "" }}{{ end }}
+{{- range (list $postgisDigest $pgbDigest) }}
+{{- if and . (not (regexMatch "^sha256:[a-f0-9]{64}$" .)) }}
+{{- fail (printf "image_digests: %q is not a sha256 digest (sha256:<64 hex>)" .) }}
+{{- end }}
+{{- end }}
+{{- $postgis := ternary (printf "ghcr.io/cloudnative-pg/postgis:17@%s" $postgisDigest) "ghcr.io/cloudnative-pg/postgis:17" (ne $postgisDigest "") }}
 cluster:
   name: postgis1
-  image: ghcr.io/cloudnative-pg/postgis:17
+  image: {{ ternary $postgis "ghcr.io/cloudnative-pg/postgis:17" ($pg | dig "pin_cluster_image" false) }}
   instances: 1
   {{- /* Sizing, optional per environment: `postgres_db.resources` replaces the chart's
          requests/limits, `postgres_db.parameters` overrides single Postgres parameters
@@ -98,6 +116,7 @@ envMarker:
   environment: {{ . | quote }}
   database: datasets
   secret: postgis1-datasets-connection-string
+  image: {{ $postgis }}
 {{- end }}
 
 roles:
@@ -223,6 +242,9 @@ poolers:
     {{- with .Environment.Values | dig "postgres_db" "pooler_resources" nil }}
     resources: {{ toJson . }}
     {{- end }}
+    {{- if $pgbTag }}
+    image: {{ printf "ghcr.io/cloudnative-pg/pgbouncer:%s" $pgbTag }}{{ with $pgbDigest }}@{{ . }}{{ end }}
+    {{- end }}
 
 connection_strings:
   - database: datasets
@@ -304,7 +326,7 @@ backup:
 {{- /* Tunes prefect's hot tables only: on where prefect's database is. */}}
 table_tuning:
   enabled: {{ has "prefect" $tools }}
-  image: ghcr.io/cloudnative-pg/postgis:17
+  image: {{ $postgis }}
   databases:
     - name: prefect
       secret: postgis1-prefect-connection-string
@@ -320,6 +342,7 @@ table_tuning:
 
 grants:
   enabled: true
+  image: {{ $postgis }}
   database: datasets
   role: datasets_ro
   secret: postgis1-datasets-connection-string
@@ -332,6 +355,7 @@ grants:
 
 mirror:
   enabled: {{ $mirrorOn }}
+  image: {{ $postgis }}
   database: datasets
   role: mirror_writer
   secret: postgis1-datasets-connection-string

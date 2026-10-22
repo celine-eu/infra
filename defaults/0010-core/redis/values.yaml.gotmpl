@@ -30,3 +30,12 @@ extraObjects:
 auth:
   enabled: false
 {{- end }}
+
+# Pod Security `restricted`: the chart's context (uid 999, non-root, no privilege
+# escalation) plus no capabilities.
+containerSecurityContext:
+  runAsUser: 999
+  runAsNonRoot: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: [ALL]

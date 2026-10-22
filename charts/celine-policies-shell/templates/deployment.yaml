@@ -42,8 +42,10 @@ spec:
       # with the first failure, so a failed run is both stored and blocking.
       initContainers:
         - name: bootstrap
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          image: {{ include "celine-policies-shell.imageRef" (dict "repository" .Values.image.repository "tag" .Values.image.tag "digests" .Values.imageDigests) | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
           command:
             - /bin/sh
             - -c
@@ -240,7 +242,14 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
         - name: bootstrap-record
-          image: {{ .Values.bootstrap.record.image | quote }}
+          {{- $record := regexFind "^(.+):([^:/]+)$" .Values.bootstrap.record.image }}
+          {{- if not $record }}
+          {{- fail (printf "bootstrap.record.image must be repository:tag, got %q" .Values.bootstrap.record.image) }}
+          {{- end }}
+          {{- $recordAt := splitList ":" .Values.bootstrap.record.image }}
+          image: {{ include "celine-policies-shell.imageRef" (dict "repository" (initial $recordAt | join ":") "tag" (last $recordAt) "digests" .Values.imageDigests) | quote }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
           command:
             - /bin/sh
             - -c
@@ -294,8 +303,10 @@ spec:
       {{- end }}
       containers:
         - name: shell
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          image: {{ include "celine-policies-shell.imageRef" (dict "repository" .Values.image.repository "tag" .Values.image.tag "digests" .Values.imageDigests) | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
           # Sync clients.yaml on startup with retry (Keycloak may not be ready),
           # then stay alive for manual exec.
           command:

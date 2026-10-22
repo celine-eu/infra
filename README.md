@@ -339,6 +339,40 @@ minikube does not, so `dev` renders it without effect).
 
     task test:network-policy
 
+## Pod Security `restricted`
+
+Every workload the `celine-<env>` namespace receives in prod passes Pod Security
+`restricted`, by infra defaults: no privilege escalation and no capabilities on every
+container (the shells, policies-shell's init containers, postgres-db's Jobs, Keycloak and
+its dbchecker, Redis, the app broker, qdrant), the postgres-db Jobs as the postgis image's
+postgres user (uid 26), and qdrant without its root `chown` init container
+(`updateVolumeFsOwnership: false`: the pod's fsGroup gives the volume to its group). The
+seccomp profile is left to the cluster (GKE Autopilot sets `RuntimeDefault`). An
+environment enforces it with `network_policy.pod_security.enforce: restricted`.
+auth-setup's dashboard (`nginx:alpine`, root) does not pass: keep it off where
+`restricted` is enforced.
+
+    task test:pod-security
+
+## Images by digest
+
+An environment pins images by digest in one map, by repository and tag:
+
+| Value | Effect |
+|---|---|
+| `image_digests.<repository>.<tag>` | `sha256:<64 hex>`. A container whose `repository:tag` is listed runs `repository:tag@sha256:…`; the `app.kubernetes.io/version` label keeps the tag. Keyed by tag: a tag bumped without its digest runs unpinned, never the old image under the new name. A value that is not a sha256 digest stops the render. Unset: images by tag |
+| `ingress_controller.image_tag`, `oauth2_proxy.image_tag` | name the Traefik / oauth2-proxy tag (otherwise the chart's), so the map can pin it |
+| `postgres_db.pgbouncer_image_tag` | names the pooler's pgbouncer tag (otherwise the CNPG operator's), so the map can pin it |
+| `postgres_db.pin_cluster_image` | `true`: the postgis Cluster's image is pinned too. Off by default because a changed `imageName` restarts Postgres; the postgres-db Jobs take the digest as soon as it is listed |
+
+Keycloak (`ghcr.io/celine-eu/keycloak`) and its dbchecker render as `repository@digest`
+(keycloakx's own value). Not pinnable this way: qdrant 1.17.0 (no digest value; a
+`tag@digest` tag breaks the chart's `semverCompare`), the CNPG operator and the pooler's
+init container (the operator image; changing it upgrades the instance manager). Redis is
+pinned by its chart. `sync_tables.image` is one reference: write `tag@sha256:…` there.
+
+    task test:image-digest
+
 ## Redis
 
 One Redis (release `redis`, group `core`) holds the oauth2-proxy sessions, and on

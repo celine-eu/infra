@@ -8,9 +8,13 @@ spec:
   template:
     spec:
       restartPolicy: OnFailure
+      securityContext:
+        {{- toYaml $.Values.jobPodSecurityContext | nindent 8 }}
       containers:
         - name: table-tuning
           image: {{ .Values.table_tuning.image }}
+          securityContext:
+            {{- toYaml $.Values.jobSecurityContext | nindent 12 }}
           {{- with $.Values.jobResources }}
           resources:
             {{- toYaml . | nindent 12 }}

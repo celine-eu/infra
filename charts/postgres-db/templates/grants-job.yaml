@@ -27,9 +27,13 @@ spec:
   template:
     spec:
       restartPolicy: OnFailure
+      securityContext:
+        {{- toYaml $.Values.jobPodSecurityContext | nindent 8 }}
       containers:
         - name: grants
           image: {{ .image }}
+          securityContext:
+            {{- toYaml $.Values.jobSecurityContext | nindent 12 }}
           {{- with $.Values.jobResources }}
           resources:
             {{- toYaml . | nindent 12 }}
