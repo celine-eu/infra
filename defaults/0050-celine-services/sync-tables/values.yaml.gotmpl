@@ -20,6 +20,9 @@
 #       server_cert: ""                 # secret: PEM, the sink host's certificate (push CA)
 #       server_key: ""                  # secret: PEM
 #       resources: {}
+#       pod_annotations: {}             # e.g. cluster-autoscaler.kubernetes.io/safe-to-evict:
+#                                       # "false", so the autoscaler never moves it mid-push
+#       pdb: false                      # true: a PodDisruptionBudget, maxUnavailable 0
 #     push_source:                      # the environment that sends (staging)
 #       enabled: false
 #       schedule: "*/30 * * * *"
@@ -78,6 +81,9 @@ sink:
   serverCert: {{ $sink | dig "server_cert" "" | toJson }}
   serverKey: {{ $sink | dig "server_key" "" | toJson }}
   resources: {{ $sink | dig "resources" (dict) | toJson }}
+  podAnnotations: {{ $sink | dig "pod_annotations" (dict) | toJson }}
+  podDisruptionBudget:
+    enabled: {{ $sink | dig "pdb" false }}
   networkPolicy:
     ingressNamespace: {{ $sink | dig "ingress_namespace" "ingress" | quote }}
 

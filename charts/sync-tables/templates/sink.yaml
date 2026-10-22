@@ -79,6 +79,9 @@ spec:
       annotations:
         checksum/ca: {{ $s.ca | sha256sum }}
         checksum/allow-schemas: {{ toJson $s.allowSchemas | sha256sum }}
+        {{- with $s.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       {{- include "sync-tables.podSpecCommon" . | nindent 6 }}
       containers:
@@ -152,6 +155,24 @@ spec:
     app.kubernetes.io/component: sink
   ports:
     - { name: sync, port: {{ $s.listenPort }}, targetPort: sync }
+{{- if $s.podDisruptionBudget.enabled }}
+---
+# No voluntary disruption: a node drain or scale-down waits for the operator instead of
+# cutting a push in the middle (the source reports it as HTTP 503).
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "sync-tables.labels" . | nindent 4 }}
+spec:
+  maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: sync-tables
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: sink
+{{- end }}
 {{- if $traefik }}
 ---
 # Traefik, natively: a client certificate from the push CA is required at the handshake

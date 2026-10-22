@@ -70,6 +70,12 @@ sink:
   healthPort: 8081
   replicas: 1
   resources: {}
+  # Keep the sink through a push (one table per transaction runs for minutes): extra pod
+  # annotations, e.g. `cluster-autoscaler.kubernetes.io/safe-to-evict: "false"`, and a
+  # PodDisruptionBudget with maxUnavailable 0, so a drain waits instead of cutting a push.
+  podAnnotations: {}
+  podDisruptionBudget:
+    enabled: false
   authLimits: {}                  # optional: failMax, failWindow, lockout, failGlobalMax (tool defaults)
   networkPolicy:
     enabled: true
