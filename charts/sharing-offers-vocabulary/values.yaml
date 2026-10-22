@@ -1,0 +1,32 @@
+# The data-sharing offers vocabulary, served at exactly GET /ns/sharing-offers where an
+# environment has no dataspace connector yet. Onboarding's DS_NS_URL points here: the wizard
+# renders its data-sharing consent step from it, and records the consent on the application
+# (DATASPACE_ENABLED false). Point DS_NS_URL at the connector, and remove this release, once
+# the dataspace runs in the environment.
+
+# The vocabulary, byte for byte as the connector serves it (a capture of
+# `<connector>/ns/sharing-offers`): never reformatted, so the hash of the consent text shown
+# means what it will mean when the connector serves it. Required.
+content: ""
+
+image:
+  repository: docker.io/nginxinc/nginx-unprivileged
+  tag: "1.29.2-alpine"
+  pullPolicy: IfNotPresent
+
+# The environment's `image_digests` ({repository: {tag: sha256:…}}): the image renders as
+# repository:tag@digest when listed.
+imageDigests: {}
+
+replicas: 1
+port: 8080
+
+resources:
+  requests: {cpu: 10m, memory: 16Mi}
+  limits: {memory: 64Mi}
+
+networkPolicy:
+  enabled: true
+  # The only pods that may reach it: onboarding's, in this namespace.
+  from:
+    app.kubernetes.io/name: celine-onboarding

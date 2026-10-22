@@ -72,6 +72,11 @@ tasks:
     cmds:
       - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/postgres-db -v {{.CLI_ARGS}}
 
+  test:sharing-offers-vocabulary:
+    desc: "Render sharing-offers-vocabulary and check it serves the vocabulary byte for byte at /ns/sharing-offers only, restricted, reachable from onboarding only, off by default"
+    cmds:
+      - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/sharing-offers-vocabulary -v {{.CLI_ARGS}}
+
   test:sync-tables:
     desc: "Render sync-tables' sink and check it can be kept through a push: pod annotations, a PodDisruptionBudget (maxUnavailable 0) and explicit resources, all off by default"
     cmds:
@@ -86,6 +91,16 @@ tasks:
     desc: "Render the releases prod runs with `image_digests` and check each listed repository:tag renders as repository:tag@sha256 (keycloakx: repository@sha256), the version label keeps the tag, an unlisted tag stays unpinned, a non-digest stops the render, and the postgis Cluster is pinned only on request"
     cmds:
       - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/image-digest -v {{.CLI_ARGS}}
+
+  test:private-egress:
+    desc: "Render onboarding and keycloak and check each takes a node selector per environment (private nodes leave through Cloud NAT, Brevo's allowlisted address); unset, no selector"
+    cmds:
+      - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/private-egress -v {{.CLI_ARGS}}
+
+  test:tls-setup:
+    desc: "Render tls-setup and check the opt-in ClusterIssuer mirrors the namespaced ACME Issuer (e-mail, server, HTTP-01 solver), named <issuer>-cluster unless set; off by default"
+    cmds:
+      - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/tls-setup -v {{.CLI_ARGS}}
 
   test:redis:
     desc: "Render redis and oauth2-proxy and check the Redis password comes only from the redis-auth Secret (secretKeyRef), a rotation restarts both, no password changes nothing outside prod, and prod refuses to render without one"

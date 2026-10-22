@@ -1,0 +1,6 @@
+apiVersion: v2
+name: sharing-offers-vocabulary
+description: The data-sharing offers vocabulary (GET /ns/sharing-offers) served from a static copy of the dataspace connector's, for an environment whose dataspace is not installed yet
+type: application
+version: 0.1.0
+appVersion: "1.29.2"

@@ -327,6 +327,21 @@ releases:
     labels:
       group: celine-services
 
+  # The data-sharing offers vocabulary, a static copy of the dataspace connector's
+  # /ns/sharing-offers, for an environment whose dataspace is not installed yet (onboarding's
+  # DS_NS_URL). See defaults/0050-celine-services/sharing-offers-vocabulary/values.yaml.gotmpl.
+  - name: sharing-offers-vocabulary
+    namespace: celine-{{ .Environment.Name }}
+    chart: ../charts/sharing-offers-vocabulary
+    createNamespace: true
+    installed: {{ .Environment.Values | dig "sharing_offers_vocabulary" "enabled" false }}
+    missingFileHandler: Warn
+    values:
+      - ../defaults/0050-celine-services/sharing-offers-vocabulary/values.yaml.gotmpl
+      - ../envs/{{ .Environment.Name }}/0050-celine-services/sharing-offers-vocabulary/values.yaml.gotmpl
+    labels:
+      group: celine-services
+
   # sync_tables' exchange layer: the sink where an environment receives copied tables (prod),
   # the push source where one sends them (staging), the serving source developers pull from
   # (staging). Off unless a role is enabled. See

@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    {{- include "sharing-offers-vocabulary.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      {{- include "sharing-offers-vocabulary.selector" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "sharing-offers-vocabulary.labels" . | nindent 8 }}
+      annotations:
+        checksum/content: {{ .Values.content | sha256sum }}
+        checksum/nginx: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: nginx
+          image: {{ include "sharing-offers-vocabulary.imageRef" (dict "repository" .Values.image.repository "tag" .Values.image.tag "digests" .Values.imageDigests) | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - {name: http, containerPort: {{ .Values.port }}}
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 30
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - {name: nginx, mountPath: /etc/nginx/nginx.conf, subPath: nginx.conf, readOnly: true}
+            - {name: vocabulary, mountPath: /srv/vocabulary, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: nginx
+          configMap:
+            name: {{ .Release.Name }}-nginx
+        - name: vocabulary
+          configMap:
+            name: {{ .Release.Name }}
+        - name: tmp
+          emptyDir: {}

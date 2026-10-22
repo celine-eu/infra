@@ -1,0 +1,21 @@
+# defaults/0050-celine-services/sharing-offers-vocabulary/values.yaml.gotmpl
+#
+# The data-sharing offers vocabulary (charts/sharing-offers-vocabulary), for an environment
+# whose dataspace is not installed yet: onboarding's DS_NS_URL points at it
+# (`onboarding.env.DS_NS_URL: http://sharing-offers-vocabulary.<namespace>.svc.cluster.local:8080`).
+# Installed only where `sharing_offers_vocabulary.enabled` is true. Environment keys:
+#
+#   sharing_offers_vocabulary:
+#     enabled: false
+#     content: ""        # the connector's /ns/sharing-offers, byte for byte (an environment
+#                        # file reads it from the deployment)
+#     resources: {}      # overrides the chart's small requests
+{{- $v := .Values | dig "sharing_offers_vocabulary" (dict) | default (dict) }}
+
+content: {{ $v | dig "content" "" | toJson }}
+{{- with $v | dig "resources" nil }}
+resources: {{ . | toJson }}
+{{- end }}
+
+# Images pinned by digest where the environment lists them (`image_digests`).
+imageDigests: {{ .Values | dig "image_digests" (dict) | toJson }}

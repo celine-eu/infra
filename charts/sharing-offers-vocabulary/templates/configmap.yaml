@@ -1,0 +1,51 @@
+{{- if not .Values.content }}
+{{- fail "sharing-offers-vocabulary: content is required (the connector's /ns/sharing-offers, byte for byte)" }}
+{{- end }}
+# The vocabulary as binaryData: the bytes reach the pod unchanged.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    {{- include "sharing-offers-vocabulary.labels" . | nindent 4 }}
+binaryData:
+  sharing-offers.json: {{ .Values.content | b64enc }}
+---
+# Exactly two paths: the vocabulary and the health check. Temporary files under /tmp, the
+# root filesystem read-only.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-nginx
+  labels:
+    {{- include "sharing-offers-vocabulary.labels" . | nindent 4 }}
+data:
+  nginx.conf: |
+    worker_processes 1;
+    pid /tmp/nginx.pid;
+    error_log /dev/stderr warn;
+    events { worker_connections 64; }
+    http {
+      access_log /dev/stdout;
+      server_tokens off;
+      client_body_temp_path /tmp/client_temp;
+      proxy_temp_path /tmp/proxy_temp;
+      fastcgi_temp_path /tmp/fastcgi_temp;
+      uwsgi_temp_path /tmp/uwsgi_temp;
+      scgi_temp_path /tmp/scgi_temp;
+      server {
+        listen {{ .Values.port }};
+        location = /ns/sharing-offers {
+          default_type application/json;
+          add_header Cache-Control "public, max-age=300";
+          alias /srv/vocabulary/sharing-offers.json;
+        }
+        location = /healthz {
+          default_type text/plain;
+          return 200 "ok\n";
+        }
+        location / {
+          return 404;
+        }
+      }
+    }
