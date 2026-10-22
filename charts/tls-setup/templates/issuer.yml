@@ -1,3 +1,14 @@
+{{- define "tls-setup.solvers" -}}
+- http01:
+    ingress:
+      {{- if .Values.solverIngressClassName }}
+      # A dedicated IngressClass: set as the spec field, so no other controller
+      # that answers the `nginx` class annotation picks the solver up.
+      ingressClassName: {{ .Values.solverIngressClassName }}
+      {{- else }}
+      class: nginx
+      {{- end }}
+{{- end }}
 {{- if .Values.selfSigned }}
 ---
 # Self-signed CA issuer — uses a pre-existing Secret containing ca.crt + ca.key
@@ -24,13 +35,23 @@ spec:
       name: {{ .Values.issuer }}
     server: https://acme-v02.api.letsencrypt.org/directory
     solvers:
-      - http01:
-          ingress:
-            {{- if .Values.solverIngressClassName }}
-            # A dedicated IngressClass: set as the spec field, so no other controller
-            # that answers the `nginx` class annotation picks the solver up.
-            ingressClassName: {{ .Values.solverIngressClassName }}
-            {{- else }}
-            class: nginx
-            {{- end }}
+      {{- include "tls-setup.solvers" . | nindent 6 }}
+{{- if .Values.clusterIssuer.enabled }}
+{{- $name := .Values.clusterIssuer.name | default (printf "%s-cluster" .Values.issuer) }}
+---
+# The same ACME account settings, cluster-wide: for Ingresses in namespaces of their own.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: {{ $name }}
+spec:
+  acme:
+    email: {{ .Values.email }}
+    preferredChain: ""
+    privateKeySecretRef:
+      name: {{ $name }}
+    server: https://acme-v02.api.letsencrypt.org/directory
+    solvers:
+      {{- include "tls-setup.solvers" . | nindent 6 }}
+{{- end }}
 {{- end }}

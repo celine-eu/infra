@@ -7,3 +7,9 @@ email: {{ .Environment.Values.tls_setup.email }}
 # IngressClass of the ACME HTTP-01 solver, only when `ingress_controller.class` is set;
 # unset, the solver keeps the `class: nginx` annotation form.
 solverIngressClassName: {{ .Values | dig "ingress_controller" "class" "" | quote }}
+
+# A ClusterIssuer beside the Issuer (`tls_setup.cluster_issuer`), for an add-on's Ingresses in
+# namespaces of their own: off unless the environment enables it; name default `<issuer>-cluster`.
+clusterIssuer:
+  enabled: {{ .Environment.Values | dig "tls_setup" "cluster_issuer" "enabled" false }}
+  name: {{ .Environment.Values | dig "tls_setup" "cluster_issuer" "name" "" | quote }}

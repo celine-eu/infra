@@ -7,3 +7,10 @@ email: issuer@celine.test
 # IngressClass of the ACME HTTP-01 solver (spec field). Empty: the `class: nginx`
 # annotation form.
 solverIngressClassName: ""
+
+# A ClusterIssuer beside the namespaced Issuer, with its ACME settings, for Ingresses in
+# namespaces of their own (an add-on's). Its account key is a Secret in cert-manager's
+# cluster resource namespace. Name empty: `<issuer>-cluster`. ACME only (not selfSigned).
+clusterIssuer:
+  enabled: false
+  name: ""
