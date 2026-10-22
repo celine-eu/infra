@@ -11,4 +11,10 @@
 {{- $_ := set .Values "volumes" (append .Values.volumes $vol) }}
 {{- $_ := set .Values "volumeMounts" (append .Values.volumeMounts $mnt) }}
 {{- end }}
+{{- /* Both claims are ReadWriteOnce (templates/pvc.yaml): a rolling update stalls when
+       the new pod lands on another node, so Recreate unless `strategy` says otherwise.
+       rollingUpdate: null clears the field the API server defaulted on the live object. */}}
+{{- if and (not .Values.strategy) (or .Values.persistence.data.enabled .Values.persistence.qdrant.enabled) }}
+{{- $_ := set .Values "strategy" (dict "type" "Recreate" "rollingUpdate" nil) }}
+{{- end }}
 {{ include "celine-services.deployment" . }}

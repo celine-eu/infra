@@ -91,6 +91,11 @@ persistence:
     storageClass: ""
     mountPath: /app/qdrant
 
+# The Deployment's rollout strategy. Empty: Recreate while a claim above is mounted (both
+# are ReadWriteOnce: the old pod must release them before the new one mounts them), the
+# Kubernetes default (RollingUpdate) otherwise.
+strategy: {}
+
 configMap:
   enabled: false
   name: ""
