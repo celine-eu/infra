@@ -207,6 +207,14 @@ extraVolumes: |
 affinity: ""
 {{- end }}
 
+# Where the pod runs (`keycloak.node_selector`), e.g. cloud.google.com/private-node: "true":
+# a node without an external address, so the realm's mail leaves through Cloud NAT, whose
+# address Brevo's allowlist holds. Unset: the chart's default, no selector.
+{{- with .Environment.Values | dig "keycloak" "node_selector" nil }}
+nodeSelector:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+
 # JVM app using 722Mi actual — needs a ceiling to prevent unbounded growth
 resources:
   requests:
