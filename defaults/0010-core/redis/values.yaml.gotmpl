@@ -8,27 +8,40 @@
 {{- if and (eq .Environment.Name "prod") (eq $password "") }}
 {{- fail "redis.password is required on prod: Redis holds every user's oauth2-proxy session" }}
 {{- end }}
+{{- /* `pod_disruption.redis` (defaults/0050-celine-services/pod-disruption.yaml.gotmpl):
+       a PodDisruptionBudget (the chart has none) and pod annotations, so a node scale-down
+       does not take every session with it. Absent, nothing changes. */}}
+{{- $pd := .Environment.Values | dig "pod_disruption" .Release.Name (dict) | default (dict) }}
+{{- $annotations := deepCopy ($pd | dig "pod_annotations" (dict)) }}
+{{- $objects := list }}
+{{- if $password }}
+{{- $_ := set $annotations "checksum/redis-auth" ($password | sha256sum) }}
+{{- $objects = append $objects (dict "apiVersion" "v1" "kind" "Secret" "metadata" (dict "name" "redis-auth") "type" "Opaque" "stringData" (dict "password" $password)) }}
+{{- end }}
+{{- if eq (toString ($pd | dig "pdb" false)) "true" }}
+{{- $objects = append $objects (dict "apiVersion" "policy/v1" "kind" "PodDisruptionBudget" "metadata" (dict "name" .Release.Name) "spec" (dict "maxUnavailable" ($pd | dig "max_unavailable" 0 | int) "selector" (dict "matchLabels" (dict "app.kubernetes.io/name" "redis" "app.kubernetes.io/instance" .Release.Name)))) }}
+{{- end }}
 {{- if $password }}
 auth:
   enabled: true
   existingSecret: redis-auth
   existingSecretPasswordKey: password
-
-# A changed password restarts Redis (oauth2-proxy carries the same annotation).
-podAnnotations:
-  checksum/redis-auth: {{ $password | sha256sum | quote }}
-
-extraObjects:
-  - apiVersion: v1
-    kind: Secret
-    metadata:
-      name: redis-auth
-    type: Opaque
-    stringData:
-      password: {{ $password | quote }}
 {{- else }}
 auth:
   enabled: false
+{{- end }}
+
+# A changed password restarts Redis (oauth2-proxy carries the same annotation).
+{{- with $annotations }}
+podAnnotations:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+
+# The Secret `redis-auth` (with a password) and the PodDisruptionBudget (with
+# pod_disruption.redis.pdb).
+{{- with $objects }}
+extraObjects:
+  {{- toYaml . | nindent 2 }}
 {{- end }}
 
 # Pod Security `restricted`: the chart's context (uid 999, non-root, no privilege

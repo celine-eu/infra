@@ -215,6 +215,19 @@ nodeSelector:
   {{- toYaml . | nindent 2 }}
 {{- end }}
 
+# `pod_disruption.keycloak` (defaults/0050-celine-services/pod-disruption.yaml.gotmpl): pod
+# annotations and the chart's PodDisruptionBudget, so a node scale-down does not stop every
+# sign-in. Absent, nothing changes (the chart renders no budget).
+{{- $pd := .Environment.Values | dig "pod_disruption" .Release.Name (dict) | default (dict) }}
+{{- with $pd | dig "pod_annotations" (dict) }}
+podAnnotations:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- if eq (toString ($pd | dig "pdb" false)) "true" }}
+podDisruptionBudget:
+  maxUnavailable: {{ $pd | dig "max_unavailable" 0 | int }}
+{{- end }}
+
 # JVM app using 722Mi actual — needs a ceiling to prevent unbounded growth
 resources:
   requests:

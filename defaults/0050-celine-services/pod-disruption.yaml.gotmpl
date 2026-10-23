@@ -1,0 +1,29 @@
+{{- /*
+  Keep a release's pods through a node scale-down (README "Pod disruption"). Layered by
+  every release built on the celine-services library but the operator shells
+  (helmfile.d/0050-celine-services);
+  keycloak, oauth2-proxy and redis read the same key in their own defaults. Absent,
+  nothing changes.
+
+    pod_disruption:
+      <release>:                # the release name, e.g. webapp, frontend-webapp
+        pdb: false              # true: a PodDisruptionBudget over the release's pods
+        max_unavailable: 0      # its maxUnavailable: 0 keeps a one-replica release; 1
+                                # lets a two-replica release go one pod at a time
+        pod_annotations: {}     # extra annotations on the pods, e.g.
+                                # cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
+
+  On GKE Autopilot the budget is the cheap way: the autoscaler does not remove a node
+  whose pods a budget does not let it evict. `safe-to-evict: "false"` does the same, but
+  makes an extended-duration pod, which Autopilot raises to at least 500m CPU.
+*/}}
+{{- $pd := .Environment.Values | dig "pod_disruption" .Release.Name (dict) | default (dict) }}
+{{- with $pd | dig "pod_annotations" (dict) }}
+podAnnotations:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- if eq (toString ($pd | dig "pdb" false)) "true" }}
+podDisruptionBudget:
+  enabled: true
+  maxUnavailable: {{ $pd | dig "max_unavailable" 0 | int }}
+{{- end }}

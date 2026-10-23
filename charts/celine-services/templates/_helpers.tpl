@@ -737,4 +737,34 @@ spec:
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+{{ include "celine-services.podDisruptionBudget" . }}
+{{- end }}
+
+{{/* ----------------------------------------------------------------------------
+  PodDisruptionBudget — opt-in (.Values.podDisruptionBudget.enabled), over the
+  Deployment's pods. The cluster autoscaler does not remove a node whose pods a budget
+  does not let it evict, so maxUnavailable 0 (the default) keeps a one-replica service
+  through a node scale-down. A rollout is not an eviction: RollingUpdate and Recreate
+  roll as before. A drain waits (GKE forces it after an hour on an upgrade).
+    podDisruptionBudget:
+      enabled: false
+      maxUnavailable: 0
+----------------------------------------------------------------------------- */}}
+
+{{- define "celine-services.podDisruptionBudget" -}}
+{{- $pdb := .Values.podDisruptionBudget | default dict }}
+{{- if $pdb.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "celine-services.fullname" . }}
+  labels:
+    {{- include "celine-services.labels" . | nindent 4 }}
+spec:
+  maxUnavailable: {{ $pdb.maxUnavailable | default 0 }}
+  selector:
+    matchLabels:
+      {{- include "celine-services.selectorLabels" . | nindent 6 }}
+{{- end }}
 {{- end }}

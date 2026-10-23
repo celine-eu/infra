@@ -411,6 +411,33 @@ The CELINE services default to requests 100m / 256Mi and limits 500m / 512Mi
 (`defaults/0050-celine-services/values.yaml.gotmpl`), overridden per service with
 `<service>.resources`.
 
+## Pod disruption
+
+A cluster autoscaler that scales a node down deletes the pods on it; a one-replica service
+is then down until its new pod is ready (GKE Autopilot, prod 2026-10-23: `webapp` twice in
+13 minutes, Traefik answering "503 no available server"). Opt-in per environment and per
+release, keyed by the release name; unset, nothing renders differently:
+
+```yaml
+pod_disruption:
+  webapp:
+    pdb: true              # a PodDisruptionBudget over the release's pods
+    max_unavailable: 0     # default 0; 1 lets a two-replica release go one pod at a time
+    pod_annotations: {}    # extra pod annotations
+```
+
+The autoscaler does not remove a node whose pods a budget does not let it evict. A rollout
+is not an eviction, so RollingUpdate and Recreate releases roll as before; a drain waits
+(GKE forces a node upgrade after an hour). `cluster-autoscaler.kubernetes.io/safe-to-evict:
+"false"` in `pod_annotations` also keeps the pod, but on Autopilot makes it an
+extended-duration pod, raised to at least 500m CPU.
+
+Read by every release built on the `celine-services` library except the operator shells
+(`defaults/0050-celine-services/pod-disruption.yaml.gotmpl`), and by `keycloak` (the
+chart's budget), `oauth2-proxy` and `redis` (a budget through `extraObjects`: oauth2-proxy's
+own renders only above one replica, redis has none). `sync_tables.sink` has its own
+`pod_annotations` / `pdb`. Tests: `task test:pod-disruption`.
+
 ## Sync environment marker
 
 `sync_tables` (celine-eu/demo3) copies `datasets` from dev to local and from dev to prod,
