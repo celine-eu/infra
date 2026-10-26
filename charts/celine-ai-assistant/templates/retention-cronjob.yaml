@@ -1,0 +1,107 @@
+{{- /*
+  Daily `celine-assistant retention run` (celine-ai-assistant REQ-0058): deletes members'
+  conversations and own uploads idle for RETENTION_MONTHS (12 by default, what the
+  privacy notice promises). It deletes stored files, which live on the `data` claim
+  (ReadWriteOnce): the job mounts that claim and runs on the node the service pod runs
+  on, the only node that can mount it beside the service. Elsewhere the command deletes
+  nothing and exits 1. Its pods carry no service selector label, so the Service never
+  routes to them.
+*/ -}}
+{{- if .Values.retention.enabled }}
+{{- $fullname := include "celine-services.fullname" . }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ $fullname }}-retention
+  labels:
+    {{- include "celine-services.labels" . | nindent 4 }}
+    app.kubernetes.io/component: retention
+spec:
+  schedule: {{ .Values.retention.schedule | quote }}
+  {{- with .Values.retention.timeZone }}
+  timeZone: {{ . | quote }}
+  {{- end }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: {{ .Values.retention.activeDeadlineSeconds }}
+      backoffLimit: {{ .Values.retention.backoffLimit }}
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/instance: {{ .Release.Name }}
+            app.kubernetes.io/component: retention
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: {{ .Values.podSecurityContext.runAsUser | default 1000 }}
+            {{- with .Values.podSecurityContext.fsGroup }}
+            fsGroup: {{ . }}
+            {{- end }}
+          containers:
+            - name: retention
+              image: {{ include "celine-services.image" . | quote }}
+              imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
+              command: ["celine-assistant", "retention", "run"]
+              {{- $args := list }}
+              {{- if .Values.retention.dryRun }}
+              {{- $args = append $args "--dry-run" }}
+              {{- end }}
+              {{- with .Values.retention.months }}
+              {{- $args = concat $args (list "--months" (toString .)) }}
+              {{- end }}
+              {{- with $args }}
+              args: {{ toJson . }}
+              {{- end }}
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: [ALL]
+              env:
+                - name: LOG_LEVEL
+                  value: {{ .Values.logLevel | default "INFO" | quote }}
+                {{- include "celine-services.postureEnv" . | nindent 16 }}
+                {{- include "celine-services.postgresEnv" . | nindent 16 }}
+                {{- include "celine-services.s3Env" . | nindent 16 }}
+                {{- include "celine-services.caEnv" . | nindent 16 }}
+                {{- with .Values.extraEnv }}
+                {{- toYaml . | nindent 16 }}
+                {{- end }}
+              volumeMounts:
+                {{- include "celine-services.caVolumeMount" . | nindent 16 }}
+                {{- if .Values.persistence.data.enabled }}
+                - name: data
+                  mountPath: {{ .Values.persistence.data.mountPath }}
+                {{- end }}
+              {{- with .Values.retention.resources }}
+              resources:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+          volumes:
+            {{- include "celine-services.caVolume" . | nindent 12 }}
+            {{- if .Values.persistence.data.enabled }}
+            - name: data
+              persistentVolumeClaim:
+                claimName: {{ $fullname }}-data
+            {{- end }}
+          {{- if .Values.persistence.data.enabled }}
+          affinity:
+            podAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - topologyKey: kubernetes.io/hostname
+                  labelSelector:
+                    matchLabels:
+                      {{- include "celine-services.selectorLabels" . | nindent 22 }}
+          {{- end }}
+          {{- with .Values.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}

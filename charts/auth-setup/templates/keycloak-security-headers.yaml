@@ -1,0 +1,19 @@
+{{- /*
+Response headers ingress-nginx (or Traefik's NGINX provider) adds on the Keycloak host, named
+by the keycloak release's `custom-headers` annotation (defaults/0020-auth/keycloak). Only what
+Keycloak does not send itself: a custom-headers entry replaces a header of the same name, and
+Keycloak sets its own Content-Security-Policy, X-Frame-Options (its iframes need SAMEORIGIN)
+and Referrer-Policy. nosniff reaches the controller's own answers too (the 404 on `/` and on
+every path outside the public rules). Every name must be in the controller's
+`global-allowed-response-headers` (README "Security headers"), or the host answers 503.
+*/}}
+{{- if .Values.keycloakSecurityHeaders.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-security-headers
+  labels:
+    app: keycloak
+data:
+  X-Content-Type-Options: "nosniff"
+{{- end }}

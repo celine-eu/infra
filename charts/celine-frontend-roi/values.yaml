@@ -57,32 +57,20 @@ ingress:
 
 # Response headers ingress-nginx adds on this host's Ingresses (custom-headers; README
 # "Security headers"). Off only in the dev environment.
-# SvelteKit (adapter-node, no kit.csp): an inline bootstrap and theme script, inline
-# style attributes and injected HTML, OpenStreetMap tiles (Leaflet), address search on
-# Nominatim, a static map image for printing, html2canvas and jsPDF for the PDF.
-# Report-Only until the browser reports nothing on the calculator and its PDF export
-# (README "Security headers").
+# SvelteKit (adapter-node) with an inline bootstrap and theme script, inline style
+# attributes, OpenStreetMap tiles (Leaflet), address search on Nominatim, a static map
+# image for printing, html2canvas and jsPDF for the PDF.
 securityHeaders:
   enabled: true
   referrerPolicy: strict-origin-when-cross-origin
   csp:
-    # The app enforces its script directives itself (kit.csp in its svelte.config.js: a
-    # per-request nonce); the rest is still on trial here, as Report-Only, without
-    # script-src or default-src so the app's nonce is not reported.
+    # The app sends the whole Content-Security-Policy, enforced (kit.csp in its
+    # svelte.config.js: a per-request nonce, default-src 'self', each outside host named).
+    # The controller would replace it, so this ConfigMap carries none (README "Security
+    # headers"). Needs celine-frontend-roi with that policy: an older image would lose
+    # its Report-Only trial and keep only its script directives.
     sentByApp: true
-    reportOnly: true
-    directives:
-      style-src: "'self' 'unsafe-inline'"
-      img-src: "'self' data: blob: https://*.tile.openstreetmap.org https://staticmap.openstreetmap.de"
-      font-src: "'self'"
-      connect-src: "'self' https://nominatim.openstreetmap.org https://*.tile.openstreetmap.org"
-      frame-src: "'self'"
-      media-src: "'self'"
-      manifest-src: "'self'"
-      object-src: "'none'"
-      base-uri: "'self'"
-      form-action: "'self' https://sso.{{ .Values.ingress.domain }} https://keycloak.{{ .Values.ingress.domain }}"
-      frame-ancestors: "'none'"
+    reportOnly: false
   # The calculator's API Ingress (ingress.apiPaths) answers JSON only: it allows nothing.
   apiCsp:
     reportOnly: false

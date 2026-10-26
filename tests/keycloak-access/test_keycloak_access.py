@@ -163,6 +163,40 @@ def test_the_public_hostname_is_unchanged(keycloak_staging):
 
 
 # ---------------------------------------------------------------------------
+# response headers on the public host (release keycloak, ConfigMap from auth-setup)
+# ---------------------------------------------------------------------------
+# Keycloak sends its own Content-Security-Policy, X-Frame-Options and Referrer-Policy on its
+# pages, and a custom-headers entry replaces a header of the same name, so the ConfigMap holds
+# only what is missing: nosniff, which the controller's own answers (the 404 on `/` and every
+# path outside the public rules) lack. Off where `security_headers.enabled` is false (dev).
+
+CUSTOM_HEADERS = "nginx.ingress.kubernetes.io/custom-headers"
+HEADERS_ON = "domain: example.org\nsecurity_headers:\n  enabled: true\n"
+
+
+def keycloak_annotations(docs: list[dict]) -> dict[str, str]:
+    (ingress,) = of_kind(docs, "Ingress")
+    return ingress["metadata"].get("annotations") or {}
+
+
+def headers_configmaps(docs: list[dict]) -> list[dict]:
+    return [d for d in of_kind(docs, "ConfigMap") if d["metadata"]["name"] == "keycloak-security-headers"]
+
+
+def test_dev_sends_no_custom_headers_on_keycloak(keycloak_dev):
+    assert CUSTOM_HEADERS not in keycloak_annotations(keycloak_dev)
+    assert not headers_configmaps(docs_of(render("0020-auth.yaml.gotmpl", "auth-setup")))
+
+
+def test_the_keycloak_host_sends_nosniff_and_nothing_keycloak_sends_itself():
+    keycloak = docs_of(render("0020-auth.yaml.gotmpl", "keycloak", env="staging", override=HEADERS_ON))
+    assert keycloak_annotations(keycloak)[CUSTOM_HEADERS] == "celine-staging/keycloak-security-headers"
+    setup = docs_of(render("0020-auth.yaml.gotmpl", "auth-setup", env="staging", override=HEADERS_ON))
+    (configmap,) = headers_configmaps(setup)
+    assert configmap["data"] == {"X-Content-Type-Options": "nosniff"}
+
+
+# ---------------------------------------------------------------------------
 # the policies-shell bootstrap and sync (release policies-shell)
 # ---------------------------------------------------------------------------
 

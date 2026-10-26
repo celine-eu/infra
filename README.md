@@ -530,7 +530,7 @@ and its inline scripts - SvelteKit's bootstrap, the theme script - carry a fresh
 host allows inline scripts. A static ConfigMap cannot carry a per-request nonce, and the
 controller replaces a header of the same name, so these charts set `csp.sentByApp: true` and
 their ConfigMap holds no enforced policy; the render stops if an environment gives them one.
-Grid and roi keep their Report-Only trial of the other directives here, without `script-src`
+Grid keeps its Report-Only trial of the other directives here, without `script-src`
 or `default-src`. An API Ingress of its own on such a host keeps an enforced policy from the controller
 (`securityHeaders.apiCsp`, ConfigMap `<release>-api-security-headers`): roi's calculator API
 allows nothing (`default-src 'none'`). Paths that share the page's Ingress - `/oauth2` on every
@@ -542,9 +542,15 @@ or the hosts are briefly without one.
 | webapp, assistant, community | enforced, sent by the app | scripts by nonce, inline styles, `data:`/`blob:` images; community: OpenStreetMap tiles |
 | onboarding | enforced, sent by the app | scripts by nonce, inline styles, `data:`/`blob:` images |
 | grid | scripts enforced by the app (nonce, a `blob:` worker); the rest Report-Only here | inline styles, the CARTO and ArcGIS map hosts |
-| roi | scripts enforced by the app (nonce); the rest Report-Only here | inline styles, OpenStreetMap tiles, Nominatim, the static map image |
+| roi | enforced, sent by the app | scripts by nonce, inline styles, `data:`/`blob:` images, the `a`/`b`/`c` OpenStreetMap tile hosts, the static map image, Nominatim (no wildcard) |
 | legal | enforced | inline styles only; no script |
 | api gateway | enforced | nothing (`default-src 'none'`) |
+
+The Keycloak host gets only `X-Content-Type-Options: nosniff` (ConfigMap
+`keycloak-security-headers` from the auth-setup release, named by the keycloak release's
+`custom-headers`): Keycloak sends its own policy, `X-Frame-Options` and `Referrer-Policy`,
+which a header of the same name would replace. It also reaches the controller's 404 on the
+paths outside the public rules, `/` included.
 
 **Before the first deployment with these headers**, the controller must allow the header
 names. It refuses any other with a 503 on every path of the Ingress that names it. In the

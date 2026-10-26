@@ -4,6 +4,11 @@ realm: celine
 domain: celine.test
 issuer: celine-tls
 
+# The Keycloak host's response headers (templates/keycloak-security-headers.yaml): on
+# outside dev (`security_headers.enabled`).
+keycloakSecurityHeaders:
+  enabled: false
+
 realmAdmin:
   username: "celine-admin"
   email: "admin@celine.test"

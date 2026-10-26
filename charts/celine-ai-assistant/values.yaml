@@ -106,6 +106,29 @@ configMap:
 volumeMounts: []
 volumes: []
 
+# Daily `celine-assistant retention run` (celine-ai-assistant REQ-0058): deletes members'
+# conversations and own uploads idle for RETENTION_MONTHS (12 by default, what the
+# privacy notice promises). Off by default: the command exists only from the assistant
+# release carrying REQ-0058; turn it on per environment once that image is deployed.
+# Mounts the `data` claim and runs on the service pod's node (templates/retention-cronjob.yaml).
+retention:
+  enabled: false
+  schedule: "17 3 * * *"
+  timeZone: "Etc/UTC"
+  # Count what would go, delete nothing (`--dry-run`).
+  dryRun: false
+  # Override RETENTION_MONTHS for the job (`--months`); empty keeps the service's.
+  months: null
+  activeDeadlineSeconds: 3600
+  backoffLimit: 1
+  resources:
+    requests:
+      cpu: 10m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
 logLevel: "INFO"
 extraEnv: []
 extraSecrets: {}

@@ -11,7 +11,9 @@
 ##
 ## It has no volume: git clones live in the container and are re-made on a restart,
 ## and uploaded files are on the service's volume. `kb reindex --re-extract`, which
-## reads those files, runs in the service pod instead.
+## reads those files, runs in the service pod instead; so do `erase-subject` and
+## `retention run`, which delete them (here they delete nothing and exit 1). The
+## daily retention job is the assistant chart's (`retention.enabled`).
 ## ----------------------------------------------------------------------------
 
 fullnameOverride: ai-assistant-shell

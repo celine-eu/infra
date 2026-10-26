@@ -10,9 +10,10 @@
   onboarding APIs) carries no annotation, so the controller does not replace them.
 - The SvelteKit frontends send their own Content-Security-Policy, with a per-request
   nonce for the inline bootstrap: the controller would replace it, so their ConfigMap
-  carries no enforced policy - webapp, assistant, community and onboarding none at all,
-  grid and roi a Report-Only trial of the other directives, without script-src or
-  default-src. No rendered policy allows 'unsafe-inline' scripts.
+  carries no enforced policy - webapp, assistant, community, onboarding and roi (whose
+  apps send the whole policy) none at all, grid a Report-Only trial of the other
+  directives, without script-src or default-src. No rendered policy allows
+  'unsafe-inline' scripts.
 - `security_headers.enabled: false` (envs/dev) renders neither; any other environment
   refuses it. `security_headers.csp.<release>` switches a host to Report-Only and
   overrides directives.
@@ -41,7 +42,7 @@ HELMFILE = "0050-celine-services.yaml.gotmpl"
 DOMAIN = "example.org"
 ENABLE = (
     "onboarding:\n  enabled: true\n"
-    "legal:\n  enabled: true\n  image: registry.example.org/legal-site\n"
+    "legal:\n  enabled: true\n  image: registry.example.org/legal-site\n  image_tag: v0.0.0\n"
 )
 
 # release -> the Ingresses of its host that must NOT carry the gateway's headers
@@ -62,7 +63,7 @@ SENT_BY_APP = {
     "frontend-community": False,
     "frontend-onboarding": False,
     "frontend-grid": True,
-    "frontend-roi": True,
+    "frontend-roi": False,
 }
 # Ingress -> the ConfigMap of its own, for an API Ingress whose policy is not the page's
 OWN_CONFIGMAP = {"frontend-roi-api": "frontend-roi-api-security-headers",
@@ -256,7 +257,9 @@ def test_a_host_can_report_only_and_override_directives():
      "only a Report-Only one may be set here"),
     ("    frontend-grid:\n      report_only: false\n",
      "only a Report-Only one may be set here"),
-    ("    frontend-roi:\n      directives:\n        script-src: \"'self' 'unsafe-inline'\"\n",
+    ("    frontend-roi:\n      directives:\n        img-src: \"'self'\"\n",
+     "only a Report-Only one may be set here"),
+    ("    frontend-grid:\n      directives:\n        script-src: \"'self' 'unsafe-inline'\"\n",
      "may not set script-src"),
 ])
 def test_a_host_whose_app_sends_its_policy_refuses_one_that_would_replace_or_report_it(override, message):

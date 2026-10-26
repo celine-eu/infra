@@ -18,6 +18,11 @@ oauth2Proxy:
   cookieSecret: {{ .Environment.Values.auth_setup.cookieSecret }}
 
 dashboard_enabled: {{ .Environment.Values | dig "auth_setup" "dashboard_enabled" true }}
+
+# The Keycloak host's response headers, named by the keycloak release's custom-headers
+# annotation: with every public host's (`security_headers.enabled`, off in dev only).
+keycloakSecurityHeaders:
+  enabled: {{ .Environment.Values | dig "security_headers" "enabled" true }}
 {{- with .Environment.Values | dig "auth_setup" "dashboard_resources" nil }}
 dashboard_resources: {{ toJson . }}
 {{- end }}

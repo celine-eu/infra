@@ -109,6 +109,12 @@ ingress:
     ## See https://www.ibm.com/support/pages/502-error-ingress-keycloak-response
     nginx.ingress.kubernetes.io/proxy-buffer-size: 128k
     cert-manager.io/issuer: {{ .Environment.Values.tls_setup.issuer | default "celine-tls" }}
+    {{- if .Environment.Values | dig "security_headers" "enabled" true }}
+    # nosniff on this host, the controller's own answers included (the 404 on `/`): the
+    # ConfigMap is auth-setup's (templates/keycloak-security-headers.yaml), which this
+    # release `needs`. Off in dev, like every public host's headers.
+    nginx.ingress.kubernetes.io/custom-headers: "{{ .Release.Namespace }}/keycloak-security-headers"
+    {{- end }}
 
   # Additional Ingress labels
   labels: {}
