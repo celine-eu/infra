@@ -112,6 +112,11 @@ tasks:
     cmds:
       - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/redis -v {{.CLI_ARGS}}
 
+  test:prefect-pipelines:
+    desc: "Render prefect-pipelines and check a flow's secret env (global.extraSecrets) lives only in the prefect-pipelines-secrets Secret, read by secretKeyRef after the global env"
+    cmds:
+      - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/prefect-pipelines -v {{.CLI_ARGS}}
+
   test:nudging:
     desc: "Render nudging and check its VAPID private key comes only from nudging-secrets (secretKeyRef), never a plain env value; public key and subject stay plain; click-tracking secret unchanged"
     cmds:
