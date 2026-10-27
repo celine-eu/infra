@@ -147,6 +147,11 @@ tasks:
     cmds:
       - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/frontend-roi -v {{.CLI_ARGS}}
 
+  test:frontend-env-banner:
+    desc: "Render the frontends and check each is told its environment (PUBLIC_CELINE_ENV, like CELINE_ENV) and, outside prod, its prod URL (PUBLIC_CELINE_PROD_URL from prod_reads.domain)"
+    cmds:
+      - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/frontend-env-banner -v {{.CLI_ARGS}}
+
   set-context:
     desc: Set kubectl default namespace to celine
     cmds:

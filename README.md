@@ -266,6 +266,12 @@ included, is hardened, and a hardened service refuses to start with a developmen
 (default database password, client secret equal to the client id, missing issuer or key).
 Images before the celine-sdk release that carries `posture` ignore the variable.
 
+The frontends built from celine-frontend (webapp, assistant, community, grid, roi) get the
+same value as `PUBLIC_CELINE_ENV`: anything but `prod` shows a banner saying the UI is a
+development version. Outside prod, with `prod_reads.domain` set, they also get
+`PUBLIC_CELINE_PROD_URL`, `https://<the app's host>.<prod_reads.domain>`, which the banner
+links; without it the banner has no link. Frontend images before the banner ignore both.
+
 | Value | Effect |
 |---|---|
 | `celine_env` | overrides `CELINE_ENV`. Default: the helmfile environment's name. `dev` outside the environment `dev` stops the render |

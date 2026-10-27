@@ -7,6 +7,19 @@ ingress:
   host: community.{{ .Environment.Values.domain }}
   domain: {{ .Environment.Values.domain }}
 
+# The development-version banner (celine-frontend `EnvBanner`): PUBLIC_CELINE_ENV is
+# CELINE_ENV's value (`celine_env`, else the environment's name); outside prod,
+# PUBLIC_CELINE_PROD_URL is this host on prod's domain (`prod_reads.domain`), the banner's link.
+{{- $celineEnv := .Values | dig "celine_env" .Environment.Name | toString }}
+{{- $prodDomain := .Values | dig "prod_reads" "domain" "" | toString }}
+extraEnv:
+  - name: PUBLIC_CELINE_ENV
+    value: {{ $celineEnv | quote }}
+  {{- if and $prodDomain (ne ($celineEnv | trim | lower) "prod") }}
+  - name: PUBLIC_CELINE_PROD_URL
+    value: {{ printf "https://community.%s" $prodDomain | quote }}
+  {{- end }}
+
 # IngressClass of every Ingress (`ingress_controller.class`, default nginx).
 ingressClassName: {{ .Values | dig "ingress_controller" "class" "nginx" | quote }}
 
