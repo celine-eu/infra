@@ -5,7 +5,7 @@ mirrors read prod as prod's `svc-pipelines`).
 `global.extraSecrets` adds keys to that Secret beside `CELINE_OIDC_CLIENT_SECRET`; a flow
 reads one with `{name, secret: prefect-pipelines-secrets, key}`. The value must appear
 only in the Secret: the shell Deployment and the deploy Job reference it by
-secretKeyRef, after the global env, so the flow's value wins.
+secretKeyRef; a flow entry replaces the global one of the same name.
 
     task test:prefect-pipelines
 
@@ -93,15 +93,22 @@ def test_the_value_appears_only_in_the_secret():
 
 
 @pytest.mark.parametrize("kind", ["Deployment", "Job"])
-def test_the_flow_reads_it_by_reference_after_the_global_env(kind):
+def test_the_flow_entry_replaces_the_global_one(kind):
+    # One entry per name: a Deployment whose env repeats a name cannot be patched
+    # ("The order in patch list ... doesn't match $setElementOrder list").
     _, docs = render(with_extra_secret())
     [doc] = [d for d in flow_workloads(docs) if d["kind"] == kind]
     refs = [e for e in container_env(doc) if e["name"] == "CELINE_OIDC_CLIENT_SECRET"]
-    assert [e.get("valueFrom", {}).get("secretKeyRef") for e in refs] == [
-        {"name": SECRET, "key": "CELINE_OIDC_CLIENT_SECRET"},
-        {"name": SECRET, "key": KEY},
-    ]
+    assert [e.get("valueFrom", {}).get("secretKeyRef") for e in refs] == [{"name": SECRET, "key": KEY}]
     assert all("value" not in e for e in refs)
+
+
+@pytest.mark.parametrize("kind", ["Deployment", "Job"])
+def test_no_env_name_repeats(kind):
+    _, docs = render(with_extra_secret())
+    [doc] = [d for d in flow_workloads(docs) if d["kind"] == kind]
+    names = [e["name"] for e in container_env(doc)]
+    assert len(names) == len(set(names))
 
 
 def test_without_extra_secrets_the_secret_is_unchanged():
