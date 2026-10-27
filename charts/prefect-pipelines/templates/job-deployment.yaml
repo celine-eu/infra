@@ -73,7 +73,9 @@ spec:
               echo "Building prefect.yaml for {{ $flow.name }}"
               mkdir -p /config
 
-              cat > /config/prefect.yaml <<EOF
+              # Quoted heredoc: the shell expands nothing, so no value of the Job's env
+              # (secrets included) can land in the deployment.
+              cat > /config/prefect.yaml <<'EOF'
               name: {{ $flow.name }}-deployment
               deployments:
                 - name: {{ $flow.name }}-flow
@@ -105,22 +107,23 @@ spec:
                       image_pull_policy: IfNotPresent
                       image: {{ $flow.image }}
                       namespace: {{ $.Values.global.namespace }}
+                      # Kubernetes env list: secrets by secretKeyRef (the work pool's base
+                      # job template accepts it). A flow entry replaces the global one of
+                      # the same name.
                       env:
-                      {{- range (concat $.Values.global.env $flow.env) }}
-                      {{- if .value }}
-                                {{ .name }}: "{{ .value }}"
-                      {{- else }}
-                                {{ .name }}: "$${{ .name }}"
+                      {{- $flowNames := list }}
+                      {{- range $flow.env }}{{ $flowNames = append $flowNames .name }}{{ end }}
+                      {{- range $.Values.global.env }}
+                      {{- if not (has .name $flowNames) }}
+                      {{- include "prefect-pipelines.runEnv" . | trim | nindent 24 }}
                       {{- end }}
+                      {{- end }}
+                      {{- range $flow.env }}
+                      {{- include "prefect-pipelines.runEnv" . | trim | nindent 24 }}
                       {{- end }}
               EOF
 
-              echo "Generated /config/prefect.yaml:"
-              cat /config/prefect.yaml
-
               echo "Registering Prefect deployment for {{ $flow.name }}"
               prefect deploy --prefect-file /config/prefect.yaml
-              echo ""
-              cat /config/prefect.yaml
 ---
 {{- end }}

@@ -25,17 +25,27 @@ worker:
             "type": "object",
             "properties": {
               "env": {
-                "type": "object",
-                "additionalProperties": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
-                  ]
-                }
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "object"
+                    }
+                  }
+                ]
               },
               "name": {
                 "anyOf": [

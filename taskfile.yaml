@@ -113,7 +113,7 @@ tasks:
       - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/redis -v {{.CLI_ARGS}}
 
   test:prefect-pipelines:
-    desc: "Render prefect-pipelines and check a flow's secret env (global.extraSecrets) lives only in the prefect-pipelines-secrets Secret, read by secretKeyRef after the global env"
+    desc: "Render prefect-pipelines and check a flow's secret env (global.extraSecrets) lives only in the prefect-pipelines-secrets Secret, read by secretKeyRef after the global env, and reaches flow runs as secretKeyRef in job_variables, never as a value"
     cmds:
       - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/prefect-pipelines -v {{.CLI_ARGS}}
 
