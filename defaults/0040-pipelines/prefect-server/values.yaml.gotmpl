@@ -21,6 +21,12 @@ server:
     # which then hit the uq_task_run__flow_run_id_task_key_dynamic_key constraint
     - name: PREFECT_SERVER_DATABASE_COMMAND_TIMEOUT
       value: "180"
+    # Statement timeout for API/service DB work (Prefect default 10s). At 10s the
+    # db-vacuum DELETEs on events/event_resources time out every loop, and a flow's
+    # set_state landing in that window fails with a 500 (rec-metering crashes at :x2,
+    # rec-it-batches failed 2026-11-01). Must stay below COMMAND_TIMEOUT.
+    - name: PREFECT_SERVER_DATABASE_TIMEOUT
+      value: "60"
     - name: PREFECT_SERVER_DATABASE_CONNECTION_TIMEOUT
       value: "30"
     - name: PREFECT_SERVER_DATABASE_CONNECTION_POOL_SIZE
