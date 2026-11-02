@@ -715,6 +715,7 @@ default. A gateway firewall or WAF in front does not change this.
 |---|---|
 | `keycloak.public_realms` | the realms the public host serves. Default: `[<keycloak.realm>]`. `master` stops the render |
 | `keycloak.admin_forward_port` | the localhost port of the admin console, `KC_HOSTNAME_ADMIN=http://localhost:<port>`. Default `18080` |
+| `keycloak.admin_public` | `{enabled, allow_source_ranges}`: the admin console on the public host, from an allowlist, outside prod only. Default off. See below |
 
 **There is no admin ingress.** The master realm and the admin console are reached only through
 `kubectl port-forward` to the Keycloak Service, from a machine with cluster credentials:
@@ -772,6 +773,29 @@ unset S T
 Master's tokens then carry the issuer `http://localhost:18080/realms/master`; celine-policies
 checks only that it ends in `/realms/master`. The first console sign-in of a master admin outside
 dev enrols TOTP and recovery codes.
+
+**Outside prod, the console can move to the public host** (`keycloak.admin_public`), for a
+browser impersonation that must start on the host whose cookies the platform sees:
+
+```yaml
+keycloak:
+  admin_public:
+    enabled: true
+    allow_source_ranges: [192.168.1.47/32]   # the addresses the ingress controller sees
+```
+
+- a second Ingress, the chart's `keycloak-keycloakx-console`, serves `/admin` and
+  `/realms/master` on `keycloak.<domain>` with
+  `nginx.ingress.kubernetes.io/whitelist-source-range`; any other source gets 403. The public
+  realm's Ingress is unchanged;
+- `KC_HOSTNAME_ADMIN` and master's Frontend URL become `https://keycloak.<domain>`, so the
+  port-forward no longer serves the console; `task keycloak:forward` prints the public URL
+  instead;
+- the render stops in prod (environment or `celine_env`), without a non-empty list of CIDRs,
+  on a range that admits everything (`/0`), with an ingress class other than `nginx` (the
+  annotation is ingress-nginx's), and with `keycloak.admin_mfa` off (or unset in dev);
+- the allowlist filters the address the controller sees. Behind a proxy or a NAT that is the
+  proxy's address, not the client's: measure it in the controller's access log first.
 
 **Inside the cluster** nothing administers Keycloak through the public host: the policies-shell
 bootstrap and sync, and provisioning, use `keycloak.internal_url`. Services keep validating

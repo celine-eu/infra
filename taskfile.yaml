@@ -276,6 +276,14 @@ tasks:
           echo "No KC_HOSTNAME_ADMIN on statefulset {{ .STATEFULSET }} in $NS: deploy the keycloak release from this infra first"
           exit 1
         fi
+        case "$URL" in
+          https://*)
+            # keycloak.admin_public: the console moved to the public host, the forward would
+            # only redirect there (README, "Keycloak admin access").
+            echo "The admin console of $NS is on the public host (keycloak.admin_public), from its allowlist only:"
+            echo "  $URL/admin/master/console/"
+            exit 0;;
+        esac
         PORT=${URL##*:}
         # The console signs in to master through master's own URL, so master's Frontend URL
         # must be this URL too; the policies-shell bootstrap sets it on every start (README,

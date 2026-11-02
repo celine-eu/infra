@@ -78,6 +78,20 @@ resources:
 {{- else }}
 {{- fail (printf "keycloak.admin_mfa must be true, false or {enabled: true|false}, got %v" $adminMfa) }}
 {{- end }}
+{{- /* keycloak.admin_public (defaults/0020-auth/keycloak, which validates the allowlist): the
+       admin console on the public host, never in prod, and never without the admin second
+       factor. Master's Frontend URL follows it. */}}
+{{- $adminPublicOn := eq (.Environment.Values | dig "keycloak" "admin_public" "enabled" false | toString) "true" }}
+{{- if $adminPublicOn }}
+{{- $celineEnv := .Environment.Values | dig "celine_env" .Environment.Name | toString | trim | lower }}
+{{- if or (eq .Environment.Name "prod") (eq $celineEnv "prod") }}
+{{- fail (printf "keycloak.admin_public is never enabled in prod (environment %s, celine_env %s): prod's admin console stays on the port-forward" .Environment.Name $celineEnv) }}
+{{- end }}
+{{- if or (eq $adminMfaRequired "false") (and (eq $adminMfaRequired "") (eq (lower $env) "dev")) }}
+{{- fail "keycloak.admin_public needs keycloak.admin_mfa: a console reachable from the network keeps the admin second factor" }}
+{{- end }}
+{{- end }}
+{{- $masterFrontendUrl := ternary (printf "https://keycloak.%s" .Environment.Values.domain) (printf "http://localhost:%d" (.Environment.Values | dig "keycloak" "admin_forward_port" 18080 | int)) $adminPublicOn }}
 keycloak:
   # The Keycloak Service inside the cluster, never the public host: the public host serves
   # no /admin and no /realms/master (defaults/0020-auth/keycloak), and bootstrap and sync
@@ -187,10 +201,11 @@ bootstrap:
   bruteForceEnabled: {{ if hasKey $bruteForce "enabled" }}{{ $bruteForce.enabled | toString | quote }}{{ else }}""{{ end }}
   # Rendered only when keycloak.admin_mfa is set: unset, bootstrap turns it on unless dev.
   adminMfaRequired: {{ $adminMfaRequired | quote }}
-  # The admin console's port-forward URL, derived exactly as defaults/0020-auth/keycloak
-  # derives KC_HOSTNAME_ADMIN, so the two never disagree: master's Frontend URL must be it, or
-  # the console never signs in to master (README, "Keycloak admin access").
-  masterFrontendUrl: {{ printf "http://localhost:%d" (.Environment.Values | dig "keycloak" "admin_forward_port" 18080 | int) | quote }}
+  # The admin console's URL (the port-forward, or the public host with keycloak.admin_public),
+  # derived exactly as defaults/0020-auth/keycloak derives KC_HOSTNAME_ADMIN, so the two never
+  # disagree: master's Frontend URL must be it, or the console never signs in to master
+  # (README, "Keycloak admin access").
+  masterFrontendUrl: {{ $masterFrontendUrl | quote }}
   overlay:
     {{- with .Environment.Values | dig "keycloak" "platform" (dict) }}
     {{- toYaml . | nindent 4 }}

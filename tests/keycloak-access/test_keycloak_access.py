@@ -5,7 +5,9 @@
   realm and `/` match no rule.
 - The master realm and the admin console are reached through `kubectl port-forward` on
   http://localhost:<keycloak.admin_forward_port>: KC_HOSTNAME_ADMIN says so, KC_HOSTNAME stays
-  the public URL. There is no admin Ingress.
+  the public URL. There is no admin Ingress, unless `keycloak.admin_public` (never in prod)
+  serves `/admin` and `/realms/master` on the public host from an ingress-nginx allowlist;
+  the admin hostname and master's Frontend URL then move to that host.
 - What administers Keycloak from inside the cluster (the policies-shell bootstrap and sync,
   provisioning) uses the Keycloak Service.
 - The admin console signs in to master through master's own URL, so the policies-shell
@@ -497,3 +499,112 @@ def test_nothing_else_administers_keycloak_through_the_public_host():
             if "keycloak." in m.group(0) and "https://keycloak." in m.group(0):
                 hits.append(f"{path.relative_to(REPO)}: {m.group(0)!r}")
     assert hits == []
+
+
+# ---------------------------------------------------------------------------
+# the admin console on the public host, outside prod (keycloak.admin_public)
+# ---------------------------------------------------------------------------
+# A browser impersonation must start on the host whose cookies the webapp sees, so an
+# environment other than prod may serve `/admin` and `/realms/master` on keycloak.<domain>,
+# from an allowlist only. The admin hostname, and master's Frontend URL with it, then move to
+# the public host: the port-forward stops serving the console. Prod never renders it.
+
+ALLOWED = "192.168.1.47/32"
+ADMIN_PUBLIC = f"keycloak:\n  admin_public:\n    enabled: true\n    allow_source_ranges: [{ALLOWED}]\n"
+PUBLIC_INGRESS = "keycloak-keycloakx"
+CONSOLE_INGRESS = "keycloak-keycloakx-console"
+WHITELIST = "nginx.ingress.kubernetes.io/whitelist-source-range"
+
+
+def ingress_named(docs: list[dict], name: str) -> dict | None:
+    found = [i for i in of_kind(docs, "Ingress") if i["metadata"]["name"] == name]
+    assert len(found) <= 1
+    return found[0] if found else None
+
+
+def paths_of(ingress: dict) -> dict[str, str]:
+    (rule,) = ingress["spec"]["rules"]
+    return {p["path"]: p["pathType"] for p in rule["http"]["paths"]}
+
+
+@pytest.fixture(scope="module")
+def keycloak_admin_public() -> list[dict]:
+    return docs_of(render("0020-auth.yaml.gotmpl", "keycloak", env="staging",
+                          override="domain: example.org\n" + ADMIN_PUBLIC))
+
+
+def test_by_default_there_is_no_console_ingress(keycloak_dev, keycloak_staging):
+    for docs in (keycloak_dev, keycloak_staging):
+        assert ingress_named(docs, CONSOLE_INGRESS) is None
+
+
+def test_the_console_ingress_serves_admin_and_master_on_the_public_host_from_the_allowlist(keycloak_admin_public):
+    console = ingress_named(keycloak_admin_public, CONSOLE_INGRESS)
+    assert console is not None
+    assert [r["host"] for r in console["spec"]["rules"]] == ["keycloak.example.org"]
+    assert paths_of(console) == {"/admin": "Prefix", "/realms/master": "Prefix"}
+    assert console["metadata"]["annotations"][WHITELIST] == ALLOWED
+    assert console["spec"]["ingressClassName"] == "nginx"
+    assert console["spec"]["tls"] == [{"hosts": ["keycloak.example.org"], "secretName": "keycloak-tls"}]
+
+
+def test_several_ranges_are_joined_with_commas():
+    override = ("domain: example.org\nkeycloak:\n  admin_public:\n    enabled: true\n"
+                "    allow_source_ranges: [192.168.1.47/32, 10.252.1.0/24]\n")
+    console = ingress_named(docs_of(render("0020-auth.yaml.gotmpl", "keycloak", env="staging", override=override)),
+                            CONSOLE_INGRESS)
+    assert console["metadata"]["annotations"][WHITELIST] == "192.168.1.47/32,10.252.1.0/24"
+
+
+def test_the_public_realms_ingress_is_unchanged(keycloak_admin_public):
+    public = ingress_named(keycloak_admin_public, PUBLIC_INGRESS)
+    assert paths_of(public) == {f"/realms/{REALM}": "Prefix", "/resources": "Prefix"}
+    assert WHITELIST not in (public["metadata"].get("annotations") or {})
+
+
+def test_the_admin_hostname_follows_the_flag(keycloak_admin_public):
+    env = keycloak_env(keycloak_admin_public)
+    assert env["KC_HOSTNAME_ADMIN"]["value"] == "https://keycloak.example.org"
+    assert env["KC_HOSTNAME"]["value"] == "https://keycloak.example.org"
+
+
+def test_masters_frontend_url_follows_the_flag_too():
+    override = f"domain: example.org\n{ADMIN_PUBLIC}policies_shell:\n  bootstrap:\n    client_secret: {SECRET}\n"
+    shell = containers(docs_of(policies_shell(override, env="staging")))
+    assert env_of(shell["bootstrap"])["MASTER_FRONTEND_URL"]["value"] == "https://keycloak.example.org"
+
+
+@pytest.mark.parametrize("release,helmfile", [("keycloak", "0020-auth.yaml.gotmpl"),
+                                              ("policies-shell", "0050-celine-services.yaml.gotmpl")])
+@pytest.mark.parametrize("env,extra", [("prod", ""), ("staging", "celine_env: prod\n")])
+def test_prod_never_renders_the_admin_console_on_the_public_host(release, helmfile, env, extra):
+    override = f"domain: example.org\n{extra}{ADMIN_PUBLIC}policies_shell:\n  bootstrap:\n    client_secret: {SECRET}\n"
+    result = render(helmfile, release, override=override, env=env)
+    assert result.returncode != 0
+    assert "keycloak.admin_public is never enabled in prod" in result.stderr
+
+
+@pytest.mark.parametrize("ranges", ["", "    allow_source_ranges: []\n", "    allow_source_ranges: 192.168.1.47/32\n",
+                                    "    allow_source_ranges: [0.0.0.0/0]\n", "    allow_source_ranges: ['::/0']\n",
+                                    "    allow_source_ranges: [192.168.1.47]\n", "    allow_source_ranges: [not-a-range]\n"])
+def test_the_allowlist_is_required_and_never_everyone(ranges):
+    override = f"domain: example.org\nkeycloak:\n  admin_public:\n    enabled: true\n{ranges}"
+    result = render("0020-auth.yaml.gotmpl", "keycloak", env="staging", override=override)
+    assert result.returncode != 0
+    assert "keycloak.admin_public.allow_source_ranges" in result.stderr
+
+
+def test_only_ingress_nginx_enforces_the_allowlist():
+    # the annotation means nothing to another controller: the console would be open to all
+    override = "domain: example.org\ningress_controller:\n  class: traefik\n" + ADMIN_PUBLIC
+    result = render("0020-auth.yaml.gotmpl", "keycloak", env="staging", override=override)
+    assert result.returncode != 0
+    assert "keycloak.admin_public needs ingress-nginx" in result.stderr
+
+
+def test_the_admin_second_factor_cannot_be_off_with_a_public_console():
+    override = (f"domain: example.org\n{ADMIN_PUBLIC}  admin_mfa: false\n"
+                f"policies_shell:\n  bootstrap:\n    client_secret: {SECRET}\n")
+    result = policies_shell(override, env="staging")
+    assert result.returncode != 0
+    assert "keycloak.admin_public needs keycloak.admin_mfa" in result.stderr

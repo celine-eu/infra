@@ -89,6 +89,13 @@ secrets:
   the Keycloak Service (`task keycloak:forward`), on http://localhost:<keycloak.admin_forward_port>.
   Everything inside the cluster that administers Keycloak (the policies-shell bootstrap and
   sync, provisioning) uses the Service, never this host.
+
+  Outside prod, `keycloak.admin_public` (`enabled`, `allow_source_ranges`) serves the admin
+  console and master on this host too, from the allowlist only: a browser impersonation must
+  start on the host whose cookies the platform sees. The admin hostname, and master's
+  Frontend URL with it (policies-shell), then move to this host and the port-forward no
+  longer serves the console. Prod never renders it, and the allowlist is an ingress-nginx
+  annotation, so another controller stops the render.
 */}}
 {{- $realm := .Environment.Values | dig "keycloak" "realm" "celine" }}
 {{- $publicRealms := .Environment.Values | dig "keycloak" "public_realms" (list $realm) }}
@@ -96,6 +103,33 @@ secrets:
 {{- fail "keycloak.public_realms must not name master: the master realm is reached only through a port-forward" }}
 {{- end }}
 {{- $adminPort := .Environment.Values | dig "keycloak" "admin_forward_port" 18080 | int }}
+{{- $adminPublic := .Environment.Values | dig "keycloak" "admin_public" (dict) | default (dict) }}
+{{- $adminPublicOn := eq ($adminPublic | dig "enabled" false | toString) "true" }}
+{{- $adminRanges := list }}
+{{- if $adminPublicOn }}
+{{- $celineEnv := .Environment.Values | dig "celine_env" .Environment.Name | toString | trim | lower }}
+{{- if or (eq .Environment.Name "prod") (eq $celineEnv "prod") }}
+{{- fail (printf "keycloak.admin_public is never enabled in prod (environment %s, celine_env %s): prod's admin console stays on the port-forward" .Environment.Name $celineEnv) }}
+{{- end }}
+{{- $ranges := $adminPublic | dig "allow_source_ranges" nil }}
+{{- if not (and (kindIs "slice" $ranges) $ranges) }}
+{{- fail "keycloak.admin_public.allow_source_ranges is required when keycloak.admin_public.enabled: a non-empty list of CIDRs, e.g. [192.168.1.47/32]" }}
+{{- end }}
+{{- range $ranges }}
+{{- $range := toString . | trim }}
+{{- if not (regexMatch "^(([0-9]{1,3}\\.){3}[0-9]{1,3}/[0-9]{1,2}|[0-9a-fA-F:]+/[0-9]{1,3})$" $range) }}
+{{- fail (printf "keycloak.admin_public.allow_source_ranges: %q is not a CIDR (address/prefix)" $range) }}
+{{- end }}
+{{- if hasSuffix "/0" $range }}
+{{- fail (printf "keycloak.admin_public.allow_source_ranges: %q admits every address" $range) }}
+{{- end }}
+{{- $adminRanges = append $adminRanges $range }}
+{{- end }}
+{{- if ne (.Values | dig "ingress_controller" "class" "nginx" | toString) "nginx" }}
+{{- fail "keycloak.admin_public needs ingress-nginx: the allowlist is its whitelist-source-range annotation, which another controller ignores" }}
+{{- end }}
+{{- end }}
+{{- $adminUrl := ternary (printf "https://keycloak.%s" .Environment.Values.domain) (printf "http://localhost:%d" $adminPort) $adminPublicOn }}
 ingress:
   # If `true`, an Ingress is created
   enabled: true
@@ -132,6 +166,27 @@ ingress:
         {{- end }}
         - path: /resources
           pathType: Prefix
+  # The admin console and master on the same host, from the allowlist only
+  # (keycloak.admin_public, never in prod). The chart's console Ingress, with the public
+  # Ingress's TLS. Off: no such Ingress, `/admin` and `/realms/master` answer 404.
+  console:
+    enabled: {{ $adminPublicOn }}
+    {{- if $adminPublicOn }}
+    ingressClassName: {{ .Values | dig "ingress_controller" "class" "nginx" | quote }}
+    annotations:
+      nginx.ingress.kubernetes.io/whitelist-source-range: {{ join "," $adminRanges | quote }}
+      nginx.ingress.kubernetes.io/proxy-buffer-size: 128k
+      {{- if .Environment.Values | dig "security_headers" "enabled" true }}
+      nginx.ingress.kubernetes.io/custom-headers: "{{ .Release.Namespace }}/keycloak-security-headers"
+      {{- end }}
+    rules:
+      - host: "keycloak.{{ .Environment.Values.domain }}"
+        paths:
+          - path: /admin
+            pathType: Prefix
+          - path: /realms/master
+            pathType: Prefix
+    {{- end }}
   # TLS configuration
   tls:
     - hosts:
@@ -163,13 +218,13 @@ extraEnv: |
   - name: KC_HOSTNAME_STRICT
     value: "false"
   # The admin console's own links and redirects, for the port-forward (`task keycloak:forward`
-  # forwards to this port). localhost is a secure context, so plain http needs no
-  # certificate. KC_HOSTNAME above stays the URL of every realm, issuers included. The
+  # forwards to this port), or the public host when keycloak.admin_public is on. localhost is
+  # a secure context, so plain http needs no certificate. KC_HOSTNAME above stays the URL of every realm, issuers included. The
   # console also needs the master realm's Frontend URL set to the same value: the
   # policies-shell bootstrap sets it on every start, from the same admin_forward_port
   # (README, "Keycloak admin access").
   - name: KC_HOSTNAME_ADMIN
-    value: "http://localhost:{{ $adminPort }}"
+    value: "{{ $adminUrl }}"
   - name: KEYCLOAK_IMPORT
     value: /opt/keycloak/data/import/celine-realm.json
   - name: KEYCLOAK_IMPORT_STRATEGY
