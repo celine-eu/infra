@@ -1,0 +1,127 @@
+## ----------------------------------------------------------------------------
+## celine-member-mirror — values.yaml
+##
+## An intermediate environment (staging, preprod) mirrors the source environment's
+## members (prod's): prod's member key as username and key, prod's Keycloak `sub` as account
+## id, no e-mail, name or credentials. One CronJob, one pod, two halves in sequence:
+##
+##   1. init container `keycloak`: `celine-policies keycloak mirror-members`
+##      (celine-policies REQ-0021). Exit 0 ok, 1 refused or failed, 2 partial (some
+##      members skipped). The wrapper turns 2 into success, so a skipped member does not
+##      block the registry half; 1 fails the pod and the registry half does not run.
+##   2. container `registry`: `celine-rec-registry mirror-members --apply`
+##      (rec-registry REQ-0104). Exit 0 ok, 1 a write failed, 2 refused or unreadable.
+##
+## Both read the source's `GET <source.url>/admin/export/mirror` as the source realm's
+## `source.clientId`. Both CLIs refuse to run under a prod environment signal; this chart
+## refuses to render with one.
+##
+## A one-off run, also while suspended:
+##   kubectl create job --from=cronjob/member-mirror member-mirror-manual-<ts>
+## ----------------------------------------------------------------------------
+
+# Off: nothing renders. infra's helmfile turns it on with `member_mirror.enabled`, never in
+# prod.
+enabled: false
+
+# The environment signal both CLIs read (ENV for celine-policies, CELINE_ENV for
+# rec-registry). Required; `prod` and `production` stop the render.
+env: ""
+
+schedule: "*/15 * * * *"
+timeZone: ""
+# true: no scheduled run; `kubectl create job --from=cronjob/...` still works.
+suspend: false
+# true: both halves count what they would change and write nothing (celine-policies
+# `--dry-run`, rec-registry without `--apply`).
+dryRun: false
+activeDeadlineSeconds: 900
+backoffLimit: 0
+successfulJobsHistoryLimit: 1
+failedJobsHistoryLimit: 3
+
+# The source environment: its registry through its API gateway, and its realm.
+source:
+  # e.g. https://api.<prod domain>/rec-registry
+  url: ""
+  # e.g. https://keycloak.<prod domain>/realms/celine
+  issuer: ""
+  # A client of the source realm holding `rec-registry.mirror` (celine-policies clients.yaml).
+  clientId: svc-member-mirror
+
+# The Keycloak half: this environment's realm, written as its admin client.
+keycloak:
+  image:
+    repository: ghcr.io/celine-eu/celine-policies
+    tag: "latest"
+  # The Keycloak Service inside the cluster, as policies-shell: never the source's host
+  # (the CLI refuses that).
+  baseUrl: "http://keycloak-keycloakx-http"
+  realm: "celine"
+  # Partial import needs `manage-realm`: the realm's `celine-admin-cli` (keycloak bootstrap).
+  adminClientId: celine-admin-cli
+  # Usernames of this realm that may impersonate the mirrors (CELINE_MEMBER_MIRROR_IMPERSONATORS).
+  # Empty: the variable is not set and the permission is left as it is.
+  impersonators: []
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# The registry half: this environment's registry.
+registry:
+  image:
+    repository: ghcr.io/celine-eu/rec-registry
+    tag: "latest"
+  apiUrl: "http://rec-registry:8004"
+  # This realm's token endpoint base (its public issuer, as rec-registry-shell).
+  authUrl: ""
+  # A client of this realm whose token reaches rec-registry with rec-registry.export,
+  # .members.write and .assets.write (or .admin).
+  clientId: celine-cli
+  resources:
+    requests:
+      cpu: 10m
+      memory: 256Mi
+    limits:
+      cpu: 200m
+      memory: 512Mi
+
+# The three secrets, written to the release's Secret (`<fullname>`) and read only by
+# secretKeyRef. All three are required.
+secrets:
+  # The source realm's `source.clientId` secret (prod's svc-member-mirror).
+  sourceClientSecret: ""
+  # This realm's `keycloak.adminClientId` secret.
+  keycloakAdminClientSecret: ""
+  # This realm's `registry.clientId` secret.
+  registryClientSecret: ""
+
+# The environment's `image_digests` ({repository: {tag: sha256:…}}): a listed image renders
+# as `repository:tag@sha256:…`. Empty: images by tag.
+imageDigests: {}
+image:
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+# A Secret with `ca.crt`, mounted and named by SSL_CERT_FILE/REQUESTS_CA_BUNDLE (self-signed
+# environments). Empty: the image's bundle.
+caSecret: ""
+
+nameOverride: ""
+fullnameOverride: "member-mirror"
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: [ALL]
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

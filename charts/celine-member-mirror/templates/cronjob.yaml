@@ -1,0 +1,147 @@
+{{- /*
+  The member mirror (store plan a-prod-member-can-try-staging-under-a-pseudonym, C3): the
+  Keycloak half as an init container, the registry half as the container, in one pod. The
+  init container's wrapper turns celine-policies' exit 2 (some members skipped) into
+  success, so the registry half still runs; any other failure fails the pod.
+*/ -}}
+{{- if .Values.enabled }}
+{{- include "celine-member-mirror.check" . }}
+{{- $fullname := include "celine-member-mirror.fullname" . }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "celine-member-mirror.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.schedule | quote }}
+  {{- with .Values.timeZone }}
+  timeZone: {{ . | quote }}
+  {{- end }}
+  suspend: {{ .Values.suspend }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: {{ .Values.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.failedJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: {{ .Values.activeDeadlineSeconds }}
+      backoffLimit: {{ .Values.backoffLimit }}
+      template:
+        metadata:
+          labels:
+            {{- include "celine-member-mirror.labels" . | nindent 12 }}
+        spec:
+          restartPolicy: Never
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          securityContext:
+            {{- toYaml .Values.podSecurityContext | nindent 12 }}
+          initContainers:
+            - name: keycloak
+              image: {{ include "celine-member-mirror.imageRef" (dict "repository" .Values.keycloak.image.repository "tag" .Values.keycloak.image.tag "digests" .Values.imageDigests) | quote }}
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              securityContext:
+                {{- toYaml .Values.containerSecurityContext | nindent 16 }}
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  celine-policies keycloak mirror-members{{ if .Values.dryRun }} --dry-run{{ end }}
+                  rc=$?
+                  if [ "$rc" -eq 2 ]; then
+                    echo "member-mirror: keycloak half partial (exit 2, some members skipped); the registry half runs"
+                    exit 0
+                  fi
+                  exit "$rc"
+              env:
+                - name: ENV
+                  value: {{ .Values.env | quote }}
+                - name: CELINE_KEYCLOAK_BASE_URL
+                  value: {{ .Values.keycloak.baseUrl | quote }}
+                - name: CELINE_KEYCLOAK_REALM
+                  value: {{ .Values.keycloak.realm | quote }}
+                - name: CELINE_KEYCLOAK_ADMIN_CLIENT_ID
+                  value: {{ .Values.keycloak.adminClientId | quote }}
+                {{- include "celine-member-mirror.secretEnv" (dict "name" "CELINE_KEYCLOAK_ADMIN_CLIENT_SECRET" "secret" $fullname "key" "keycloak-admin-client-secret") | nindent 16 }}
+                - name: CELINE_MEMBER_MIRROR_SOURCE_URL
+                  value: {{ .Values.source.url | quote }}
+                - name: CELINE_MEMBER_MIRROR_SOURCE_ISSUER
+                  value: {{ .Values.source.issuer | quote }}
+                - name: CELINE_MEMBER_MIRROR_SOURCE_CLIENT_ID
+                  value: {{ .Values.source.clientId | quote }}
+                {{- include "celine-member-mirror.secretEnv" (dict "name" "CELINE_MEMBER_MIRROR_SOURCE_CLIENT_SECRET" "secret" $fullname "key" "source-client-secret") | nindent 16 }}
+                {{- with .Values.keycloak.impersonators }}
+                - name: CELINE_MEMBER_MIRROR_IMPERSONATORS
+                  value: {{ join " " . | quote }}
+                {{- end }}
+                {{- include "celine-member-mirror.caEnv" . | nindent 16 }}
+              {{- if .Values.caSecret }}
+              volumeMounts:
+                - name: celine-ca
+                  mountPath: /etc/ssl/celine-ca
+                  readOnly: true
+              {{- end }}
+              resources:
+                {{- toYaml .Values.keycloak.resources | nindent 16 }}
+          containers:
+            - name: registry
+              image: {{ include "celine-member-mirror.imageRef" (dict "repository" .Values.registry.image.repository "tag" .Values.registry.image.tag "digests" .Values.imageDigests) | quote }}
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              securityContext:
+                {{- toYaml .Values.containerSecurityContext | nindent 16 }}
+              command:
+                - celine-rec-registry
+                - mirror-members
+                {{- if not .Values.dryRun }}
+                - --apply
+                {{- end }}
+              env:
+                - name: CELINE_ENV
+                  value: {{ .Values.env | quote }}
+                - name: SOURCE_REGISTRY_API_URL
+                  value: {{ .Values.source.url | quote }}
+                - name: SOURCE_REGISTRY_AUTH_URL
+                  value: {{ .Values.source.issuer | quote }}
+                - name: SOURCE_REGISTRY_CLIENT_ID
+                  value: {{ .Values.source.clientId | quote }}
+                {{- include "celine-member-mirror.secretEnv" (dict "name" "SOURCE_REGISTRY_CLIENT_SECRET" "secret" $fullname "key" "source-client-secret") | nindent 16 }}
+                - name: REGISTRY_API_URL
+                  value: {{ .Values.registry.apiUrl | quote }}
+                - name: REGISTRY_AUTH_URL
+                  value: {{ .Values.registry.authUrl | quote }}
+                - name: REGISTRY_CLIENT_ID
+                  value: {{ .Values.registry.clientId | quote }}
+                {{- include "celine-member-mirror.secretEnv" (dict "name" "REGISTRY_CLIENT_SECRET" "secret" $fullname "key" "registry-client-secret") | nindent 16 }}
+                {{- include "celine-member-mirror.caEnv" . | nindent 16 }}
+              {{- if .Values.caSecret }}
+              volumeMounts:
+                - name: celine-ca
+                  mountPath: /etc/ssl/celine-ca
+                  readOnly: true
+              {{- end }}
+              resources:
+                {{- toYaml .Values.registry.resources | nindent 16 }}
+          {{- if .Values.caSecret }}
+          volumes:
+            - name: celine-ca
+              secret:
+                secretName: {{ .Values.caSecret }}
+                items:
+                  - key: ca.crt
+                    path: ca.crt
+          {{- end }}
+          {{- with .Values.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.affinity }}
+          affinity:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}

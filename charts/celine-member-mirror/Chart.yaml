@@ -1,0 +1,9 @@
+apiVersion: v2
+name: celine-member-mirror
+description: >
+  An intermediate environment's member mirror: one CronJob that mirrors the source
+  environment's (prod's) members into this realm (celine-policies `keycloak mirror-members`)
+  and then into this registry (`celine-rec-registry mirror-members`). Never for prod.
+type: application
+version: 0.1.0
+appVersion: "latest"

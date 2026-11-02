@@ -1,0 +1,80 @@
+{{- /*
+  The member mirror of an intermediate environment (charts/celine-member-mirror): mirrors
+  prod's members into this realm and this registry on a schedule. Off unless
+  `member_mirror.enabled: true`; never in the `prod` environment (the helmfile does not
+  install it there, and this file renders it off). Every key read with dig.
+
+  Environment values (secrets in secrets.sops.yaml):
+    member_mirror:
+      enabled: false
+      schedule: <cron>                       # default: every 15 minutes
+      suspend: false
+      dry_run: false
+      impersonators: []                      # usernames of this realm, da decidere
+      source_client_id: svc-member-mirror    # prod realm client, rec-registry.mirror
+      source_realm: celine
+      keycloak_admin_client_id: celine-admin-cli
+      registry_client_id: celine-cli
+      source_client_secret: <secret>         # prod's member_mirror.client_secret
+      keycloak_admin_client_secret: <secret> # this realm's celine-admin-cli
+      registry_client_secret: <secret>       # only when registry_client_id is not celine-cli
+                                             # (celine-cli: auth_setup.clientCLISecret)
+  The source is prod: `prod_reads.domain` (api.<domain>/rec-registry, keycloak.<domain>).
+*/}}
+{{- $mm := .Environment.Values | dig "member_mirror" (dict) | default (dict) }}
+{{- $on := and (ne .Environment.Name "prod") ($mm | dig "enabled" false) }}
+enabled: {{ $on }}
+{{- if $on }}
+{{- $env := .Environment.Values | dig "celine_env" .Environment.Name | toString }}
+{{- if has ($env | trim | lower) (list "prod" "production") }}
+{{- fail (printf "member_mirror: celine_env is %q in environment %s; a member mirror never runs in prod" $env .Environment.Name) }}
+{{- end }}
+{{- $prodDomain := .Environment.Values | dig "prod_reads" "domain" "" | toString }}
+{{- if not $prodDomain }}
+{{- fail "member_mirror: prod_reads.domain is required, prod's domain (api.<domain>/rec-registry, keycloak.<domain>)" }}
+{{- end }}
+{{- $realm := .Environment.Values | dig "keycloak" "realm" "celine" | default "celine" }}
+{{- $sourceSecret := $mm | dig "source_client_secret" "" | toString }}
+{{- if not $sourceSecret }}
+{{- fail "member_mirror.source_client_secret is required in the environment's secrets: prod's svc-member-mirror secret (prod's member_mirror.client_secret)" }}
+{{- end }}
+{{- $kcSecret := $mm | dig "keycloak_admin_client_secret" "" | toString }}
+{{- if not $kcSecret }}
+{{- fail "member_mirror.keycloak_admin_client_secret is required in the environment's secrets: this realm's celine-admin-cli secret (admin console, Clients > celine-admin-cli > Credentials)" }}
+{{- end }}
+{{- $registryClient := $mm | dig "registry_client_id" "celine-cli" | toString }}
+{{- $registrySecret := $mm | dig "registry_client_secret" "" | toString }}
+{{- if and (not $registrySecret) (eq $registryClient "celine-cli") }}
+{{- $registrySecret = .Environment.Values | dig "auth_setup" "clientCLISecret" "" | toString }}
+{{- end }}
+{{- if not $registrySecret }}
+{{- fail (printf "member_mirror.registry_client_secret is required in the environment's secrets: the secret of %s in this realm" $registryClient) }}
+{{- end }}
+env: {{ $env | quote }}
+schedule: {{ $mm | dig "schedule" "*/15 * * * *" | quote }}
+suspend: {{ $mm | dig "suspend" false }}
+dryRun: {{ $mm | dig "dry_run" false }}
+imageDigests: {{ .Environment.Values | dig "image_digests" (dict) | toJson }}
+caSecret: {{ if .Environment.Values | dig "tls_setup" "self_signed" false }}{{ .Environment.Values | dig "tls_setup" "ca_secret" "celine-ca" | quote }}{{ else }}""{{ end }}
+source:
+  url: {{ printf "https://api.%s/rec-registry" $prodDomain | quote }}
+  issuer: {{ printf "https://keycloak.%s/realms/%s" $prodDomain ($mm | dig "source_realm" "celine") | quote }}
+  clientId: {{ $mm | dig "source_client_id" "svc-member-mirror" | quote }}
+keycloak:
+  image:
+    tag: {{ .Environment.Values | dig "policies_shell" "image_tag" "latest" | default "latest" | quote }}
+  baseUrl: {{ .Environment.Values | dig "keycloak" "internal_url" "http://keycloak-keycloakx-http" | quote }}
+  realm: {{ $realm | quote }}
+  adminClientId: {{ $mm | dig "keycloak_admin_client_id" "celine-admin-cli" | quote }}
+  impersonators: {{ $mm | dig "impersonators" (list) | default (list) | toJson }}
+registry:
+  image:
+    tag: {{ .Environment.Values | dig "rec_registry" "image_tag" "latest" | default "latest" | quote }}
+  apiUrl: {{ $mm | dig "registry_api_url" "http://rec-registry:8004" | quote }}
+  authUrl: {{ printf "https://keycloak.%s/realms/%s" .Environment.Values.domain $realm | quote }}
+  clientId: {{ $registryClient | quote }}
+secrets:
+  sourceClientSecret: {{ $sourceSecret | quote }}
+  keycloakAdminClientSecret: {{ $kcSecret | quote }}
+  registryClientSecret: {{ $registrySecret | quote }}
+{{- end }}

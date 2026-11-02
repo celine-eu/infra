@@ -142,6 +142,16 @@ tasks:
     cmds:
       - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/traefik -v {{.CLI_ARGS}}
 
+  test:rec-registry:
+    desc: "Render rec-registry and check POD_HMAC_KEY: read from its Secret by secretKeyRef, rendered only where rec_registry.pod_hmac_key is set (prod)"
+    cmds:
+      - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/rec-registry -v {{.CLI_ARGS}}
+
+  test:member-mirror:
+    desc: "Render member-mirror (staging only, never prod) and check both halves' env, secrets by secretKeyRef only, and that the Keycloak half's exit 2 (partial) lets the registry half run while exit 1 fails the pod"
+    cmds:
+      - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/member-mirror -v {{.CLI_ARGS}}
+
   test:frontend-roi:
     desc: "Render the ROI host and check the page and calculator are public, the feedback paths need an existing SSO session (401, no redirect) and keep the API's limits and policy"
     cmds:

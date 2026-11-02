@@ -20,7 +20,7 @@
 {{- end }}
 {{- $secrets := .Environment.Values | dig "dataspace" "client_secrets" (dict) | default (dict) }}
 {{- /* The names this file already sets: a client id giving one of them would set it twice. */}}
-{{- $taken := list "SVC_DT_SECRET" "SVC_PIPELINES_SECRET" "SVC_DATASET_SECRET" "SVC_NUDGING_SECRET" "SVC_REC_REGISTRY_SECRET" "SVC_FLEXIBILITY_SECRET" "SVC_WEBAPP_SECRET" "SVC_COMMUNITY_SECRET" "SVC_PROVISIONING_SECRET" "SVC_GRID_SECRET" "SVC_FORECAST_SECRET" "SVC_ONBOARDING_SECRET" "SVC_ONBOARDING_CLI_SECRET" "CELINE_ADMIN_CLI_SECRET" "OAUTH2_PROXY_CLIENT_SECRET" }}
+{{- $taken := list "SVC_DT_SECRET" "SVC_PIPELINES_SECRET" "SVC_DATASET_SECRET" "SVC_NUDGING_SECRET" "SVC_REC_REGISTRY_SECRET" "SVC_FLEXIBILITY_SECRET" "SVC_WEBAPP_SECRET" "SVC_COMMUNITY_SECRET" "SVC_PROVISIONING_SECRET" "SVC_GRID_SECRET" "SVC_FORECAST_SECRET" "SVC_ONBOARDING_SECRET" "SVC_ONBOARDING_CLI_SECRET" "CELINE_ADMIN_CLI_SECRET" "OAUTH2_PROXY_CLIENT_SECRET" "SVC_MEMBER_MIRROR_SECRET" }}
 {{- range $clients }}
 {{- if not (and (kindIs "string" .) (regexMatch "^[a-z0-9][a-z0-9-]*$" .)) }}
 {{- fail (printf "dataspace.policies_shell.clients: %v is not a realm client id (lower-case letters, digits and '-')" .) }}
@@ -133,6 +133,13 @@ extraEnv:
     value: {{ .Values.domain | quote }}
   - name: CELINE_URL_SCHEME
     value: "https"
+{{- /* svc-member-mirror (celine-policies clients.yaml, REQ-0021): this realm's own secret,
+       `member_mirror.client_secret`. Outside dev no guessable default: unset, the variable is
+       not set, and a policies release that declares the client refuses to sync. */}}
+{{- with .Environment.Values | dig "member_mirror" "client_secret" (ternary "svc-member-mirror" "" (eq .Environment.Name "dev")) }}
+  - name: SVC_MEMBER_MIRROR_SECRET
+    value: {{ . | quote }}
+{{- end }}
 {{- range $dsEnv }}
   - name: {{ .name }}
     value: {{ .value | quote }}

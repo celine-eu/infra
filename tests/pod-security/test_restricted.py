@@ -58,11 +58,20 @@ POLICIES_SHELL = """policies_shell:
     client_secret: 0123456789abcdef0123456789abcdef
 """
 
+MEMBER_MIRROR = """prod_reads:
+  domain: prod.example.org
+member_mirror:
+  enabled: true
+  source_client_secret: source-secret
+  keycloak_admin_client_secret: kc-admin-secret
+"""
+
 # (helmfile, release, override)
 RELEASES = {
     "policies-shell": ("0050-celine-services.yaml.gotmpl", "policies-shell", POLICIES_SHELL),
     "dataset-api-shell": ("0050-celine-services.yaml.gotmpl", "dataset-api-shell", ""),
     "rec-registry-shell": ("0050-celine-services.yaml.gotmpl", "rec-registry-shell", ""),
+    "member-mirror": ("0050-celine-services.yaml.gotmpl", "member-mirror", MEMBER_MIRROR),
     "postgres-db": ("0010-core.yaml.gotmpl", "postgres-db", POSTGRES_JOBS),
     "keycloak": ("0020-auth.yaml.gotmpl", "keycloak", ""),
     "redis": ("0010-core.yaml.gotmpl", "redis", ""),
