@@ -1,5 +1,7 @@
-# The add-on layer: envs/<env>/addons.yaml.gotmpl, loaded only where it exists, after
-# values.yaml (README, "Add-on layer"). Absent, nothing changes.
+# Environments: `dev` is the one versioned here; every other one is discovered, any envs/<name>/
+# holding a values.yaml (a directory or a link to one, never committed here). Each gets, in
+# order: values.yaml, addons.yaml.gotmpl when present (README, "Add-on layer"), its
+# secrets.sops.yaml when present. No other environment name is written here.
 environments:
   dev:
     values:
@@ -9,23 +11,24 @@ environments:
       {{- end }}
     secrets:
       - ../envs/dev/secrets.sops.yaml
-  staging:
+  {{- range $e := readDirEntries "../envs" }}
+  {{- $dir := printf "../envs/%s" $e.Name }}
+  {{- if and (ne $e.Name "dev") (not (hasPrefix "." $e.Name)) (isFile (printf "%s/values.yaml" $dir)) }}
+  {{ $e.Name }}:
     values:
-      - ../envs/staging/values.yaml
-      {{- if isFile "../envs/staging/addons.yaml.gotmpl" }}
-      - ../envs/staging/addons.yaml.gotmpl
+      - {{ $dir }}/values.yaml
+      {{- if isFile (printf "%s/addons.yaml.gotmpl" $dir) }}
+      - {{ $dir }}/addons.yaml.gotmpl
       {{- end }}
+    {{- if isFile (printf "%s/secrets.sops.yaml" $dir) }}
     secrets:
-      - ../envs/staging/secrets.sops.yaml
-  prod:
-    values:
-      - ../envs/prod/values.yaml
-      {{- if isFile "../envs/prod/addons.yaml.gotmpl" }}
-      - ../envs/prod/addons.yaml.gotmpl
-      {{- end }}
-    secrets:
-      - ../envs/prod/secrets.sops.yaml
+      - {{ $dir }}/secrets.sops.yaml
+    {{- end }}
+  {{- end }}
+  {{- end }}
 ---
+# The namespace: the environment value `namespace`, by default celine-<environment name>.
+{{- $ns := .Environment.Values | dig "namespace" (printf "celine-%s" .Environment.Name) | toString }}
 repositories:
   - name: superset
     url: https://apache.github.io/superset
@@ -39,7 +42,7 @@ repositories:
 
 releases:
   - name: superset
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: superset/superset
     version: 0.15.0
     installed: {{ .Environment.Values | dig "superset" "enabled" true }}
@@ -52,7 +55,7 @@ releases:
       group: apps
 
   - name: marquez
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: ../charts/marquez
     createNamespace: true
     missingFileHandler: Warn
@@ -63,7 +66,7 @@ releases:
       group: apps
 
   - name: mosquitto-go-auth
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: ../charts/mosquitto-go-auth
     createNamespace: true
     missingFileHandler: Warn
@@ -74,7 +77,7 @@ releases:
       group: apps
 
   - name: mqtt-setup
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: ../charts/mqtt-setup
     createNamespace: true
     missingFileHandler: Warn
@@ -86,12 +89,12 @@ releases:
 
 {{- if .Values.mqtt_ingestor.enabled }}
   - name: mqtt-ingestor
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: ../charts/mqtt-ingestor
     createNamespace: true
     missingFileHandler: Warn
     needs:
-      - celine-{{ .Environment.Name }}/mqtt-setup
+      - {{ $ns }}/mqtt-setup
     values:
       - ../defaults/0030-apps/mqtt-ingestor/values.yaml.gotmpl
       - ../envs/{{ .Environment.Name }}/0030-apps/mqtt-ingestor/values.yaml.gotmpl
@@ -100,7 +103,7 @@ releases:
 {{- end }}
 
   - name: qdrant
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: qdrant/qdrant
     version: 1.17.0
     createNamespace: true

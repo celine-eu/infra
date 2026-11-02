@@ -1,3 +1,5 @@
-preprod*
-prod*
-staging*
+# Only dev is versioned here. Any other environment is a link to a deployment repository
+# (or a local folder), and is never committed to this repository.
+/*
+!/.gitignore
+!/dev/

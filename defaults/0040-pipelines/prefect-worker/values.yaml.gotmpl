@@ -17,7 +17,7 @@ worker:
     workPool: celine
     # jobNamespace controls the observer watch namespace only.
     # Job spawn namespace is set via the base job template's namespace variable default.
-    jobNamespace: celine-{{ .Environment.Name }}
+    jobNamespace: {{ .Environment.Values | dig "namespace" (printf "celine-%s" .Environment.Name) }}
     baseJobTemplate:
       configuration: |
         {
@@ -88,7 +88,7 @@ worker:
               },
               "namespace": {
                 "type": "string",
-                "default": "celine-{{ .Environment.Name }}"
+                "default": "{{ .Environment.Values | dig "namespace" (printf "celine-%s" .Environment.Name) }}"
               },
               "backoff_limit": {
                 "type": "integer",

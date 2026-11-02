@@ -1,5 +1,7 @@
-# The add-on layer: envs/<env>/addons.yaml.gotmpl, loaded only where it exists, after
-# values.yaml (README, "Add-on layer"). Absent, nothing changes.
+# Environments: `dev` is the one versioned here; every other one is discovered, any envs/<name>/
+# holding a values.yaml (a directory or a link to one, never committed here). Each gets, in
+# order: values.yaml, addons.yaml.gotmpl when present (README, "Add-on layer"), its
+# secrets.sops.yaml when present. No other environment name is written here.
 environments:
   dev:
     values:
@@ -9,30 +11,31 @@ environments:
       {{- end }}
     secrets:
       - ../envs/dev/secrets.sops.yaml
-  staging:
+  {{- range $e := readDirEntries "../envs" }}
+  {{- $dir := printf "../envs/%s" $e.Name }}
+  {{- if and (ne $e.Name "dev") (not (hasPrefix "." $e.Name)) (isFile (printf "%s/values.yaml" $dir)) }}
+  {{ $e.Name }}:
     values:
-      - ../envs/staging/values.yaml
-      {{- if isFile "../envs/staging/addons.yaml.gotmpl" }}
-      - ../envs/staging/addons.yaml.gotmpl
+      - {{ $dir }}/values.yaml
+      {{- if isFile (printf "%s/addons.yaml.gotmpl" $dir) }}
+      - {{ $dir }}/addons.yaml.gotmpl
       {{- end }}
+    {{- if isFile (printf "%s/secrets.sops.yaml" $dir) }}
     secrets:
-      - ../envs/staging/secrets.sops.yaml
-  prod:
-    values:
-      - ../envs/prod/values.yaml
-      {{- if isFile "../envs/prod/addons.yaml.gotmpl" }}
-      - ../envs/prod/addons.yaml.gotmpl
-      {{- end }}
-    secrets:
-      - ../envs/prod/secrets.sops.yaml
+      - {{ $dir }}/secrets.sops.yaml
+    {{- end }}
+  {{- end }}
+  {{- end }}
 ---
+# The namespace: the environment value `namespace`, by default celine-<environment name>.
+{{- $ns := .Environment.Values | dig "namespace" (printf "celine-%s" .Environment.Name) | toString }}
 # repositories:
 #   - name: celine-services
 #     url: ../charts/celine-services
 
 releases:
   - name: digital-twin
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: ../charts/celine-digital-twin
     createNamespace: true
     missingFileHandler: Warn
@@ -45,7 +48,7 @@ releases:
       group: celine-services
 
   - name: dataset-api
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: ../charts/celine-dataset-api
     createNamespace: true
     missingFileHandler: Warn
@@ -58,7 +61,7 @@ releases:
       group: celine-services
 
   - name: dataset-api-shell
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: ../charts/celine-dataset-api-shell
     createNamespace: true
     missingFileHandler: Warn
@@ -70,7 +73,7 @@ releases:
       group: celine-services
 
   - name: ai-assistant
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: ../charts/celine-ai-assistant
     createNamespace: true
     missingFileHandler: Warn
@@ -85,7 +88,7 @@ releases:
   # Operator pod for `celine-assistant kb`. Reads the assistant's defaults first, so
   # the CLI runs with the service's environment (and its KB_GIT_TOKEN secret).
   - name: ai-assistant-shell
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: ../charts/celine-ai-assistant-shell
     missingFileHandler: Warn
     values:
@@ -98,7 +101,7 @@ releases:
       group: celine-services
 
   - name: webapp
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: ../charts/celine-webapp
     createNamespace: true
     missingFileHandler: Warn
@@ -111,7 +114,7 @@ releases:
       group: celine-services
 
   - name: nudging
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: ../charts/celine-nudging
     createNamespace: true
     missingFileHandler: Warn
@@ -124,7 +127,7 @@ releases:
       group: celine-services
 
   - name: rec-registry
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: ../charts/celine-rec-registry
     createNamespace: true
     missingFileHandler: Warn
@@ -137,7 +140,7 @@ releases:
       group: celine-services
 
   - name: rec-registry-shell
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: ../charts/celine-rec-registry-shell
     missingFileHandler: Warn
     labels:
@@ -148,7 +151,7 @@ releases:
       - ../envs/{{ .Environment.Name }}/0050-celine-services/celine-rec-registry-shell/values.yaml.gotmpl
 
   - name: mqtt-auth
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: ../charts/celine-mqtt-auth
     missingFileHandler: Warn
     values:
@@ -160,7 +163,7 @@ releases:
       group: celine-services
 
   - name: policies-shell
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: ../charts/celine-policies-shell
     missingFileHandler: Warn
     labels:
@@ -171,7 +174,7 @@ releases:
       - ../envs/{{ .Environment.Name }}/0050-celine-services/celine-policies-shell/values.yaml.gotmpl
 
   - name: flexibility-api
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: ../charts/celine-flexibility-api
     createNamespace: true
     missingFileHandler: Warn
@@ -184,7 +187,7 @@ releases:
       group: celine-services
 
   - name: api-gateway
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: ../charts/api-gateway
     createNamespace: true
     missingFileHandler: Warn
@@ -196,7 +199,7 @@ releases:
       group: celine-services
 
   - name: roi
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: ../charts/celine-roi
     createNamespace: true
     missingFileHandler: Warn
@@ -209,7 +212,7 @@ releases:
       group: celine-services
 
   - name: frontend-assistant
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: ../charts/celine-frontend-assistant
     createNamespace: true
     missingFileHandler: Warn
@@ -222,7 +225,7 @@ releases:
       group: celine-services
 
   - name: frontend-webapp
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: ../charts/celine-frontend-webapp
     createNamespace: true
     missingFileHandler: Warn
@@ -235,7 +238,7 @@ releases:
       group: celine-services
 
   - name: frontend-roi
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: ../charts/celine-frontend-roi
     createNamespace: true
     missingFileHandler: Warn
@@ -248,7 +251,7 @@ releases:
       group: celine-services
 
   - name: grid
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: ../charts/celine-grid
     createNamespace: true
     missingFileHandler: Warn
@@ -261,7 +264,7 @@ releases:
       group: celine-services
 
   - name: frontend-grid
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: ../charts/celine-frontend-grid
     createNamespace: true
     missingFileHandler: Warn
@@ -274,7 +277,7 @@ releases:
       group: celine-services
 
   - name: provisioning
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: ../charts/celine-provisioning
     missingFileHandler: Warn
     values:
@@ -286,7 +289,7 @@ releases:
       group: celine-services
 
   - name: community
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: ../charts/celine-community
     createNamespace: true
     missingFileHandler: Warn
@@ -299,7 +302,7 @@ releases:
       group: celine-services
 
   - name: frontend-community
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: ../charts/celine-frontend-community
     createNamespace: true
     missingFileHandler: Warn
@@ -316,7 +319,7 @@ releases:
   # environment has by default (the encryption key, the forwarded-IP range).
   # See defaults/0050-celine-services/celine-onboarding/values.yaml.gotmpl.
   - name: onboarding
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: ../charts/celine-onboarding
     createNamespace: true
     installed: {{ .Environment.Values | dig "onboarding" "enabled" false }}
@@ -333,7 +336,7 @@ releases:
   # and the deployment's data). Off until `legal.enabled: true` and `legal.image_tag`. See
   # defaults/0050-celine-services/celine-legal/values.yaml.gotmpl.
   - name: legal
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: ../charts/celine-legal
     createNamespace: true
     installed: {{ .Environment.Values | dig "legal" "enabled" false }}
@@ -350,7 +353,7 @@ releases:
   # /ns/sharing-offers, for an environment whose dataspace is not installed yet (onboarding's
   # DS_NS_URL). See defaults/0050-celine-services/sharing-offers-vocabulary/values.yaml.gotmpl.
   - name: sharing-offers-vocabulary
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: ../charts/sharing-offers-vocabulary
     createNamespace: true
     installed: {{ .Environment.Values | dig "sharing_offers_vocabulary" "enabled" false }}
@@ -366,7 +369,7 @@ releases:
   # (staging). Off unless a role is enabled. See
   # defaults/0050-celine-services/sync-tables/values.yaml.gotmpl.
   - name: sync-tables
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: ../charts/sync-tables
     createNamespace: true
     installed: {{ or (.Environment.Values | dig "sync_tables" "sink" "enabled" false) (.Environment.Values | dig "sync_tables" "push_source" "enabled" false) (.Environment.Values | dig "sync_tables" "serve" "enabled" false) }}
@@ -382,7 +385,7 @@ releases:
   # `member_mirror.enabled: true`, and never installed in prod. See
   # defaults/0050-celine-services/celine-member-mirror/values.yaml.gotmpl.
   - name: member-mirror
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: ../charts/celine-member-mirror
     installed: {{ and (ne .Environment.Name "prod") (.Environment.Values | dig "member_mirror" "enabled" false) }}
     missingFileHandler: Warn
@@ -393,7 +396,7 @@ releases:
       group: celine-services
 
   - name: frontend-onboarding
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: ../charts/celine-frontend-onboarding
     createNamespace: true
     installed: {{ .Environment.Values | dig "onboarding" "enabled" false }}

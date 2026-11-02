@@ -2,7 +2,7 @@
 global:
   oidcClientSecret: {{ .Environment.Values.pipelines.client_secret | quote }}
   image: prefecthq/prefect:3-latest
-  namespace: celine-{{ .Environment.Name }}
+  namespace: {{ .Environment.Values | dig "namespace" (printf "celine-%s" .Environment.Name) }}
   work_pool: celine
   env:
     - name: PREFECT_MODE

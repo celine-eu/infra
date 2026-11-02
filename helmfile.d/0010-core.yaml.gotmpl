@@ -1,5 +1,7 @@
-# The add-on layer: envs/<env>/addons.yaml.gotmpl, loaded only where it exists, after
-# values.yaml (README, "Add-on layer"). Absent, nothing changes.
+# Environments: `dev` is the one versioned here; every other one is discovered, any envs/<name>/
+# holding a values.yaml (a directory or a link to one, never committed here). Each gets, in
+# order: values.yaml, addons.yaml.gotmpl when present (README, "Add-on layer"), its
+# secrets.sops.yaml when present. No other environment name is written here.
 environments:
   dev:
     values:
@@ -9,23 +11,24 @@ environments:
       {{- end }}
     secrets:
       - ../envs/dev/secrets.sops.yaml
-  staging:
+  {{- range $e := readDirEntries "../envs" }}
+  {{- $dir := printf "../envs/%s" $e.Name }}
+  {{- if and (ne $e.Name "dev") (not (hasPrefix "." $e.Name)) (isFile (printf "%s/values.yaml" $dir)) }}
+  {{ $e.Name }}:
     values:
-      - ../envs/staging/values.yaml
-      {{- if isFile "../envs/staging/addons.yaml.gotmpl" }}
-      - ../envs/staging/addons.yaml.gotmpl
+      - {{ $dir }}/values.yaml
+      {{- if isFile (printf "%s/addons.yaml.gotmpl" $dir) }}
+      - {{ $dir }}/addons.yaml.gotmpl
       {{- end }}
+    {{- if isFile (printf "%s/secrets.sops.yaml" $dir) }}
     secrets:
-      - ../envs/staging/secrets.sops.yaml
-  prod:
-    values:
-      - ../envs/prod/values.yaml
-      {{- if isFile "../envs/prod/addons.yaml.gotmpl" }}
-      - ../envs/prod/addons.yaml.gotmpl
-      {{- end }}
-    secrets:
-      - ../envs/prod/secrets.sops.yaml
+      - {{ $dir }}/secrets.sops.yaml
+    {{- end }}
+  {{- end }}
+  {{- end }}
 ---
+# The namespace: the environment value `namespace`, by default celine-<environment name>.
+{{- $ns := .Environment.Values | dig "namespace" (printf "celine-%s" .Environment.Name) | toString }}
 repositories:
   - name: cnpg
     url: https://cloudnative-pg.github.io/charts
@@ -82,7 +85,7 @@ releases:
       group: core
 
   - name: postgres-db
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: ../charts/postgres-db
     version: 0.1.0
     createNamespace: true
@@ -96,7 +99,7 @@ releases:
       group: core
 
   - name: redis
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: oci://ghcr.io/cloudpirates-io/helm-charts/redis
     version: 0.6.3
     createNamespace: true
@@ -165,7 +168,7 @@ releases:
       group: core
 
   - name: tls-setup
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: ../charts/tls-setup
     needs:
       - cert-manager/cert-manager
@@ -206,7 +209,7 @@ releases:
 {{- end }}
 {{- end }}
   - name: celine-network-policy
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: ../charts/celine-network-policy
     version: 0.1.0
     createNamespace: true
@@ -223,8 +226,8 @@ releases:
           - -c
           - |
             set -euo pipefail
-            kubectl create namespace celine-{{ .Environment.Name }} --dry-run=client -o yaml | kubectl apply -f -
-            kubectl label namespace celine-{{ .Environment.Name }} --overwrite {{ join " " $psaLabels }}
+            kubectl create namespace {{ $ns }} --dry-run=client -o yaml | kubectl apply -f -
+            kubectl label namespace {{ $ns }} --overwrite {{ join " " $psaLabels }}
     {{- end }}
     values:
       - ../defaults/0010-core/celine-network-policy/values.yaml.gotmpl
@@ -233,7 +236,7 @@ releases:
       group: core
 
   - name: registry-accounts
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: ../charts/registry-accounts
     version: 0.1.0
     createNamespace: true
@@ -246,7 +249,7 @@ releases:
 
   ## S3 storage setup
   - name: s3-accounts
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: ../charts/s3-accounts
     version: 0.1.0
     createNamespace: true
@@ -259,7 +262,7 @@ releases:
 
 {{- if .Values.seaweedfs.enabled }}
   - name: seaweedfs
-    namespace: celine-{{ .Environment.Name }}
+    namespace: {{ $ns }}
     chart: seaweedfs/seaweedfs
     version: 4.0.398
     createNamespace: true
