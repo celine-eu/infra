@@ -8,6 +8,26 @@ oidc:
 migrate:
   enabled: true
 
+{{- $podHmacKey := .Environment.Values | dig "rec_registry" "pod_hmac_key" "" }}
+# Replaces the chart's list, so its entry is repeated here.
+extraEnv:
+  - name: REC_REGISTRY_URL
+    value: http://celine-rec-registry:8004
+  {{- if $podHmacKey }}
+  # The key PODs are hashed with (REQ-0105). Prod only: whoever holds it can rebuild every
+  # POD from its hash. Read from the Secret, never a plain value in the Deployment.
+  - name: POD_HMAC_KEY
+    valueFrom:
+      secretKeyRef:
+        name: {{ .Release.Name }}-secrets
+        key: POD_HMAC_KEY
+  {{- end }}
+
+{{- if $podHmacKey }}
+extraSecrets:
+  POD_HMAC_KEY: {{ $podHmacKey | quote }}
+{{- end }}
+
 {{- with .Environment.Values | dig "rec_registry" "resources" nil }}
 resources:
   {{- toYaml . | nindent 2 }}
