@@ -1,0 +1,115 @@
+{{- /* One entry of `oauth2_proxy.gates` (release `oauth2-proxy-<name>`): an admin UI behind its
+       own oauth2-proxy, as a reverse proxy, with no Traefik Middleware. For clusters where a
+       tenant may not create `middlewares.traefik.io`: Traefik's egress is unrestricted, so a
+       tenant-written forwardAuth address would bypass the tenant's egress policy.
+
+       Entry: `name` (the release suffix), `upstream` (the UI's in-cluster URL), optional
+       `host` (the label under `domain`, default `name`). The UI's own Ingress must give the
+       host up (`prefect_server.ingress_enabled: false`, `marquez.ingress_enabled: false`).
+
+       - Client: the environment's oauth2-proxy client (`auth_setup.clientID`, `clientSecret`,
+         `cookieSecret`), so the Keycloak client is the one celine-policies declares. Its
+         redirect URIs must include https://<host>.<domain>/*.
+       - Session: a cookie on the gate's own host; no Redis, no shared ConfigMap.
+       - Who passes: `role:<auth_setup.adminRole>` only (default platform-admin; the
+         keycloak-oidc provider turns realm roles into `role:<name>` groups).
+       - Back channel: with `keycloak.internal_url`, token and keys go there and discovery
+         is skipped. The issuer and the browser's login stay on `keycloak.public_url`.
+         Without it, discovery uses the public URL, which a tenant pod may not reach
+         when that host is served by the cluster's own Traefik. */}}
+{{- $name := trimPrefix "oauth2-proxy-" .Release.Name }}
+{{- $gate := dict }}
+{{- range (.Environment.Values | dig "oauth2_proxy" "gates" list) }}
+{{- if eq (toString .name) $name }}{{ $gate = . }}{{ end }}
+{{- end }}
+{{- $upstream := $gate | dig "upstream" "" | toString }}
+{{- if not $upstream }}
+{{- fail (printf "oauth2_proxy.gates: %q needs an upstream (the UI's in-cluster URL)" $name) }}
+{{- end }}
+{{- $host := printf "%s.%s" ($gate | dig "host" $name | toString) .Environment.Values.domain }}
+{{- $adminRole := .Environment.Values | dig "auth_setup" "adminRole" "platform-admin" | toString }}
+{{- if not (regexMatch "^[A-Za-z0-9._-]+(:[A-Za-z0-9._-]+)?$" $adminRole) }}
+{{- fail (printf "auth_setup.adminRole must be a realm role name, or <client>:<role> for a client role, got %q" $adminRole) }}
+{{- end }}
+{{- $realm := .Environment.Values | dig "keycloak" "realm" "celine" | toString }}
+{{- $public := printf "%s/realms/%s" (.Environment.Values | dig "keycloak" "public_url" (printf "https://keycloak.%s" .Environment.Values.domain) | toString) $realm }}
+{{- $internal := .Environment.Values | dig "keycloak" "internal_url" "" | toString }}
+{{- $ic := .Environment.Values | dig "ingress_controller" (dict) | default (dict) }}
+{{- $traefik := eq ($ic | dig "annotations" "nginx" | toString) "traefik" }}
+{{- $ns := .Environment.Values | dig "namespace" (printf "celine-%s" .Environment.Name) | toString }}
+{{- $clusterIssuer := .Environment.Values | dig "tls_setup" "ingress_cluster_issuer" "" | toString }}
+{{- $secure := not (.Environment.Values | dig "tls_setup" "self_signed" false) }}
+{{- $repo := "quay.io/oauth2-proxy/oauth2-proxy" }}
+{{- $tag := .Environment.Values | dig "oauth2_proxy" "image_tag" "" | toString }}
+{{- if $tag }}
+{{- $digest := .Environment.Values | dig "image_digests" $repo $tag "" }}
+{{- if and $digest (not (regexMatch "^sha256:[a-f0-9]{64}$" $digest)) }}
+{{- fail (printf "image_digests.%s.%s must be a sha256 digest (sha256:<64 hex>), got %q" $repo $tag $digest) }}
+{{- end }}
+image:
+  repository: {{ $repo }}
+  tag: {{ ternary (printf "%s@%s" $tag $digest) $tag (ne $digest "") | quote }}
+{{- end }}
+
+config:
+  clientID: {{ .Environment.Values | dig "auth_setup" "clientID" "oauth2_proxy" | quote }}
+  clientSecret: {{ required "auth_setup.clientSecret is required by oauth2_proxy.gates" (.Environment.Values | dig "auth_setup" "clientSecret" "") | quote }}
+  cookieSecret: {{ required "auth_setup.cookieSecret is required by oauth2_proxy.gates" (.Environment.Values | dig "auth_setup" "cookieSecret" "") | quote }}
+  configFile: |-
+    provider = "keycloak-oidc"
+    oidc_issuer_url = "{{ $public }}"
+    {{- if $internal }}
+    skip_oidc_discovery = true
+    login_url = "{{ $public }}/protocol/openid-connect/auth"
+    redeem_url = "{{ $internal }}/realms/{{ $realm }}/protocol/openid-connect/token"
+    oidc_jwks_url = "{{ $internal }}/realms/{{ $realm }}/protocol/openid-connect/certs"
+    {{- end }}
+    upstreams = [ "{{ $upstream }}" ]
+    redirect_url = "https://{{ $host }}/oauth2/callback"
+    scope = "openid email profile"
+    email_domains = [ "*" ]
+    allowed_groups = [ "role:{{ $adminRole }}" ]
+    skip_provider_button = true
+    reverse_proxy = true
+    session_store_type = "cookie"
+    cookie_httponly = true
+    cookie_samesite = "lax"
+    cookie_secure = {{ $secure }}
+
+sessionStorage:
+  type: cookie
+
+ingress:
+  enabled: true
+  className: {{ ternary ($ic | dig "class" "traefik") ($ic | dig "class" "nginx") $traefik | quote }}
+  path: /
+  pathType: Prefix
+  hosts:
+    - {{ $host | quote }}
+  annotations:
+{{- if $clusterIssuer }}
+    cert-manager.io/cluster-issuer: {{ $clusterIssuer }}
+{{- else }}
+    cert-manager.io/issuer: {{ .Environment.Values | dig "tls_setup" "issuer" "celine-tls" }}
+{{- end }}
+{{- if $traefik }}
+    traefik.ingress.kubernetes.io/router.entrypoints: {{ $ic | dig "entrypoint" "websecure" }}
+    {{- with $ic | dig "tls_options" "" }}
+    traefik.ingress.kubernetes.io/router.tls.options: {{ printf "%s-%s@kubernetescrd" $ns . }}
+    {{- end }}
+{{- else }}
+    # The Keycloak tokens in the session cookies pass nginx's default header buffer.
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "32k"
+{{- end }}
+  tls:
+    - secretName: {{ printf "%s-tls" .Release.Name }}
+      hosts:
+        - {{ $host | quote }}
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 32Mi
+  limits:
+    cpu: 100m
+    memory: 64Mi

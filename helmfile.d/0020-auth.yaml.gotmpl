@@ -76,3 +76,20 @@ releases:
       - ../envs/{{ .Environment.Name }}/0020-auth/oauth2-proxy/values.yaml.gotmpl
     labels:
       group: auth
+
+  # `oauth2_proxy.gates`: one oauth2-proxy per admin UI, as a reverse proxy in front of it
+  # (defaults/0020-auth/oauth2-proxy-gate), for clusters where the tenant may not create
+  # the forwardAuth Middleware. None by default.
+  {{- range $g := $.Environment.Values | dig "oauth2_proxy" "gates" list }}
+  - name: oauth2-proxy-{{ $g.name }}
+    namespace: {{ $ns }}
+    chart: oauth2-proxy/oauth2-proxy
+    version: 8.3.1
+    createNamespace: true
+    missingFileHandler: Warn
+    values:
+      - ../defaults/0020-auth/oauth2-proxy-gate/values.yaml.gotmpl
+      - ../envs/{{ $.Environment.Name }}/0020-auth/oauth2-proxy-{{ $g.name }}/values.yaml.gotmpl
+    labels:
+      group: auth
+  {{- end }}

@@ -137,6 +137,11 @@ tasks:
     cmds:
       - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/ingress-routing -v {{.CLI_ARGS}}
 
+  test:oauth2-proxy-gate:
+    desc: "Render oauth2_proxy.gates (an admin UI behind its own oauth2-proxy as reverse proxy, no Traefik Middleware) and check host, upstream, client, back channel and restricted"
+    cmds:
+      - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/oauth2-proxy-gate -v {{.CLI_ARGS}}
+
   test:traefik:
     desc: "Render infra's Traefik and check it keeps serving while its pods move: never evicted for node scale-down, a preStop sleep (drain_seconds) inside the grace period, the client address kept"
     cmds:
