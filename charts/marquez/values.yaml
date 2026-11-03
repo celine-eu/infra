@@ -64,8 +64,15 @@ resources:
 # MaxGCPauseMillis=200 targets <200ms GC pauses.
 javaOpts: "-Xms512m -Xmx1536m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+ExitOnOutOfMemoryError"
 
+# Pod and container securityContext of the api and web Deployments (and, for the container, of
+# the retention CronJob). Empty: none set, as before. The retention pod has its own, as its
+# image (postgres) runs under a different uid.
+podSecurityContext: {}
+containerSecurityContext: {}
+
 retention:
   enabled: true
+  podSecurityContext: {}
   schedule: "45 */6 * * *"
   keepVersions: 5
   runMaxAgeDays: 30

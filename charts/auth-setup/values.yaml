@@ -2,6 +2,10 @@ secure: false
 
 realm: celine
 domain: celine.test
+# The Keycloak host oauth2-proxy's issuer is on (empty: https://keycloak.<domain>).
+keycloakUrl: ""
+# The in-namespace Keycloak release runs here: its realm import and response headers render.
+localKeycloak: true
 issuer: celine-tls
 
 # The Keycloak host's response headers (templates/keycloak-security-headers.yaml): on

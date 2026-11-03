@@ -71,7 +71,7 @@ registry:
   image:
     tag: {{ .Environment.Values | dig "rec_registry" "image_tag" "latest" | default "latest" | quote }}
   apiUrl: {{ $mm | dig "registry_api_url" "http://rec-registry:8004" | quote }}
-  authUrl: {{ printf "https://keycloak.%s/realms/%s" .Environment.Values.domain $realm | quote }}
+  authUrl: {{ printf "%s/realms/%s" (.Environment.Values | dig "keycloak" "public_url" (printf "https://keycloak.%s" .Environment.Values.domain)) $realm | quote }}
   clientId: {{ $registryClient | quote }}
 secrets:
   sourceClientSecret: {{ $sourceSecret | quote }}

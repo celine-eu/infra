@@ -17,6 +17,9 @@ image:
 ingress:
   host: roi.{{ .Environment.Values.domain }}
   domain: {{ .Environment.Values.domain }}
+  # The realm users sign out of (the keycloak-logout redirect): `keycloak.public_url`, by
+  # default https://keycloak.<domain>, and `keycloak.realm`, by default celine.
+  keycloakRealmUrl: {{ printf "%s/realms/%s" (.Environment.Values | dig "keycloak" "public_url" (printf "https://keycloak.%s" .Environment.Values.domain)) (.Environment.Values | dig "keycloak" "realm" "celine") | quote }}
   auth:
     enabled: false
   apiAnnotations:

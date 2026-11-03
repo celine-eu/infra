@@ -260,7 +260,7 @@ releases:
     labels:
       group: core
 
-{{- if .Values.seaweedfs.enabled }}
+{{- if (.Values | dig "seaweedfs" "enabled" false) }}
   - name: seaweedfs
     namespace: {{ $ns }}
     chart: seaweedfs/seaweedfs

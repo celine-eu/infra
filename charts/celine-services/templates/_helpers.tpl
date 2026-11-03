@@ -455,7 +455,7 @@ metadata:
     {{- include "celine-services.labels" . | nindent 4 }}
   annotations:
     cert-manager.io/issuer: {{ .Values.ingress.issuer | default "celine-tls" }}
-    nginx.ingress.kubernetes.io/permanent-redirect: "https://keycloak.{{ .Values.ingress.domain }}/realms/celine/protocol/openid-connect/logout?client_id=oauth2_proxy&post_logout_redirect_uri=https://{{ .Values.ingress.host }}/"
+    nginx.ingress.kubernetes.io/permanent-redirect: "{{ .Values.ingress.keycloakRealmUrl | default (printf "https://keycloak.%s/realms/celine" .Values.ingress.domain) }}/protocol/openid-connect/logout?client_id=oauth2_proxy&post_logout_redirect_uri=https://{{ .Values.ingress.host }}/"
     nginx.ingress.kubernetes.io/permanent-redirect-code: "302"
 spec:
   ingressClassName: {{ $.Values.ingressClassName | default "nginx" }}

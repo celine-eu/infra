@@ -15,10 +15,18 @@ spec:
       labels:
         app.kubernetes.io/name: marquez-web
     spec:
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: marquez-web
           image: {{ .Values.image.web }}
           imagePullPolicy: IfNotPresent
+          {{- with .Values.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           env:
             - name: MARQUEZ_HOST
               value: {{ include "marquez.fullname" . }}-api

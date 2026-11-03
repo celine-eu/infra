@@ -87,7 +87,7 @@ releases:
     labels:
       group: apps
 
-{{- if .Values.mqtt_ingestor.enabled }}
+{{- if (.Values | dig "mqtt_ingestor" "enabled" false) }}
   - name: mqtt-ingestor
     namespace: {{ $ns }}
     chart: ../charts/mqtt-ingestor

@@ -1,3 +1,6 @@
+{{- /* Optional hardening of the flow-run Jobs, per environment (all unset: unchanged render):
+       prefect_worker.job.{pod_security_context, container_security_context, volumes, volume_mounts} */}}
+{{- $job := .Environment.Values | dig "prefect_worker" "job" (dict) | default (dict) }}
 worker:
   image:
     prefectTag: 3.6.26-python3.11-kubernetes
@@ -205,6 +208,12 @@ worker:
                         "name": "prefect-job",
                         "image": "{{ `{{ image }}` }}",
                         "imagePullPolicy": "{{ `{{ image_pull_policy }}` }}",
+                        {{- with (dig "container_security_context" (dict) $job) }}
+                        "securityContext": {{ toJson . }},
+                        {{- end }}
+                        {{- with (dig "volume_mounts" (list) $job) }}
+                        "volumeMounts": {{ toJson . }},
+                        {{- end }}
                         "resources": {
                           "requests": {
                             "cpu": "200m",
@@ -220,6 +229,12 @@ worker:
                     "completions": 1,
                     "parallelism": 1,
                     "restartPolicy": "Never",
+                    {{- with (dig "pod_security_context" (dict) $job) }}
+                    "securityContext": {{ toJson . }},
+                    {{- end }}
+                    {{- with (dig "volumes" (list) $job) }}
+                    "volumes": {{ toJson . }},
+                    {{- end }}
                     "imagePullSecrets": "{{ `{{ image_pull_secrets }}` }}",
                     "serviceAccountName": "{{ `{{ service_account_name }}` }}"
                   }

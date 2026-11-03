@@ -1,3 +1,4 @@
+{{- if .Values.localKeycloak }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -7,3 +8,4 @@ metadata:
 data:
   celine-realm.json: |
 {{ tpl (.Files.Get "files/celine-realm.json.gotmpl") . | indent 4 }}
+{{- end }}

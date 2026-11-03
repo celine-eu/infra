@@ -30,14 +30,35 @@ service:
 {{- if not (regexMatch "^[A-Za-z0-9._-]+(:[A-Za-z0-9._-]+)?$" $adminRole) }}
 {{- fail (printf "auth_setup.adminRole must be a realm role name, or <client>:<role> for a client role, got %q" $adminRole) }}
 {{- end }}
+{{- /* `ingress_controller.annotations: traefik`: Traefik-native, as for prefect-server (see there). */}}
+{{- $ic := .Environment.Values | dig "ingress_controller" (dict) | default (dict) }}
+{{- $traefik := eq ($ic | dig "annotations" "nginx" | toString) "traefik" }}
+{{- $ns := .Environment.Values | dig "namespace" (printf "celine-%s" .Environment.Name) | toString }}
+{{- $clusterIssuer := .Environment.Values | dig "tls_setup" "ingress_cluster_issuer" "" | toString }}
 ingress:
   enabled: true
-  className: nginx
+  className: {{ ternary ($ic | dig "class" "traefik") "nginx" $traefik }}
   host: "marquez.{{ .Environment.Values.domain }}"
   tlsEnabled: true
   tlsSecret: marquez-tls
   annotations:
+{{- if $clusterIssuer }}
+    cert-manager.io/cluster-issuer: {{ $clusterIssuer }}
+    cert-manager.io/issuer: null
+{{- else }}
     cert-manager.io/issuer: {{ .Environment.Values.tls_setup.issuer | default "celine-tls" }}
+{{- end }}
+{{- if $traefik }}
+    traefik.ingress.kubernetes.io/router.entrypoints: {{ $ic | dig "entrypoint" "websecure" }}
+    traefik.ingress.kubernetes.io/router.middlewares: {{ printf "%s-oauth2-proxy-auth@kubernetescrd" $ns }}
+    {{- with $ic | dig "tls_options" "" }}
+    traefik.ingress.kubernetes.io/router.tls.options: {{ printf "%s-%s@kubernetescrd" $ns . }}
+    {{- end }}
+    # The chart's own defaults carry the nginx gate: removed here (null drops a chart key).
+    nginx.ingress.kubernetes.io/auth-url: null
+    nginx.ingress.kubernetes.io/auth-signin: null
+    nginx.ingress.kubernetes.io/auth-response-headers: null
+{{- else }}
     # nginx.ingress.kubernetes.io/rewrite-target: /
     # Platform admins only: `auth_setup.adminRole`, default `platform-admin`. oauth2-proxy's
     # keycloak-oidc provider turns each realm role in realm_access.roles into the group
@@ -46,6 +67,7 @@ ingress:
     nginx.ingress.kubernetes.io/auth-url: "https://sso.{{ .Environment.Values.domain }}/oauth2/auth?allowed_groups=role:{{ $adminRole }}"
     nginx.ingress.kubernetes.io/auth-signin: "https://sso.{{ .Environment.Values.domain }}/oauth2/start?rd=$scheme://$host$request_uri"
     nginx.ingress.kubernetes.io/auth-response-headers: "Authorization, X-Auth-Request-Email, X-Auth-Request-User"
+{{- end }}
 
 resources:
   api:

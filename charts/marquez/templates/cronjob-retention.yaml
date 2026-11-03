@@ -15,10 +15,18 @@ spec:
       template:
         spec:
           restartPolicy: Never
+          {{- with .Values.retention.podSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           containers:
             - name: cleanup
               image: postgres:16
               imagePullPolicy: IfNotPresent
+              {{- with .Values.containerSecurityContext }}
+              securityContext:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
               resources:
                 requests:
                   cpu: 50m

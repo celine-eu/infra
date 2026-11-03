@@ -19,7 +19,7 @@
 {{- end }}
 {{- $tokenEnv := dict
       "CELINE_ENV" $celineEnv
-      "CUSTOM_SECURITY_MANAGER_KEYCLOAK_ISSUER" (printf "https://keycloak.%s/realms/%s" .Environment.Values.domain (.Environment.Values | dig "keycloak" "realm" "celine"))
+      "CUSTOM_SECURITY_MANAGER_KEYCLOAK_ISSUER" (printf "%s/realms/%s" (.Environment.Values | dig "keycloak" "public_url" (printf "https://keycloak.%s" .Environment.Values.domain)) (.Environment.Values | dig "keycloak" "realm" "celine"))
       "CUSTOM_SECURITY_MANAGER_KEYCLOAK_AUDIENCE" (.Environment.Values | dig "auth_setup" "clientID" "oauth2_proxy") }}
 configMountPath: "/foobar"
 

@@ -21,6 +21,9 @@ image:
 ingress:
   host: assistant.{{ .Environment.Values.domain }}
   domain: {{ .Environment.Values.domain }}
+  # The realm users sign out of (the keycloak-logout redirect): `keycloak.public_url`, by
+  # default https://keycloak.<domain>, and `keycloak.realm`, by default celine.
+  keycloakRealmUrl: {{ printf "%s/realms/%s" (.Environment.Values | dig "keycloak" "public_url" (printf "https://keycloak.%s" .Environment.Values.domain)) (.Environment.Values | dig "keycloak" "realm" "celine") | quote }}
 
 # The development-version banner (celine-frontend `EnvBanner`): PUBLIC_CELINE_ENV is
 # CELINE_ENV's value (`celine_env`, else the environment's name); outside prod,

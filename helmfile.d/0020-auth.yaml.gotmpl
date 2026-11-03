@@ -52,6 +52,9 @@ releases:
     namespace: {{ $ns }}
     chart: oci://ghcr.io/codecentric/helm-charts/keycloakx
     version: 7.1.4
+    # `keycloak.enabled: false`: the environment's realm lives on a Keycloak run elsewhere
+    # (`keycloak.public_url`, `keycloak.internal_url`); this release is not installed.
+    installed: {{ .Environment.Values | dig "keycloak" "enabled" true }}
     createNamespace: true
     missingFileHandler: Warn
     values:

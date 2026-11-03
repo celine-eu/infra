@@ -1,7 +1,12 @@
 secure: true
 
-realm: celine
+realm: {{ .Environment.Values | dig "keycloak" "realm" "celine" | quote }}
 domain: "{{ .Environment.Values.domain }}"
+# oauth2-proxy's issuer: `keycloak.public_url` (by default https://keycloak.<domain>) and the realm.
+keycloakUrl: {{ .Environment.Values | dig "keycloak" "public_url" (printf "https://keycloak.%s" .Environment.Values.domain) | quote }}
+# What only the in-namespace Keycloak release uses (realm import, its response headers):
+# off with `keycloak.enabled: false`, where the environment's realm lives on a shared instance.
+localKeycloak: {{ .Environment.Values | dig "keycloak" "enabled" true }}
 issuer: {{ .Environment.Values.tls_setup.issuer }}
 # IngressClass of every Ingress (`ingress_controller.class`, default nginx).
 ingressClassName: {{ .Values | dig "ingress_controller" "class" "nginx" | quote }}
@@ -33,8 +38,12 @@ dashboard_items:
   # The public Keycloak host serves the platform realm only; the admin console is reached
   # through a port-forward (task keycloak:forward), so the link is the account console.
   - name: Account (Keycloak)
+{{- with .Environment.Values | dig "keycloak" "public_url" "" }}
+    url: {{ printf "%s/realms/%s/account" . ($.Environment.Values | dig "keycloak" "realm" "celine") | quote }}
+{{- else }}
     host: keycloak
     path: /realms/{{ .Environment.Values | dig "keycloak" "realm" "celine" }}/account
+{{- end }}
   - name: Data Pipelines (Prefect)
     host: prefect
   # - name: Monitoring (Prometheus)

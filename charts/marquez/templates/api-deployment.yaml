@@ -15,10 +15,18 @@ spec:
       labels:
         app.kubernetes.io/name: marquez-api
     spec:
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: marquez-api
           image: {{ .Values.image.api }}
           imagePullPolicy: IfNotPresent
+          {{- with .Values.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           env:
             - name: MARQUEZ_PORT
               value: "5000"

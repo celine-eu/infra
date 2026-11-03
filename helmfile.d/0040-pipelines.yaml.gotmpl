@@ -37,7 +37,9 @@ releases:
   - name: prefect-server
     namespace: {{ $ns }}
     chart: prefect/prefect-server
-    version: 2026.2.19200223
+    # `prefect_server.chart_version`: an environment may run a newer chart (e.g. for
+    # `externalDatabase`, the connection read from a database operator's own Secret).
+    version: {{ .Environment.Values | dig "prefect_server" "chart_version" "2026.2.19200223" }}
     createNamespace: true
     missingFileHandler: Warn
     values:

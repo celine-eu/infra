@@ -1,4 +1,6 @@
-{{- $keycloakPublic := printf "https://keycloak.%s/realms/%s" .Values.domain (.Values.keycloak.realm | default "celine") }}
+{{- /* The realm's public URL: `keycloak.public_url` (the Keycloak host, by default
+       https://keycloak.<domain>; an environment on a shared instance names it) and `keycloak.realm`. */}}
+{{- $keycloakPublic := printf "%s/realms/%s" (.Values | dig "keycloak" "public_url" (printf "https://keycloak.%s" .Values.domain)) (.Values.keycloak.realm | default "celine") }}
 {{- /* The posture signal, CELINE_ENV: the environment's name unless `celine_env` says
        otherwise. Only `dev` relaxes a service, and only the dev environment may say so. */}}
 {{- $celineEnv := .Values | dig "celine_env" .Environment.Name | toString }}
@@ -57,6 +59,8 @@ healthCheck:
 ingress:
   enabled: false
   domain: {{ .Values.domain }}
+  # The keycloak-logout redirect's realm (celine-services.ingress).
+  keycloakRealmUrl: {{ $keycloakPublic | quote }}
   issuer: {{ .Values.tls_setup.issuer | default "celine-tls" }}
   auth:
     enabled: true

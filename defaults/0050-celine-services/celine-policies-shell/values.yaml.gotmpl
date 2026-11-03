@@ -91,7 +91,7 @@ resources:
 {{- fail "keycloak.admin_public needs keycloak.admin_mfa: a console reachable from the network keeps the admin second factor" }}
 {{- end }}
 {{- end }}
-{{- $masterFrontendUrl := ternary (printf "https://keycloak.%s" .Environment.Values.domain) (printf "http://localhost:%d" (.Environment.Values | dig "keycloak" "admin_forward_port" 18080 | int)) $adminPublicOn }}
+{{- $masterFrontendUrl := ternary (.Environment.Values | dig "keycloak" "public_url" (printf "https://keycloak.%s" .Environment.Values.domain)) (printf "http://localhost:%d" (.Environment.Values | dig "keycloak" "admin_forward_port" 18080 | int)) $adminPublicOn }}
 keycloak:
   # The Keycloak Service inside the cluster, never the public host: the public host serves
   # no /admin and no /realms/master (defaults/0020-auth/keycloak), and bootstrap and sync
@@ -104,8 +104,12 @@ keycloak:
     secret: {{ $clientSecret | quote }}
 
   adminUser: {{ .Values.keycloak.username | default "admin" | quote }}
-  existingSecret: "keycloak-keycloakx-keycloak-admin-secret"
-  adminPasswordKey: "password"
+  # The master administrator's password for bootstrap's first sign-in: by default the
+  # in-namespace Keycloak's admin Secret. An environment on a shared instance names the
+  # Secret its operator provides (`policies_shell.admin_secret.{name,password_key}`) and the
+  # user (`keycloak.username`).
+  existingSecret: {{ .Environment.Values | dig "policies_shell" "admin_secret" "name" "keycloak-keycloakx-keycloak-admin-secret" | quote }}
+  adminPasswordKey: {{ .Environment.Values | dig "policies_shell" "admin_secret" "password_key" "password" | quote }}
   adminClientSecretKey: ""
 
 

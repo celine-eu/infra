@@ -21,7 +21,7 @@ extraEnv:
   # The audience is the edge client user tokens are issued to. Header trust is off: every
   # caller presents a verified token (refused at startup outside CELINE_ENV=dev anyway).
   - name: OAUTH2_ISSUER
-    value: {{ printf "https://keycloak.%s/realms/%s" .Environment.Values.domain (.Environment.Values | dig "keycloak" "realm" "celine") | quote }}
+    value: {{ printf "%s/realms/%s" (.Environment.Values | dig "keycloak" "public_url" (printf "https://keycloak.%s" .Environment.Values.domain)) (.Environment.Values | dig "keycloak" "realm" "celine") | quote }}
   - name: OAUTH2_AUDIENCE
     value: {{ .Environment.Values | dig "auth_setup" "clientID" "oauth2_proxy" | quote }}
   - name: OAUTH2_TRUST_HEADERS
