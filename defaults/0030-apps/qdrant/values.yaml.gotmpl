@@ -40,6 +40,12 @@ ingress:
   enabled: false
 
 
+# Per environment through `qdrant.resources` (Autopilot bills requests); 500m / 512Mi
+# otherwise.
+{{- with .Environment.Values | dig "qdrant" "resources" nil }}
+resources:
+  {{- toYaml . | nindent 2 }}
+{{- else }}
 resources:
   limits:
     cpu: 500m
@@ -47,6 +53,7 @@ resources:
   requests:
     cpu: 500m
     memory: 512Mi
+{{- end }}
 
 
 persistence:

@@ -92,6 +92,11 @@ tasks:
     cmds:
       - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/pod-security -v {{.CLI_ARGS}}
 
+  test:qdrant:
+    desc: "Render qdrant and check its resources come from qdrant.resources where set and stay at 500m / 512Mi otherwise"
+    cmds:
+      - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/qdrant -v {{.CLI_ARGS}}
+
   test:image-digest:
     desc: "Render the releases prod runs with `image_digests` and check each listed repository:tag renders as repository:tag@sha256 (keycloakx: repository@sha256), the version label keeps the tag, an unlisted tag stays unpinned, a non-digest stops the render, and the postgis Cluster is pinned only on request"
     cmds:
