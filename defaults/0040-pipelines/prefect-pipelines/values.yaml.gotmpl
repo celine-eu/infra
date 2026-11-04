@@ -4,6 +4,8 @@ global:
   image: prefecthq/prefect:3-latest
   namespace: {{ .Environment.Values | dig "namespace" (printf "celine-%s" .Environment.Name) }}
   work_pool: celine
+  # `prefect_pipelines.paused`: register every flow paused, its schedule inactive.
+  paused: {{ .Environment.Values | dig "prefect_pipelines" "paused" false }}
   env:
     - name: PREFECT_MODE
       value: prod

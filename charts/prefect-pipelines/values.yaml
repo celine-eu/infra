@@ -4,6 +4,10 @@ global:
   oidcClientSecret: svc-pipelines
   namespace: celine
   work_pool: celine
+  # true: every flow is registered paused, its schedule inactive (`prefect deploy` otherwise
+  # registers a cron schedule active, undoing a pause made in the database). For a side that
+  # must not run yet, e.g. during a migration. Unpause in Prefect, or set false and re-apply.
+  paused: false
   env:
     - name: PREFECT_MODE
       value: prod

@@ -93,11 +93,19 @@ spec:
                   # run once at time, assume idempotency
                   concurrency_limit: {{ $flow.concurrencyLimit | default 1 }}
                   collision_strategy: SKIP
+                  {{- if $.Values.global.paused }}
+                  # global.paused: registered paused, its schedule inactive (nothing runs).
+                  paused: true
+                  {{- end }}
 
                   schedule:
                     cron: {{ ($flow.schedule).cron | default "0 * * * *" | quote }}
                     # catchup: false
+                    {{- if $.Values.global.paused }}
+                    active: false
+                    {{- else }}
                     # active: true
+                    {{- end }}
 
                   work_pool:
                     name: {{ $.Values.global.work_pool }}
