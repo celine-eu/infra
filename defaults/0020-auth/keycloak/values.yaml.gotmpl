@@ -2,6 +2,30 @@
 # See https://www.keycloak.org/server/all-config
 
 
+{{- /* A Keycloak run as its own environment (an instance shared by several realms, e.g. in
+       a tenant namespace with Pod Security `restricted` and Traefik). Every option is
+       opt-in; unset, the render is today's.
+       - `keycloak.public_url`: the host's URL (default https://keycloak.<domain>), for the
+         Ingress host and KC_HOSTNAME.
+       - `keycloak.realm_import: false`: no realm import (a clean instance; celine-policies'
+         `keycloak bootstrap` creates each realm), so no auth-setup ConfigMap is mounted.
+       - `keycloak.database`: `host`, `dbname`, `username`, `existing_secret`,
+         `existing_secret_key` (e.g. a CNPG `<cluster>-app` Secret).
+       - `keycloak.pod_security_context`: the pod's securityContext (e.g. seccompProfile
+         RuntimeDefault, on a cluster that does not set it at admission).
+       - `keycloak.backchannel_dynamic: true`: requests on the Service (back channel) get
+         back-channel URLs on the Service, while issuers stay on the public URL.
+       - `ingress_controller.annotations: traefik` and `tls_setup.ingress_cluster_issuer`:
+         as for the other Ingresses. */}}
+{{- $kcPublic := .Environment.Values | dig "keycloak" "public_url" (printf "https://keycloak.%s" .Environment.Values.domain) | toString | trimSuffix "/" }}
+{{- $kcHost := $kcPublic | trimPrefix "https://" | trimPrefix "http://" }}
+{{- $realmImport := ne (.Environment.Values | dig "keycloak" "realm_import" true | toString) "false" }}
+{{- $ic := .Environment.Values | dig "ingress_controller" (dict) | default (dict) }}
+{{- $traefik := eq ($ic | dig "annotations" "nginx" | toString) "traefik" }}
+{{- $ns := .Environment.Values | dig "namespace" (printf "celine-%s" .Environment.Name) | toString }}
+{{- $clusterIssuer := .Environment.Values | dig "tls_setup" "ingress_cluster_issuer" "" | toString }}
+{{- $db := .Environment.Values | dig "keycloak" "database" (dict) | default (dict) }}
+
 # Despite its name, `keycloak.theme.login` is the switch for the custom image
 # (ghcr.io/celine-eu/keycloak, which carries the `rec` themes) as a whole: unset, the
 # stock image runs and `keycloak.image_tag` is ignored.
@@ -37,7 +61,14 @@ command:
   - "start"
   - "--spi-events-listener-jboss-logging-success-level=info"
   - "--spi-events-listener-jboss-logging-error-level=warn"
+  {{- if $realmImport }}
   - "--import-realm"
+  {{- end }}
+
+{{- with .Environment.Values | dig "keycloak" "pod_security_context" nil }}
+podSecurityContext:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
 
 # Pod Security `restricted`: the chart's contexts (uid 1000, non-root) plus no privilege
 # escalation and no capabilities, for Keycloak and its database check.
@@ -64,13 +95,17 @@ dbchecker:
       drop: [ALL]
 
 database:
-  existingSecret: keycloak-db-secret
-  existingSecretKey: password
+  existingSecret: {{ $db | dig "existing_secret" "keycloak-db-secret" }}
+  existingSecretKey: {{ $db | dig "existing_secret_key" "password" }}
   vendor: postgres
-  hostname: postgis1-rw
+  hostname: {{ $db | dig "host" "postgis1-rw" }}
   port: 5432
+  # Not a key of the chart (it reads `database`): Keycloak's default database, keycloak.
   dbname: keycloak
-  username: keycloak
+  {{- with $db | dig "dbname" "" }}
+  database: {{ . }}
+  {{- end }}
+  username: {{ $db | dig "username" "keycloak" }}
 
 secrets:
   keycloak-admin-secret:
@@ -129,7 +164,7 @@ secrets:
 {{- fail "keycloak.admin_public needs ingress-nginx: the allowlist is its whitelist-source-range annotation, which another controller ignores" }}
 {{- end }}
 {{- end }}
-{{- $adminUrl := ternary (printf "https://keycloak.%s" .Environment.Values.domain) (printf "http://localhost:%d" $adminPort) $adminPublicOn }}
+{{- $adminUrl := ternary $kcPublic (printf "http://localhost:%d" $adminPort) $adminPublicOn }}
 ingress:
   # If `true`, an Ingress is created
   enabled: true
@@ -139,11 +174,22 @@ ingress:
   servicePort: http
   # Ingress annotations
   annotations:
+    {{- if $clusterIssuer }}
+    cert-manager.io/cluster-issuer: {{ $clusterIssuer }}
+    {{- else }}
+    cert-manager.io/issuer: {{ .Environment.Values.tls_setup.issuer | default "celine-tls" }}
+    {{- end }}
+    {{- if $traefik }}
+    traefik.ingress.kubernetes.io/router.entrypoints: {{ $ic | dig "entrypoint" "websecure" }}
+    {{- with $ic | dig "tls_options" "" }}
+    traefik.ingress.kubernetes.io/router.tls.options: {{ printf "%s-%s@kubernetescrd" $ns . }}
+    {{- end }}
+    {{- else }}
     ## Resolve HTTP 502 error using ingress-nginx:
     ## See https://www.ibm.com/support/pages/502-error-ingress-keycloak-response
     nginx.ingress.kubernetes.io/proxy-buffer-size: 128k
-    cert-manager.io/issuer: {{ .Environment.Values.tls_setup.issuer | default "celine-tls" }}
-    {{- if .Environment.Values | dig "security_headers" "enabled" true }}
+    {{- end }}
+    {{- if and (not $traefik) (.Environment.Values | dig "security_headers" "enabled" true) }}
     # nosniff on this host, the controller's own answers included (the 404 on `/`): the
     # ConfigMap is auth-setup's (templates/keycloak-security-headers.yaml), which this
     # release `needs`. Off in dev, like every public host's headers.
@@ -154,7 +200,7 @@ ingress:
   labels: {}
     # List of rules for the Ingress
   rules:
-    - host: "keycloak.{{ .Environment.Values.domain }}"
+    - host: "{{ $kcHost }}"
       # Only these paths reach Keycloak from outside: each public realm (sign-in, tokens,
       # discovery, JWKS, the account console, logout) and the static resources its pages
       # load. A Prefix path matches whole segments: /realms/celine does not match
@@ -180,7 +226,7 @@ ingress:
       nginx.ingress.kubernetes.io/custom-headers: "{{ .Release.Namespace }}/keycloak-security-headers"
       {{- end }}
     rules:
-      - host: "keycloak.{{ .Environment.Values.domain }}"
+      - host: "{{ $kcHost }}"
         paths:
           - path: /admin
             pathType: Prefix
@@ -190,7 +236,7 @@ ingress:
   # TLS configuration
   tls:
     - hosts:
-        - "keycloak.{{ .Environment.Values.domain }}"
+        - "{{ $kcHost }}"
       secretName: keycloak-tls
 
 proxy:
@@ -214,9 +260,13 @@ extraEnv: |
         name: keycloak-keycloakx-keycloak-admin-secret
         key: password
   - name: KC_HOSTNAME
-    value: "https://keycloak.{{ .Environment.Values.domain }}"
+    value: "{{ $kcPublic }}"
   - name: KC_HOSTNAME_STRICT
     value: "false"
+  {{- if eq (.Environment.Values | dig "keycloak" "backchannel_dynamic" false | toString) "true" }}
+  - name: KC_HOSTNAME_BACKCHANNEL_DYNAMIC
+    value: "true"
+  {{- end }}
   # The admin console's own links and redirects, for the port-forward (`task keycloak:forward`
   # forwards to this port), or the public host when keycloak.admin_public is on. localhost is
   # a secure context, so plain http needs no certificate. KC_HOSTNAME above stays the URL of every realm, issuers included. The
@@ -225,10 +275,12 @@ extraEnv: |
   # (README, "Keycloak admin access").
   - name: KC_HOSTNAME_ADMIN
     value: "{{ $adminUrl }}"
+  {{- if $realmImport }}
   - name: KEYCLOAK_IMPORT
     value: /opt/keycloak/data/import/celine-realm.json
   - name: KEYCLOAK_IMPORT_STRATEGY
     value: IGNORE_EXISTING  # prevents overwriting existing realm if already imported
+  {{- end }}
 {{- /* Footer links of the login and email theme (celine-policies `themes/rec`), when the
        environment has a legal host (`legal.base_url`, or the `legal` release installed):
        pages listing each community's terms and privacy notice, since a login page does
@@ -252,6 +304,7 @@ extraEnv: |
     value: "{{ . }}/privacy/"
 {{- end }}
 
+{{- if $realmImport }}
 extraVolumeMounts: |
   - name: realm-import
     mountPath: /opt/keycloak/data/import
@@ -260,6 +313,7 @@ extraVolumes: |
   - name: realm-import
     configMap:
       name: keycloak-realm-celine
+{{- end }}
 
 # The chart's pod anti-affinity (required per node, preferred per zone) stays unless the
 # environment sets `keycloak.pod_anti_affinity: false`: GKE Autopilot rejects anti-affinity
