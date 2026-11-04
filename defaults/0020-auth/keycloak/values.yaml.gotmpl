@@ -10,7 +10,9 @@
        - `keycloak.realm_import: false`: no realm import (a clean instance; celine-policies'
          `keycloak bootstrap` creates each realm), so no auth-setup ConfigMap is mounted.
        - `keycloak.database`: `host`, `dbname`, `username`, `existing_secret`,
-         `existing_secret_key` (e.g. a CNPG `<cluster>-app` Secret).
+         `existing_secret_key` (e.g. a CNPG `<cluster>-app` Secret), `url_properties`
+         (KC_DB_URL_PROPERTIES, appended to the JDBC URL with its leading `?`, e.g. a
+         session setting the database server would otherwise impose).
        - `keycloak.pod_security_context`: the pod's securityContext (e.g. seccompProfile
          RuntimeDefault, on a cluster that does not set it at admission).
        - `keycloak.backchannel_dynamic: true`: requests on the Service (back channel) get
@@ -263,6 +265,10 @@ extraEnv: |
     value: "{{ $kcPublic }}"
   - name: KC_HOSTNAME_STRICT
     value: "false"
+  {{- with $db | dig "url_properties" "" }}
+  - name: KC_DB_URL_PROPERTIES
+    value: {{ . | quote }}
+  {{- end }}
   {{- if eq (.Environment.Values | dig "keycloak" "backchannel_dynamic" false | toString) "true" }}
   - name: KC_HOSTNAME_BACKCHANNEL_DYNAMIC
     value: "true"
