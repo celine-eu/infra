@@ -39,7 +39,9 @@ policies:
   cacheMaxsize: 10000
 
 s3:
-  endpointUrl: "{{ .Values.s3_accounts.endpoint }}"
+  # `s3_accounts.endpoint`; optional, for an environment without services (e.g. a realm's
+  # policies-shell alone).
+  endpointUrl: "{{ .Values | dig "s3_accounts" "endpoint" "" }}"
   region: "us-east-1"
   existingSecret: ""
 

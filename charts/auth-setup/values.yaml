@@ -53,6 +53,8 @@ oauth2Proxy:
   clientSecret: 88a52beb361e342e19c0fe82cbda7acb
   cookieSecret: 411e509ecac4adca7be836fd8d337310
   clientCLISecret: 2e19c0fe82cbda7acbe509e88a52beb3
+  # Only these groups pass the proxy (oauth2-proxy `allowed_groups`); empty: any signed-in user.
+  allowedGroups: []
 
 # The services dashboard (a static page of links behind oauth2-proxy). false: none of it.
 dashboard_enabled: true

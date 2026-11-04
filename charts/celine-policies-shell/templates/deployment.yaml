@@ -18,7 +18,7 @@ spec:
     metadata:
       labels:
         {{- include "celine-policies-shell.selectorLabels" . | nindent 8 }}
-      {{- if or .Values.podAnnotations .Values.syncOverlays }}
+      {{- if or .Values.podAnnotations .Values.syncOverlays .Values.syncBase }}
       annotations:
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
@@ -26,6 +26,10 @@ spec:
         {{- if .Values.syncOverlays }}
         # A changed overlay restarts the shell, whose start-up sync applies it.
         checksum/sync-overlays: {{ include "celine-policies-shell.syncOverlays" . | sha256sum | quote }}
+        {{- end }}
+        {{- if .Values.syncBase }}
+        # A changed base declaration restarts the shell, whose start-up sync applies it.
+        checksum/sync-base: {{ include "celine-policies-shell.syncBase" . | sha256sum | quote }}
         {{- end }}
       {{- end }}
     spec:
@@ -56,7 +60,7 @@ spec:
                 OVERLAY="--overlay /etc/celine-policies-platform/platform.overlay.yaml"
               fi
               ALLOW="{{ if .Values.bootstrap.allowDestructive }}--allow-destructive{{ end }}"
-              BOOTSTRAP="celine-policies keycloak bootstrap $OVERLAY --secrets-file /tmp/.secrets.yaml"
+              BOOTSTRAP="celine-policies keycloak bootstrap $OVERLAY --secrets-file {{ include "celine-policies-shell.secretsFile" . }}"
               rc=0
 
               reachable=1
@@ -158,7 +162,7 @@ spec:
               echo "$rc" > $D/rc
               exit 0
           env:
-            {{- include "celine-policies-shell.keycloakEnv" . | nindent 12 }}
+            {{- include "celine-policies-shell.keycloakEnv" (dict "root" . "master" true) | nindent 12 }}
             {{- with .Values.bootstrap.bruteForceEnabled | toString }}
             - name: CELINE_KEYCLOAK_BRUTE_FORCE_ENABLED
               value: {{ . | quote }}
@@ -228,9 +232,19 @@ spec:
             {{- end }}
             {{- end }}
             {{- include "celine-policies-shell.caEnv" . | nindent 12 }}
+          {{- if include "celine-policies-shell.platformAdminPasswordEnv" . | fromYaml }}
+          # Declared platform-admin accounts' temporary passwords: this container only.
+          envFrom:
+            - secretRef:
+                name: {{ include "celine-policies-shell.fullname" . }}-bootstrap-platform-admins
+          {{- end }}
           volumeMounts:
             - name: bootstrap-record
               mountPath: /run/bootstrap
+            {{- if include "celine-policies-shell.realmScopedShell" . }}
+            - name: realm-admin-secret
+              mountPath: /run/celine-policies-secrets
+            {{- end }}
             {{- if .Values.bootstrap.overlay }}
             - name: platform-overlay
               mountPath: /etc/celine-policies-platform
@@ -313,10 +327,11 @@ spec:
             - /bin/sh
             - -c
             - |
-              CLIENTS_FILE="{{ .Values.clientsFile | default "/app/clients.yaml" }}"
+              {{- $base := include "celine-policies-shell.syncBase" . | fromYaml }}
+              CLIENTS_FILE="{{ if $base.name }}/etc/celine-policies-sync-base/{{ $base.name }}{{ else }}{{ .Values.clientsFile | default "/app/clients.yaml" }}{{ end }}"
               MAX_RETRIES=20
               RETRY_DELAY=15
-              SECRET_FILE=/tmp/.secrets.yaml
+              SECRET_FILE={{ include "celine-policies-shell.secretsFile" . }}
               
               i=0
               until celine-policies keycloak sync --secrets-file "$SECRET_FILE" "$CLIENTS_FILE"{{ range include "celine-policies-shell.syncOverlays" . | fromYamlArray }} --overlay "/etc/celine-policies-sync/{{ .name }}"{{ end }}; do
@@ -333,7 +348,7 @@ spec:
               echo "celine-policies shell ready"
               tail -f /dev/null
           env:
-            {{- include "celine-policies-shell.keycloakEnv" . | nindent 12 }}
+            {{- include "celine-policies-shell.keycloakEnv" (dict "root" . "master" .Values.shell.masterCredentials) | nindent 12 }}
             # ----------------------------------------------------------------
             # Extra env vars (for ad-hoc use)
             # ----------------------------------------------------------------
@@ -348,7 +363,7 @@ spec:
                   key: {{ default .name .key }}
               {{- end }}
             {{- end }}
-          {{- if or .Values.volumeMounts .Values.syncOverlays }}
+          {{- if or .Values.volumeMounts .Values.syncOverlays .Values.syncBase (include "celine-policies-shell.realmScopedShell" .) }}
           volumeMounts:
             {{- with .Values.volumeMounts }}
             {{- toYaml . | nindent 12 }}
@@ -358,10 +373,20 @@ spec:
               mountPath: /etc/celine-policies-sync
               readOnly: true
             {{- end }}
+            {{- if .Values.syncBase }}
+            - name: sync-base
+              mountPath: /etc/celine-policies-sync-base
+              readOnly: true
+            {{- end }}
+            {{- if include "celine-policies-shell.realmScopedShell" . }}
+            # celine-admin-cli's secret, recorded by bootstrap: sync signs in to this realm only.
+            - name: realm-admin-secret
+              mountPath: /run/celine-policies-secrets
+            {{- end }}
           {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-      {{- if or .Values.volumes .Values.bootstrap.enabled .Values.syncOverlays }}
+      {{- if or .Values.volumes .Values.bootstrap.enabled .Values.syncOverlays .Values.syncBase }}
       volumes:
         {{- with .Values.volumes }}
         {{- toYaml . | nindent 8 }}
@@ -371,9 +396,20 @@ spec:
           configMap:
             name: {{ include "celine-policies-shell.fullname" . }}-sync-overlays
         {{- end }}
+        {{- if .Values.syncBase }}
+        - name: sync-base
+          configMap:
+            name: {{ include "celine-policies-shell.fullname" . }}-sync-base
+        {{- end }}
         {{- if .Values.bootstrap.enabled }}
         - name: bootstrap-record
           emptyDir: {}
+        {{- if include "celine-policies-shell.realmScopedShell" . }}
+        - name: realm-admin-secret
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Mi
+        {{- end }}
         {{- if .Values.bootstrap.overlay }}
         - name: platform-overlay
           configMap:

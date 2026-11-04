@@ -36,9 +36,7 @@ service:
 {{- $ns := .Environment.Values | dig "namespace" (printf "celine-%s" .Environment.Name) | toString }}
 {{- $clusterIssuer := .Environment.Values | dig "tls_setup" "ingress_cluster_issuer" "" | toString }}
 ingress:
-  # `marquez.ingress_enabled: false`: the host belongs to an oauth2_proxy gate
-  # (defaults/0020-auth/oauth2-proxy-gate), which forwards here.
-  enabled: {{ .Environment.Values | dig "marquez" "ingress_enabled" true }}
+  enabled: true
   className: {{ ternary ($ic | dig "class" "traefik") "nginx" $traefik }}
   host: "marquez.{{ .Environment.Values.domain }}"
   tlsEnabled: true

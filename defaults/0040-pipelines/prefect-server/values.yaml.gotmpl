@@ -119,9 +119,7 @@ backgroundServices:
 {{- $clusterIssuer := .Environment.Values | dig "tls_setup" "ingress_cluster_issuer" "" | toString }}
 # Ingress configuration
 ingress:
-  # `prefect_server.ingress_enabled: false`: the host belongs to an oauth2_proxy gate
-  # (defaults/0020-auth/oauth2-proxy-gate), which forwards here.
-  enabled: {{ .Environment.Values | dig "prefect_server" "ingress_enabled" true }}
+  enabled: true
   servicePort: server-svc-port
   className: {{ ternary ($ic | dig "class" "traefik") "nginx" $traefik | quote }}
   host:

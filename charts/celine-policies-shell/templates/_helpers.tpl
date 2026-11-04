@@ -39,51 +39,81 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
-Keycloak connection (CELINE_KEYCLOAK_* → KeycloakSettings), shared by the shell and the
-bootstrap init container.
+Keycloak connection (CELINE_KEYCLOAK_* → KeycloakSettings). Called with
+(dict "root" $ "master" bool): `master` adds the master realm's credentials, the bootstrap
+client's secret and the master administrator's password. The bootstrap init container always
+gets them; the shell only while shell.masterCredentials is on.
 */}}
 {{- define "celine-policies-shell.keycloakEnv" -}}
+{{- $root := .root }}
+{{- $master := .master }}
+{{- $kc := $root.Values.keycloak -}}
 - name: CELINE_KEYCLOAK_BASE_URL
-  value: {{ .Values.keycloak.baseUrl | quote }}
+  value: {{ $kc.baseUrl | quote }}
 - name: CELINE_KEYCLOAK_REALM
-  value: {{ .Values.keycloak.realm | quote }}
-{{- if .Values.keycloak.env }}
+  value: {{ $kc.realm | quote }}
+{{- if $kc.env }}
 - name: CELINE_KEYCLOAK_ENV
-  value: {{ .Values.keycloak.env | quote }}
+  value: {{ $kc.env | quote }}
 {{- end }}
-{{- with .Values.keycloak.bootstrapClient }}
+{{- with $kc.bootstrapClient }}
 {{- if .clientId }}
 - name: CELINE_KEYCLOAK_BOOTSTRAP_CLIENT_ID
   value: {{ .clientId | quote }}
 {{- end }}
-{{- if .secret }}
+{{- if and $master .secret }}
 - name: CELINE_KEYCLOAK_BOOTSTRAP_CLIENT_SECRET
   valueFrom:
     secretKeyRef:
-      name: {{ include "celine-policies-shell.fullname" $ }}-bootstrap-client
+      name: {{ include "celine-policies-shell.fullname" $root }}-bootstrap-client
       key: secret
 {{- end }}
 {{- end }}
-{{- if .Values.keycloak.adminUser }}
+{{- if and $master $kc.adminUser }}
 - name: CELINE_KEYCLOAK_ADMIN_USER
-  value: {{ .Values.keycloak.adminUser | quote }}
+  value: {{ $kc.adminUser | quote }}
 {{- end }}
-{{- if .Values.keycloak.existingSecret }}
-{{- if .Values.keycloak.adminPasswordKey }}
+{{- if $kc.adminPassword }}
+{{- if $master }}
 - name: CELINE_KEYCLOAK_ADMIN_PASSWORD
   valueFrom:
     secretKeyRef:
-      name: {{ .Values.keycloak.existingSecret }}
-      key: {{ .Values.keycloak.adminPasswordKey }}
+      name: {{ include "celine-policies-shell.fullname" $root }}-keycloak-admin
+      key: password
 {{- end }}
-{{- if .Values.keycloak.adminClientSecretKey }}
+{{- else if $kc.existingSecret }}
+{{- if and $master $kc.adminPasswordKey }}
+- name: CELINE_KEYCLOAK_ADMIN_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ $kc.existingSecret }}
+      key: {{ $kc.adminPasswordKey }}
+{{- end }}
+{{- if $kc.adminClientSecretKey }}
 - name: CELINE_KEYCLOAK_ADMIN_CLIENT_SECRET
   valueFrom:
     secretKeyRef:
-      name: {{ .Values.keycloak.existingSecret }}
-      key: {{ .Values.keycloak.adminClientSecretKey }}
+      name: {{ $kc.existingSecret }}
+      key: {{ $kc.adminClientSecretKey }}
 {{- end }}
 {{- end }}
+{{- end }}
+
+{{/*
+"true" when the shell holds no master credential (shell.masterCredentials off, bootstrap on):
+it signs in as the realm's own admin client, celine-admin-cli, whose secret the bootstrap init
+container records in a memory volume both containers mount. Empty otherwise.
+*/}}
+{{- define "celine-policies-shell.realmScopedShell" -}}
+{{- if and (not .Values.shell.masterCredentials) .Values.bootstrap.enabled }}true{{ end }}
+{{- end }}
+
+{{/*
+The secrets file bootstrap records celine-admin-cli's secret in and the shell's sync reads:
+the shared memory volume for a realm-scoped shell, each container's own /tmp otherwise.
+*/}}
+{{- define "celine-policies-shell.secretsFile" -}}
+{{- if include "celine-policies-shell.realmScopedShell" . }}/run/celine-policies-secrets/secrets.yaml{{ else }}/tmp/.secrets.yaml{{ end }}
 {{- end }}
 
 {{/*
@@ -96,6 +126,54 @@ reached over TLS from there too.
 - name: {{ .name }}
   value: {{ .value | quote }}
 {{- end }}
+{{- end }}
+{{- end }}
+
+{{/*
+bootstrap.platformAdminPasswords as the variables celine-policies reads (REQ-0022): `template`
+→ CELINE_KEYCLOAK_PLATFORM_ADMIN_PASSWORD_TEMPLATE (must contain {username}), `users`
+({username: password}) → CELINE_KEYCLOAK_PLATFORM_ADMIN_PASSWORD_<USERNAME>. Empty map: none.
+*/}}
+{{- define "celine-policies-shell.platformAdminPasswordEnv" -}}
+{{- $p := .Values.bootstrap.platformAdminPasswords | default dict }}
+{{- $out := dict }}
+{{- with $p.template }}
+{{- if not (contains "{username}" (toString .)) }}
+{{- fail "bootstrap.platformAdminPasswords.template must contain {username}: without it every account gets the same password" }}
+{{- end }}
+{{- $_ := set $out "CELINE_KEYCLOAK_PLATFORM_ADMIN_PASSWORD_TEMPLATE" (toString .) }}
+{{- end }}
+{{- range $user, $pw := ($p.users | default dict) }}
+{{- if $pw }}
+{{- $_ := set $out (printf "CELINE_KEYCLOAK_PLATFORM_ADMIN_PASSWORD_%s" (regexReplaceAll "[^A-Za-z0-9]" $user "_" | upper)) (toString $pw) }}
+{{- end }}
+{{- end }}
+{{- toYaml $out }}
+{{- end }}
+
+{{/*
+syncBase, checked: {name, content} or empty. A name that is no plain file name, an empty
+content, or `clientsFile` set as well stops the render; a map content is written as YAML.
+*/}}
+{{- define "celine-policies-shell.syncBase" -}}
+{{- $b := .Values.syncBase | default dict }}
+{{- if not (kindIs "map" $b) }}
+{{- fail "syncBase must be {name, content}" }}
+{{- end }}
+{{- if $b }}
+{{- $name := $b.name | default "" | toString }}
+{{- if not (regexMatch "^[A-Za-z0-9][A-Za-z0-9._-]*$" $name) }}
+{{- fail (printf "syncBase: %q is not a file name (letters, digits, '.', '-' and '_')" $name) }}
+{{- end }}
+{{- if .Values.clientsFile }}
+{{- fail "syncBase and clientsFile name the same thing: set one" }}
+{{- end }}
+{{- $content := $b.content }}
+{{- $text := ternary (toYaml $content) (toString ($content | default "")) (kindIs "map" $content) }}
+{{- if not (trim $text) }}
+{{- fail (printf "syncBase: %s is empty" $name) }}
+{{- end }}
+{{- toYaml (dict "name" $name "content" $text) }}
 {{- end }}
 {{- end }}
 

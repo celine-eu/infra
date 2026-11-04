@@ -56,7 +56,8 @@ keycloak:
   # below; every later run, and `sync`, signs in as it, since the master admin's password
   # grant stops working once the admin has a second factor. The secret (at least 32
   # characters, e.g. `openssl rand -hex 32`) goes into a Secret, never into the pod spec,
-  # and reaches both the bootstrap init container and the shell. It holds master's `admin`
+  # and reaches the bootstrap init container, and the shell while shell.masterCredentials is
+  # on. It holds master's `admin`
   # role: treat it as the master credential. Empty clientId: celine-policies' default,
   # svc-celine-policies-bootstrap.
   bootstrapClient:
@@ -72,6 +73,10 @@ keycloak:
   # The Secret must contain the keys defined by adminPasswordKey /
   # adminClientSecretKey below.
   existingSecret: "keycloak-admin-credentials"
+  # The master administrator's password itself, for an environment whose Keycloak runs
+  # elsewhere (no admin Secret here): rendered as the Secret <fullname>-keycloak-admin and
+  # used instead of existingSecret. Empty: existingSecret.
+  adminPassword: ""
   adminPasswordKey: "admin-password"
   adminClientSecretKey: "" # optional; only if using client-credentials flow
 
@@ -123,6 +128,11 @@ bootstrap:
     firstName: ""
     lastName: ""
     password: ""
+  # Temporary passwords for the platform-admin accounts the platform overlay declares
+  # (`platform_admin.users` entries {username, email, first_name, last_name}; celine-policies
+  # REQ-0022): `template` with {username}, and/or `users` {username: password}, which wins.
+  # A Secret read by the bootstrap init container only; an existing account is never sent one.
+  platformAdminPasswords: {}
   # Where each run's export, plan, apply and check output is stored.
   record:
     image: "curlimages/curl:8.21.0"
@@ -135,6 +145,19 @@ bootstrap:
     environment: ""
 
 # --------------------------------------------------------------------------
+# The long-running shell container
+# --------------------------------------------------------------------------
+shell:
+  # true: the shell gets the master realm's credentials too (the bootstrap client's secret,
+  # the master administrator's password), as the bootstrap init container does. Anyone who
+  # can exec into the pod holds master, and so every realm of that Keycloak.
+  # false: master's credentials reach the bootstrap init container only. Bootstrap records
+  # the realm's own admin client (celine-admin-cli, realm-management roles of that realm)
+  # in a memory volume, and the shell's `sync` signs in as it. Running `bootstrap` from the
+  # shell then needs the master credentials passed by hand. Needs bootstrap.enabled.
+  masterCredentials: true
+
+# --------------------------------------------------------------------------
 # Sync overlays: further files declaring part of the realm (celine-policies
 # `keycloak sync --overlay`, repeatable, merged with clients.yaml before the
 # sync). A list of {name, content}, passed in list order; a name given twice
@@ -142,6 +165,14 @@ bootstrap:
 # `sync clients.yaml`.
 # --------------------------------------------------------------------------
 syncOverlays: []
+
+# --------------------------------------------------------------------------
+# Sync base: the deployment's own base declaration, {name, content}, synced by the
+# start-up `keycloak sync` instead of the image's clients.yaml (a realm that is not the
+# services' platform realm, e.g. one for operators only). Overlays still apply on top.
+# Empty: clientsFile, or the image's /app/clients.yaml.
+# --------------------------------------------------------------------------
+syncBase: {}
 
 # --------------------------------------------------------------------------
 # Extra environment variables (plain value or secretKeyRef)

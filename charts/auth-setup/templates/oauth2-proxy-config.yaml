@@ -11,6 +11,10 @@ data:
     oidc_issuer_url = "{{ .Values.keycloakUrl | default (printf "https://keycloak.%s" .Values.domain) }}/realms/{{ .Values.realm | default "celine" }}"
     redirect_url = "https://sso.{{ .Values.domain }}/oauth2/callback"
     email_domains = [ "*" ]
+    {{- with .Values.oauth2Proxy.allowedGroups }}
+    # Only these groups pass, on every route (auth_setup.allowed_groups).
+    allowed_groups = [ {{ range $i, $g := . }}{{ if $i }}, {{ end }}{{ $g | quote }}{{ end }} ]
+    {{- end }}
     # `organization:*`: every organization the user belongs to goes into the token's
     # `organization` claim. Keycloak's default `organization` scope, requested without a
     # value, leaves the claim EMPTY for a member of more than one organization (Keycloak 26),

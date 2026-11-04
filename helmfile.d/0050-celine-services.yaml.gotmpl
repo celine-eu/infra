@@ -162,8 +162,11 @@ releases:
     labels:
       group: celine-services
 
-  - name: policies-shell
-    namespace: {{ $ns }}
+  # `policies_shell.release_name` and `policies_shell.namespace`: the realm's shell may run
+  # elsewhere, e.g. next to a Keycloak several environments share, so that the master realm's
+  # credentials stay in that namespace. One release per realm there: give each its own name.
+  - name: {{ .Environment.Values | dig "policies_shell" "release_name" "policies-shell" }}
+    namespace: {{ .Environment.Values | dig "policies_shell" "namespace" $ns }}
     chart: ../charts/celine-policies-shell
     missingFileHandler: Warn
     labels:

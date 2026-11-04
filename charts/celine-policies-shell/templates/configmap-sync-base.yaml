@@ -1,0 +1,14 @@
+{{- with include "celine-policies-shell.syncBase" . | fromYaml }}
+{{- if .name }}
+# The deployment's own base declaration (`syncBase`), synced by the shell's start-up
+# `keycloak sync` instead of the image's clients.yaml.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "celine-policies-shell.fullname" $ }}-sync-base
+  labels:
+    {{- include "celine-policies-shell.labels" $ | nindent 4 }}
+data:
+  {{ .name }}: {{ .content | quote }}
+{{- end }}
+{{- end }}

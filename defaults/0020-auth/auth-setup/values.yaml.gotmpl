@@ -21,6 +21,10 @@ oauth2Proxy:
   # openssl rand -hex 16
   clientSecret: {{ .Environment.Values.auth_setup.clientSecret }}
   cookieSecret: {{ .Environment.Values.auth_setup.cookieSecret }}
+  # `auth_setup.allowed_groups`: only these groups pass the whole proxy (oauth2-proxy
+  # `allowed_groups`; realm roles are `role:<name>`), for an environment whose sso fronts
+  # admin UIs only. Unset: every signed-in user passes, as before.
+  allowedGroups: {{ .Environment.Values | dig "auth_setup" "allowed_groups" list | toJson }}
 
 dashboard_enabled: {{ .Environment.Values | dig "auth_setup" "dashboard_enabled" true }}
 
