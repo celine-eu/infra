@@ -94,7 +94,7 @@ def test_a_password_becomes_a_secret_of_its_own():
 
 
 # ---------------------------------------------------------------------------
-# bootstrap.platformAdminPasswords (celine-policies REQ-0022)
+# bootstrap.platformAdminPasswordTemplate (celine-policies REQ-0022)
 # ---------------------------------------------------------------------------
 
 
@@ -121,18 +121,16 @@ def test_without_passwords_no_secret_and_no_env():
 
 def test_passwords_reach_the_bootstrap_container_only():
     ds = docs(render_bootstrap(
-        "bootstrap:\n  platformAdminPasswords:\n    template: '{username}.x'\n    users:\n      alice.doe: own\n"
+        "bootstrap:\n  platformAdminPasswordTemplate: '{username}.x'\n"
     ))
     secret = next(d for d in ds if d["metadata"]["name"] == "policies-shell-bootstrap-platform-admins")
-    assert secret["stringData"] == {
-        "CELINE_KEYCLOAK_PLATFORM_ADMIN_PASSWORD_TEMPLATE": "{username}.x",
-        "CELINE_KEYCLOAK_PLATFORM_ADMIN_PASSWORD_ALICE_DOE": "own",
-    }
+    # Outside CELINE_KEYCLOAK_PLATFORM_*, which celine-policies reads as realm-setting overrides.
+    assert secret["stringData"] == {"CELINE_KEYCLOAK_ADMIN_TEMP_PASSWORD_TEMPLATE": "{username}.x"}
     cs = containers(ds)
     assert cs["bootstrap"]["envFrom"] == [{"secretRef": {"name": "policies-shell-bootstrap-platform-admins"}}]
     assert "envFrom" not in cs["shell"] and "envFrom" not in cs["bootstrap-record"]
 
 
 def test_a_template_without_the_username_stops_the_render():
-    result = render_bootstrap("bootstrap:\n  platformAdminPasswords:\n    template: same\n")
+    result = render_bootstrap("bootstrap:\n  platformAdminPasswordTemplate: same\n")
     assert result.returncode != 0 and "{username}" in result.stderr

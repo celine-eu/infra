@@ -130,23 +130,16 @@ reached over TLS from there too.
 {{- end }}
 
 {{/*
-bootstrap.platformAdminPasswords as the variables celine-policies reads (REQ-0022): `template`
-→ CELINE_KEYCLOAK_PLATFORM_ADMIN_PASSWORD_TEMPLATE (must contain {username}), `users`
-({username: password}) → CELINE_KEYCLOAK_PLATFORM_ADMIN_PASSWORD_<USERNAME>. Empty map: none.
+bootstrap.platformAdminPasswordTemplate as the variable celine-policies reads (REQ-0022):
+CELINE_KEYCLOAK_ADMIN_TEMP_PASSWORD_TEMPLATE, which must contain {username}. Empty: none.
 */}}
 {{- define "celine-policies-shell.platformAdminPasswordEnv" -}}
-{{- $p := .Values.bootstrap.platformAdminPasswords | default dict }}
 {{- $out := dict }}
-{{- with $p.template }}
-{{- if not (contains "{username}" (toString .)) }}
-{{- fail "bootstrap.platformAdminPasswords.template must contain {username}: without it every account gets the same password" }}
+{{- with .Values.bootstrap.platformAdminPasswordTemplate | toString }}
+{{- if not (contains "{username}" .) }}
+{{- fail "bootstrap.platformAdminPasswordTemplate must contain {username}: without it every account gets the same password" }}
 {{- end }}
-{{- $_ := set $out "CELINE_KEYCLOAK_PLATFORM_ADMIN_PASSWORD_TEMPLATE" (toString .) }}
-{{- end }}
-{{- range $user, $pw := ($p.users | default dict) }}
-{{- if $pw }}
-{{- $_ := set $out (printf "CELINE_KEYCLOAK_PLATFORM_ADMIN_PASSWORD_%s" (regexReplaceAll "[^A-Za-z0-9]" $user "_" | upper)) (toString $pw) }}
-{{- end }}
+{{- $_ := set $out "CELINE_KEYCLOAK_ADMIN_TEMP_PASSWORD_TEMPLATE" . }}
 {{- end }}
 {{- toYaml $out }}
 {{- end }}

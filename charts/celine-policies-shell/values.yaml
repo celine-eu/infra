@@ -128,11 +128,12 @@ bootstrap:
     firstName: ""
     lastName: ""
     password: ""
-  # Temporary passwords for the platform-admin accounts the platform overlay declares
+  # The temporary password of each platform-admin account the platform overlay declares
   # (`platform_admin.users` entries {username, email, first_name, last_name}; celine-policies
-  # REQ-0022): `template` with {username}, and/or `users` {username: password}, which wins.
-  # A Secret read by the bootstrap init container only; an existing account is never sent one.
-  platformAdminPasswords: {}
+  # REQ-0022), with {username} replaced, e.g. "{username}.example+2026"; changed at first
+  # sign-in. A Secret read by the bootstrap init container only; an existing account is never
+  # sent one. Empty: none, and bootstrap refuses to create a declared account.
+  platformAdminPasswordTemplate: ""
   # Where each run's export, plan, apply and check output is stored.
   record:
     image: "curlimages/curl:8.21.0"

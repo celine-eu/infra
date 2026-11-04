@@ -251,9 +251,9 @@ bootstrap:
     firstName: "Celine"
     lastName: "Admin"
     password: {{ .Environment.Values | dig "auth_setup" "realmAdminPassword" "celine-admin" | quote }}
-  # `policies_shell.platform_admin_passwords` (secrets): {template, users} for the accounts
-  # `keycloak.platform.platform_admin.users` declares. Empty: none.
-  platformAdminPasswords: {{ .Environment.Values | dig "policies_shell" "platform_admin_passwords" (dict) | toJson }}
+  # `policies_shell.platform_admin_password_template` (secrets): the temporary password, with
+  # {username}, of the accounts `keycloak.platform.platform_admin.users` declares. Empty: none.
+  platformAdminPasswordTemplate: {{ .Environment.Values | dig "policies_shell" "platform_admin_password_template" "" | quote }}
   record:
     bucket: {{ .Environment.Values | dig "policies_shell" "bootstrap" "bucket" "" | quote }}
     s3Secret: {{ .Environment.Values | dig "policies_shell" "bootstrap" "s3_secret" "" | quote }}
