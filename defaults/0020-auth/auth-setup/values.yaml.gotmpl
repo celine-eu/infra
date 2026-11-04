@@ -25,6 +25,10 @@ oauth2Proxy:
   # `allowed_groups`; realm roles are `role:<name>`), for an environment whose sso fronts
   # admin UIs only. Unset: every signed-in user passes, as before.
   allowedGroups: {{ .Environment.Values | dig "auth_setup" "allowed_groups" list | toJson }}
+  {{- /* `ingress_controller.annotations: traefik`: the admin UIs' forwardAuth address is the
+         proxy's root (defaults/0020-auth/oauth2-proxy), so a session must answer 2xx there:
+         static://202. Traefik treats anything else as a refusal and returns it as is. */}}
+  upstreams: {{ ternary (list "static://202") (list "file:///dev/null") (eq (.Environment.Values | dig "ingress_controller" "annotations" "nginx" | toString) "traefik") | toJson }}
 
 dashboard_enabled: {{ .Environment.Values | dig "auth_setup" "dashboard_enabled" true }}
 

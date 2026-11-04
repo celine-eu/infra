@@ -7,7 +7,7 @@ metadata:
 data:
   oauth2_proxy.cfg: |
     provider = "keycloak-oidc"
-    upstreams = [ "file:///dev/null" ]
+    upstreams = [ {{ range $i, $u := .Values.oauth2Proxy.upstreams }}{{ if $i }}, {{ end }}{{ $u | quote }}{{ end }} ]
     oidc_issuer_url = "{{ .Values.keycloakUrl | default (printf "https://keycloak.%s" .Values.domain) }}/realms/{{ .Values.realm | default "celine" }}"
     redirect_url = "https://sso.{{ .Values.domain }}/oauth2/callback"
     email_domains = [ "*" ]

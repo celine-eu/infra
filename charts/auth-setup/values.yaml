@@ -55,6 +55,11 @@ oauth2Proxy:
   clientCLISecret: 2e19c0fe82cbda7acbe509e88a52beb3
   # Only these groups pass the proxy (oauth2-proxy `allowed_groups`); empty: any signed-in user.
   allowedGroups: []
+  # What a signed-in request reaches. `file:///dev/null` (404) where the proxy only gates
+  # through `/oauth2/auth` (nginx auth-url). `static://202` where a forwardAuth address is the
+  # proxy's root (Traefik): a session answers 202, and the request goes on to the service.
+  upstreams:
+    - file:///dev/null
 
 # The services dashboard (a static page of links behind oauth2-proxy). false: none of it.
 dashboard_enabled: true

@@ -37,3 +37,19 @@ def test_set_only_those_groups_pass():
 def test_several_groups_are_one_list():
     cfg = cfg_of("auth_setup:\n  allowed_groups: [role:platform-admin, role:operator]\n")
     assert 'allowed_groups = [ "role:platform-admin", "role:operator" ]' in cfg
+
+
+# ---------------------------------------------------------------------------
+# upstreams: what a signed-in request reaches
+# ---------------------------------------------------------------------------
+
+
+def test_nginx_keeps_the_empty_upstream():
+    """nginx gates through /oauth2/auth (auth-url): the upstream is never reached."""
+    assert 'upstreams = [ "file:///dev/null" ]' in cfg_of()
+
+
+def test_traefik_answers_a_session_with_202():
+    """Traefik's forwardAuth goes to the proxy's root: a 404 from /dev/null would be a refusal."""
+    cfg = cfg_of("ingress_controller:\n  annotations: traefik\n")
+    assert 'upstreams = [ "static://202" ]' in cfg
