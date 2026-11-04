@@ -375,7 +375,11 @@ releases:
     namespace: {{ $ns }}
     chart: ../charts/sync-tables
     createNamespace: true
-    installed: {{ or (.Environment.Values | dig "sync_tables" "sink" "enabled" false) (.Environment.Values | dig "sync_tables" "push_source" "enabled" false) (.Environment.Values | dig "sync_tables" "serve" "enabled" false) }}
+    {{- $stTargetsOn := false }}
+    {{- range $_, $t := (.Environment.Values | dig "sync_tables" "push_targets" (dict) | default (dict)) }}
+    {{- if ne (toString (dig "enabled" true $t)) "false" }}{{ $stTargetsOn = true }}{{ end }}
+    {{- end }}
+    installed: {{ or (.Environment.Values | dig "sync_tables" "sink" "enabled" false) (.Environment.Values | dig "sync_tables" "push_source" "enabled" false) (.Environment.Values | dig "sync_tables" "serve" "enabled" false) $stTargetsOn }}
     missingFileHandler: Warn
     values:
       - ../defaults/0050-celine-services/sync-tables/values.yaml.gotmpl

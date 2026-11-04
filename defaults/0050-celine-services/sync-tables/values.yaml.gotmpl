@@ -35,6 +35,12 @@
 #       client_cert: ""                 # secret: PEM
 #       client_key: ""                  # secret: PEM
 #       resources: {}
+#       database_pod_selector: {cnpg.io/cluster: postgis1}   # the source database's pods (NetworkPolicy)
+#     push_targets:                     # further sinks from the same source, one CronJob each:
+#       <key>:                          # {<key>: {to, sink_url, token, ca, client_cert, client_key,
+#         enabled: true                 #  profile, schedule, resources}}; push_source's keys
+#         to: staging                   #  are the defaults. Each needs its push_source-shaped
+#                                       #  required keys. enabled: false leaves one out.
 #     serve:                            # the environment developers pull from (staging):
 #                                       # `sync-tables serve` behind the ingress, mTLS
 #       enabled: false
@@ -118,3 +124,20 @@ pushSource:
   clientCert: {{ $push | dig "client_cert" "" | toJson }}
   clientKey: {{ $push | dig "client_key" "" | toJson }}
   resources: {{ $push | dig "resources" (dict) | toJson }}
+  networkPolicy:
+    enabled: true
+    databasePodSelector: {{ $push | dig "database_pod_selector" (dict "cnpg.io/cluster" "postgis1") | toJson }}
+
+{{- $targets := $st | dig "push_targets" (dict) | default (dict) }}
+pushTargets:
+{{- range $key, $t := $targets }}
+  {{ $key }}:
+    {{- $map := dict "enabled" "enabled" "to" "to" "schedule" "schedule" "sink_url" "sinkUrl" "token" "token" "ca" "ca" "client_cert" "clientCert" "client_key" "clientKey" "profile" "profile" "resources" "resources" }}
+    {{- range $k, $v := $t }}
+    {{- if not (hasKey $map $k) }}
+    {{- fail (printf "sync_tables.push_targets.%s.%s: unknown key (known: %s)" $key $k (keys $map | sortAlpha | join ", ")) }}
+    {{- end }}
+    {{ index $map $k }}: {{ $v | toJson }}
+    {{- end }}
+{{- else }} {}
+{{- end }}

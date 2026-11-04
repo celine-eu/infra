@@ -141,3 +141,9 @@ pushSource:
     enabled: true
     databasePodSelector:
       cnpg.io/cluster: postgis1
+
+# Further push targets from the same source, one CronJob each (e.g. one environment pushing to
+# several sinks): {<key>: {to, sinkUrl, ca, clientCert, clientKey, token, profile, …}}. Each
+# entry overrides `pushSource`'s keys and is rendered as <release>-push-<key>; `enabled: false`
+# leaves it out. Independent of pushSource.enabled. Empty: none.
+pushTargets: {}
