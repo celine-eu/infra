@@ -39,3 +39,8 @@ mqtt:
   #   MQTT_PASS: secretpass
 
 resources: {}
+
+# Pod and container security contexts (e.g. Pod Security `restricted`; the image has no USER,
+# so a non-root run needs runAsUser). Empty: none set.
+podSecurityContext: {}
+securityContext: {}

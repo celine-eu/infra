@@ -14,6 +14,14 @@ spec:
     spec:
       restartPolicy: Never
       serviceAccountName: prefect-worker
+      {{- with $.Values.global.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $.Values.global.volumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- if $flow.imageSecret }}
       imagePullSecrets:
         - name: {{ $flow.imageSecret }}
@@ -22,6 +30,14 @@ spec:
         - name: prefect-deploy-{{ $flow.name }}
           image: {{ $flow.image }}
           imagePullPolicy: {{ $flow.pullPolicy | default "IfNotPresent" }}
+          {{- with $.Values.global.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $.Values.global.volumeMounts }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           env:
             # Render all global envs, except those a flow entry of the same name replaces: a name may
             # appear once, or the Deployment cannot be patched.
@@ -75,11 +91,11 @@ spec:
               set -eux
               sleep {{ $i }}
               echo "Building prefect.yaml for {{ $flow.name }}"
-              mkdir -p /config
+              mkdir -p {{ $.Values.global.deployConfigDir }}
 
               # Quoted heredoc: the shell expands nothing, so no value of the Job's env
               # (secrets included) can land in the deployment.
-              cat > /config/prefect.yaml <<'EOF'
+              cat > {{ $.Values.global.deployConfigDir }}/prefect.yaml <<'EOF'
               name: {{ $flow.name }}-deployment
               deployments:
                 - name: {{ $flow.name }}-flow
@@ -136,6 +152,6 @@ spec:
               EOF
 
               echo "Registering Prefect deployment for {{ $flow.name }}"
-              prefect deploy --prefect-file /config/prefect.yaml
+              prefect deploy --prefect-file {{ $.Values.global.deployConfigDir }}/prefect.yaml
 ---
 {{- end }}

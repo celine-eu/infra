@@ -13,11 +13,29 @@ spec:
         spec:
             restartPolicy: Never
             serviceAccountName: prefect-worker
+            {{- with $.Values.global.podSecurityContext }}
+            securityContext:
+              {{- toYaml . | nindent 14 }}
+            {{- end }}
+            {{- with $.Values.global.volumes }}
+            volumes:
+              {{- toYaml . | nindent 14 }}
+            {{- end }}
             containers:
                 - name: cleanup
-                  image: bitnami/kubectl:latest
+                  # The Kubernetes project's own image (registry.k8s.io): bitnami/kubectl is no
+                  # longer published for free. It runs as uid 0 unless the pod says otherwise.
+                  image: {{ $.Values.cleanup.image | quote }}
+                  {{- with $.Values.global.containerSecurityContext }}
+                  securityContext:
+                    {{- toYaml . | nindent 20 }}
+                  {{- end }}
+                  {{- with $.Values.global.volumeMounts }}
+                  volumeMounts:
+                    {{- toYaml . | nindent 20 }}
+                  {{- end }}
                   command:
-                      - kubectl
+                      - /bin/kubectl
                       - delete
                       - jobs
                       - -n

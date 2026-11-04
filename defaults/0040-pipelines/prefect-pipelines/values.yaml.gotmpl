@@ -6,6 +6,15 @@ global:
   work_pool: celine
   # `prefect_pipelines.paused`: register every flow paused, its schedule inactive.
   paused: {{ .Environment.Values | dig "prefect_pipelines" "paused" false }}
+  {{- /* The deploy Jobs, the cleanup Job and the shells run like the flow runs:
+         `prefect_worker.job.*` (security contexts, volumes, mounts). Unset: none. A non-root
+         deploy Job writes prefect.yaml under `prefect_pipelines.deploy_config_dir`. */}}
+  {{- $job := .Environment.Values | dig "prefect_worker" "job" (dict) | default (dict) }}
+  deployConfigDir: {{ .Environment.Values | dig "prefect_pipelines" "deploy_config_dir" "/config" | quote }}
+  podSecurityContext: {{ $job | dig "pod_security_context" (dict) | toJson }}
+  containerSecurityContext: {{ $job | dig "container_security_context" (dict) | toJson }}
+  volumes: {{ $job | dig "volumes" list | toJson }}
+  volumeMounts: {{ $job | dig "volume_mounts" list | toJson }}
   env:
     - name: PREFECT_MODE
       value: prod

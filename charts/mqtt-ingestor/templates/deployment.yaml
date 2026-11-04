@@ -16,10 +16,18 @@ spec:
         app.kubernetes.io/name: {{ include "mqtt-ingestor.name" . }}
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: {{ include "mqtt-ingestor.name" . }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           env:
 
             - name: POSTGRES_DSN

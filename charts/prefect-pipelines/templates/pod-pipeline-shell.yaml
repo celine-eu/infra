@@ -17,6 +17,14 @@ spec:
         app: pipeline-{{ .name }}-shell
     spec:
       serviceAccountName: prefect-worker
+      {{- with $.Values.global.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $.Values.global.volumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- if .imageSecret }}
       imagePullSecrets:
         - name: {{ .imageSecret }}
@@ -26,6 +34,14 @@ spec:
         - name: pipeline-{{ .name }}-shell
           image: {{ .image }}
           imagePullPolicy: {{ .pullPolicy | default "IfNotPresent" }}
+          {{- with $.Values.global.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $.Values.global.volumeMounts }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           command:
             - "bash"
             - "-c"

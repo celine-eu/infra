@@ -8,6 +8,15 @@ global:
   # registers a cron schedule active, undoing a pause made in the database). For a side that
   # must not run yet, e.g. during a migration. Unpause in Prefect, or set false and re-apply.
   paused: false
+  # Where the deploy Job writes prefect.yaml. A non-root Job cannot create /config: point it
+  # at a writable volume (e.g. /tmp/config with an emptyDir on /tmp).
+  deployConfigDir: /config
+  # Pod and container security contexts, volumes and mounts of the deploy Jobs, the cleanup
+  # Job and the pipeline shells (e.g. Pod Security `restricted`). Empty: none set.
+  podSecurityContext: {}
+  containerSecurityContext: {}
+  volumes: []
+  volumeMounts: []
   env:
     - name: PREFECT_MODE
       value: prod
@@ -84,3 +93,7 @@ flows:
     schedule:
       cron: "0 0,6,12,18 * * *"
     env: []
+
+# The pre-upgrade Job that deletes the previous deploy Jobs.
+cleanup:
+  image: registry.k8s.io/kubectl:v1.36.5
