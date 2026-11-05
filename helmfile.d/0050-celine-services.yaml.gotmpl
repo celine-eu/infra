@@ -379,6 +379,9 @@ releases:
     {{- range $_, $t := (.Environment.Values | dig "sync_tables" "push_targets" (dict) | default (dict)) }}
     {{- if ne (toString (dig "enabled" true $t)) "false" }}{{ $stTargetsOn = true }}{{ end }}
     {{- end }}
+    {{- range $_, $r := (.Environment.Values | dig "sync_tables" "relays" (dict) | default (dict)) }}
+    {{- if ne (toString (dig "enabled" true $r)) "false" }}{{ $stTargetsOn = true }}{{ end }}
+    {{- end }}
     installed: {{ or (.Environment.Values | dig "sync_tables" "sink" "enabled" false) (.Environment.Values | dig "sync_tables" "push_source" "enabled" false) (.Environment.Values | dig "sync_tables" "serve" "enabled" false) $stTargetsOn }}
     missingFileHandler: Warn
     values:

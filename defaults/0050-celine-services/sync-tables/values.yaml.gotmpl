@@ -23,6 +23,13 @@
 #       pod_annotations: {}             # e.g. cluster-autoscaler.kubernetes.io/safe-to-evict:
 #                                       # "false", so the autoscaler never moves it mid-push
 #       pdb: false                      # true: a PodDisruptionBudget, maxUnavailable 0
+#       accept_from: []                 # sync_tables >= 0.8.0: the sources it accepts (dev)
+#       events:                         # sync_tables >= 0.8.0: publish the run events a push
+#         enabled: false                #  carries, as celine-policies' svc-sync-tables-sink
+#         env: ""                       # CELINE_ENV (celine-sdk posture)
+#         mqtt: { host: "", port: 1883, use_tls: false }
+#         oidc: { base_url: "", client_id: svc-sync-tables-sink,
+#                 client_secret: { name: "", key: "" } }   # an existing Secret
 #     push_source:                      # the environment that sends (staging)
 #       enabled: false
 #       schedule: "*/30 * * * *"
@@ -36,6 +43,8 @@
 #       client_key: ""                  # secret: PEM
 #       resources: {}
 #       database_pod_selector: {cnpg.io/cluster: postgis1}   # the source database's pods (NetworkPolicy)
+#       edges: []                       # sync_tables >= 0.8.0: [{from, to, transports}], passed
+#                                       # as --config; push_targets may set their own
 #     push_targets:                     # further sinks from the same source, one CronJob each:
 #       <key>:                          # {<key>: {to, sink_url, token, ca, client_cert, client_key,
 #         enabled: true                 #  profile, schedule, resources}}; push_source's keys
@@ -60,6 +69,17 @@
 #       server_cert: ""                 # secret: PEM, the serving host's certificate (pull CA)
 #       server_key: ""                  # secret: PEM
 #       resources: {}
+#       serve_to: []                    # sync_tables >= 0.8.0: the targets it serves (local)
+#     relay:                            # sync_tables >= 0.8.0, with `relays`
+#       source_env: dev                 # the source database's marker
+#       flows_namespace: ""             # the only namespace that may POST run events
+#       min_interval: 30m
+#       max_interval: 30m
+#     relays:                           # one per sink, each replacing push_targets.<key>:
+#       <key>:                          # {sink_url, token, ca, client_cert, client_key, profile,
+#         enabled: true                 #  env, min_interval, max_interval, pending_max,
+#                                       #  allow_schemas, resources}; reads with push_source's
+#                                       #  source_secret and database_pod_selector
 #
 # The CAs, certificates and tokens come from `sync-tables certs` (one CA per purpose). The IngressClass follows
 # `ingress_controller.class` (default nginx), as for every other release.
@@ -92,6 +112,19 @@ sink:
     enabled: {{ $sink | dig "pdb" false }}
   networkPolicy:
     ingressNamespace: {{ $sink | dig "ingress_namespace" "ingress" | quote }}
+  acceptFrom: {{ $sink | dig "accept_from" (list) | toJson }}
+  {{- $ev := $sink | dig "events" (dict) }}
+  events:
+    enabled: {{ $ev | dig "enabled" false }}
+    env: {{ $ev | dig "env" "" | quote }}
+    mqtt:
+      host: {{ $ev | dig "mqtt" "host" "" | quote }}
+      port: {{ $ev | dig "mqtt" "port" 1883 }}
+      useTls: {{ $ev | dig "mqtt" "use_tls" false }}
+    oidc:
+      baseUrl: {{ $ev | dig "oidc" "base_url" "" | quote }}
+      clientId: {{ $ev | dig "oidc" "client_id" "svc-sync-tables-sink" | quote }}
+      clientSecret: {{ $ev | dig "oidc" "client_secret" (dict "name" "" "key" "") | toJson }}
 
 serve:
   enabled: {{ $serve | dig "enabled" false }}
@@ -112,6 +145,7 @@ serve:
   resources: {{ $serve | dig "resources" (dict) | toJson }}
   networkPolicy:
     ingressNamespace: {{ $serve | dig "ingress_namespace" "ingress" | quote }}
+  serveTo: {{ $serve | dig "serve_to" (list) | toJson }}
 
 pushSource:
   enabled: {{ $push | dig "enabled" false }}
@@ -124,6 +158,7 @@ pushSource:
   clientCert: {{ $push | dig "client_cert" "" | toJson }}
   clientKey: {{ $push | dig "client_key" "" | toJson }}
   resources: {{ $push | dig "resources" (dict) | toJson }}
+  edges: {{ $push | dig "edges" (list) | toJson }}
   networkPolicy:
     enabled: true
     databasePodSelector: {{ $push | dig "database_pod_selector" (dict "cnpg.io/cluster" "postgis1") | toJson }}
@@ -132,10 +167,33 @@ pushSource:
 pushTargets:
 {{- range $key, $t := $targets }}
   {{ $key }}:
-    {{- $map := dict "enabled" "enabled" "to" "to" "schedule" "schedule" "sink_url" "sinkUrl" "token" "token" "ca" "ca" "client_cert" "clientCert" "client_key" "clientKey" "profile" "profile" "resources" "resources" }}
+    {{- $map := dict "enabled" "enabled" "to" "to" "schedule" "schedule" "sink_url" "sinkUrl" "token" "token" "ca" "ca" "client_cert" "clientCert" "client_key" "clientKey" "profile" "profile" "resources" "resources" "edges" "edges" }}
     {{- range $k, $v := $t }}
     {{- if not (hasKey $map $k) }}
     {{- fail (printf "sync_tables.push_targets.%s.%s: unknown key (known: %s)" $key $k (keys $map | sortAlpha | join ", ")) }}
+    {{- end }}
+    {{ index $map $k }}: {{ $v | toJson }}
+    {{- end }}
+{{- else }} {}
+{{- end }}
+
+{{- $relay := $st | dig "relay" (dict) }}
+relay:
+  sourceEnv: {{ $relay | dig "source_env" "" | quote }}
+  flowsNamespace: {{ $relay | dig "flows_namespace" "" | quote }}
+  minInterval: {{ $relay | dig "min_interval" "30m" | quote }}
+  maxInterval: {{ $relay | dig "max_interval" "30m" | quote }}
+  {{- with $relay | dig "pending_max" nil }}
+  pendingMax: {{ . }}
+  {{- end }}
+{{- $relays := $st | dig "relays" (dict) | default (dict) }}
+relays:
+{{- range $key, $r := $relays }}
+  {{ $key }}:
+    {{- $map := dict "enabled" "enabled" "env" "env" "sink_url" "sinkUrl" "token" "token" "ca" "ca" "client_cert" "clientCert" "client_key" "clientKey" "profile" "profile" "min_interval" "minInterval" "max_interval" "maxInterval" "pending_max" "pendingMax" "allow_schemas" "allowSchemas" "resources" "resources" }}
+    {{- range $k, $v := $r }}
+    {{- if not (hasKey $map $k) }}
+    {{- fail (printf "sync_tables.relays.%s.%s: unknown key (known: %s)" $key $k (keys $map | sortAlpha | join ", ")) }}
     {{- end }}
     {{ index $map $k }}: {{ $v | toJson }}
     {{- end }}
