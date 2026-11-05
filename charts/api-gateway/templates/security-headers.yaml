@@ -37,4 +37,23 @@ data:
   {{ $name }}: {{ $value | quote }}
   {{- end }}
   {{- end }}
+{{- if (.Values.traefik | default dict).enabled }}
+---
+# Traefik mode: the same headers as a Middleware, chained by the gateway's Ingress.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: api-gateway-security-headers
+  labels:
+    app.kubernetes.io/name: api-gateway
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  headers:
+    customResponseHeaders:
+      {{- range $name, $value := $headers }}
+      {{- if $value }}
+      {{ $name }}: {{ $value | quote }}
+      {{- end }}
+      {{- end }}
+{{- end }}
 {{- end }}

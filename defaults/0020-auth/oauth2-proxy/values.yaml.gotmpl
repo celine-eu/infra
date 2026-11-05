@@ -65,6 +65,10 @@ podAnnotations:
 
 extraObjects:
 {{- if $traefik }}
+  {{- /* The headers a session's answer carries (auth-setup's config: set_xauthrequest,
+         set_authorization_header, pass_access_token), passed to the backend as the nginx
+         mode's auth-response-headers do: the frontends' APIs read the token. */}}
+  {{- $authHeaders := list "X-Auth-Request-User" "X-Auth-Request-Email" "X-Auth-Request-Groups" "Authorization" "X-Auth-Request-Access-Token" }}
   - apiVersion: traefik.io/v1alpha1
     kind: Middleware
     metadata:
@@ -72,10 +76,17 @@ extraObjects:
     spec:
       forwardAuth:
         address: {{ printf "http://%s.%s.svc.cluster.local/" .Release.Name $ns | quote }}
-        authResponseHeaders:
-          - X-Auth-Request-User
-          - X-Auth-Request-Email
-          - X-Auth-Request-Groups
+        authResponseHeaders: {{ $authHeaders | toJson }}
+  {{- /* `<release>-auth-check`: the same check without sign-in (nginx: auth-url without
+         auth-signin), for API paths whose callers handle a bare 401 themselves. */}}
+  - apiVersion: traefik.io/v1alpha1
+    kind: Middleware
+    metadata:
+      name: {{ .Release.Name }}-auth-check
+    spec:
+      forwardAuth:
+        address: {{ printf "http://%s.%s.svc.cluster.local/oauth2/auth" .Release.Name $ns | quote }}
+        authResponseHeaders: {{ $authHeaders | toJson }}
 {{- end }}
 {{- if $pdb }}
   - apiVersion: policy/v1

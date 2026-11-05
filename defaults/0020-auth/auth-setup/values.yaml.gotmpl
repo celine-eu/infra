@@ -32,6 +32,13 @@ oauth2Proxy:
 
 dashboard_enabled: {{ .Environment.Values | dig "auth_setup" "dashboard_enabled" true }}
 
+# How the dashboard's Ingress is written (as defaults/0050-celine-services/ingress-mode.yaml.gotmpl).
+{{- $icm := .Environment.Values | dig "ingress_controller" (dict) | default (dict) }}
+traefik:
+  enabled: {{ eq ($icm | dig "annotations" "nginx" | toString) "traefik" }}
+  entrypoint: {{ $icm | dig "entrypoint" "websecure" | quote }}
+  clusterIssuer: {{ .Environment.Values | dig "tls_setup" "ingress_cluster_issuer" "" | quote }}
+
 # The Keycloak host's response headers, named by the keycloak release's custom-headers
 # annotation: with every public host's (`security_headers.enabled`, off in dev only).
 keycloakSecurityHeaders:

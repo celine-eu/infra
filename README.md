@@ -326,6 +326,36 @@ names are allowed (`globalAllowedResponseHeaders`, ingress-nginx's
 `ingress_controller.allowed_response_headers` adds more; any other header turns every path of
 the Ingress into a 503), and `configuration-snippet` is only partly supported. Overrides go in `envs/<env>/0010-core/traefik/values.yaml.gotmpl`.
 
+### Traefik mode
+
+Where the cluster's Traefik runs only its Kubernetes Ingress and CRD providers (no NGINX
+provider), `ingress_controller.annotations: traefik` writes the public hosts' Ingresses for
+it: the frontends, the legal host, the API gateway, auth-setup's dashboard, Keycloak,
+oauth2-proxy, Prefect and Marquez. What the nginx annotations did becomes Middlewares in
+the release's namespace (`traefik.ingress.kubernetes.io/router.middlewares`; nothing of
+another namespace is chained):
+
+| nginx annotation | Traefik mode |
+|---|---|
+| `auth-url` + `auth-signin` | `oauth2-proxy-auth` (forwardAuth to the proxy's root: a session passes, anyone else is sent to sign in) |
+| `auth-url` alone | `oauth2-proxy-auth-check` (forwardAuth to `/oauth2/auth`: a bare 401) |
+| `auth-response-headers` | both pass `Authorization`, `X-Auth-Request-Access-Token`, `-User`, `-Email`, `-Groups` |
+| `custom-headers` | a `headers` Middleware with the same headers as the ConfigMap |
+| `permanent-redirect` (302) | a `redirectRegex` Middleware to the same target |
+| `rewrite-target: /$2` on `/<p>(/\|$)(.*)` | a `Prefix` path `/<p>` and a `stripPrefix` Middleware |
+| `proxy-buffer-size`, `proxy-body-size` | nothing: Traefik has neither limit |
+
+| Value | Effect |
+|---|---|
+| `ingress_controller.annotations` | `nginx` (default) or `traefik` |
+| `ingress_controller.entrypoint` | Traefik mode: the routers' entrypoint, default `websecure` |
+| `tls_setup.ingress_cluster_issuer` | a cert-manager ClusterIssuer instead of the namespace's issuer |
+| `cnpg.enabled` | default `true`; `false` where the cluster already runs the CloudNativePG operator (never where this release is installed: helmfile would remove it) |
+| `celine_services.migrate_resources` | requests/limits of the services' `migrate` init container (default none) |
+
+`task test:traefik-mode` checks the translation and that every path reaches the Ingress the
+nginx mode sends it to.
+
 ## Network perimeter
 
 An environment can close its namespace `celine-<env>` to the rest of the cluster

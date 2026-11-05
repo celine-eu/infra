@@ -1,0 +1,19 @@
+{{- /*
+  How the public hosts' Ingresses are written (celine-services.traefik.*). Layered by the
+  releases with an Ingress: the frontends, the legal host, the API gateway; the services
+  read the same block from values.yaml.gotmpl.
+
+    ingress_controller:
+      annotations: nginx | traefik   # nginx (default): nginx.ingress.kubernetes.io/*, for
+                                     # ingress-nginx or Traefik's NGINX provider.
+                                     # traefik: Traefik's own Middlewares, for a Traefik
+                                     # with only its Ingress and CRD providers
+      entrypoint: websecure          # Traefik mode: the router's entrypoint
+    tls_setup:
+      ingress_cluster_issuer: ""     # a ClusterIssuer instead of the namespace's issuer
+*/}}
+{{- $ic := .Environment.Values | dig "ingress_controller" (dict) | default (dict) }}
+traefik:
+  enabled: {{ eq ($ic | dig "annotations" "nginx" | toString) "traefik" }}
+  entrypoint: {{ $ic | dig "entrypoint" "websecure" | quote }}
+  clusterIssuer: {{ .Environment.Values | dig "tls_setup" "ingress_cluster_issuer" "" | quote }}

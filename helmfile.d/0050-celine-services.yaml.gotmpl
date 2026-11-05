@@ -197,6 +197,7 @@ releases:
     values:
       - ../defaults/0050-celine-services/api-gateway/values.yaml.gotmpl
       - ../defaults/0050-celine-services/security-headers.yaml.gotmpl
+      - ../defaults/0050-celine-services/ingress-mode.yaml.gotmpl
       - ../envs/{{ .Environment.Name }}/0050-celine-services/api-gateway/values.yaml.gotmpl
     labels:
       group: celine-services
@@ -222,6 +223,7 @@ releases:
     values:
       - ../defaults/0050-celine-services/celine-frontend-assistant/values.yaml.gotmpl
       - ../defaults/0050-celine-services/security-headers.yaml.gotmpl
+      - ../defaults/0050-celine-services/ingress-mode.yaml.gotmpl
       - ../defaults/0050-celine-services/pod-disruption.yaml.gotmpl
       - ../envs/{{ .Environment.Name }}/0050-frontends/celine-frontend-assistant/values.yaml.gotmpl
     labels:
@@ -235,6 +237,7 @@ releases:
     values:
       - ../defaults/0050-celine-services/celine-frontend-webapp/values.yaml.gotmpl
       - ../defaults/0050-celine-services/security-headers.yaml.gotmpl
+      - ../defaults/0050-celine-services/ingress-mode.yaml.gotmpl
       - ../defaults/0050-celine-services/pod-disruption.yaml.gotmpl
       - ../envs/{{ .Environment.Name }}/0050-frontends/celine-frontend-webapp/values.yaml.gotmpl
     labels:
@@ -248,6 +251,7 @@ releases:
     values:
       - ../defaults/0050-celine-services/celine-frontend-roi/values.yaml.gotmpl
       - ../defaults/0050-celine-services/security-headers.yaml.gotmpl
+      - ../defaults/0050-celine-services/ingress-mode.yaml.gotmpl
       - ../defaults/0050-celine-services/pod-disruption.yaml.gotmpl
       - ../envs/{{ .Environment.Name }}/0050-frontends/celine-frontend-roi/values.yaml.gotmpl
     labels:
@@ -274,6 +278,7 @@ releases:
     values:
       - ../defaults/0050-celine-services/celine-frontend-grid/values.yaml.gotmpl
       - ../defaults/0050-celine-services/security-headers.yaml.gotmpl
+      - ../defaults/0050-celine-services/ingress-mode.yaml.gotmpl
       - ../defaults/0050-celine-services/pod-disruption.yaml.gotmpl
       - ../envs/{{ .Environment.Name }}/0050-frontends/celine-frontend-grid/values.yaml.gotmpl
     labels:
@@ -312,6 +317,7 @@ releases:
     values:
       - ../defaults/0050-celine-services/celine-frontend-community/values.yaml.gotmpl
       - ../defaults/0050-celine-services/security-headers.yaml.gotmpl
+      - ../defaults/0050-celine-services/ingress-mode.yaml.gotmpl
       - ../defaults/0050-celine-services/pod-disruption.yaml.gotmpl
       - ../envs/{{ .Environment.Name }}/0050-frontends/celine-frontend-community/values.yaml.gotmpl
     labels:
@@ -347,6 +353,7 @@ releases:
     values:
       - ../defaults/0050-celine-services/celine-legal/values.yaml.gotmpl
       - ../defaults/0050-celine-services/security-headers.yaml.gotmpl
+      - ../defaults/0050-celine-services/ingress-mode.yaml.gotmpl
       - ../defaults/0050-celine-services/pod-disruption.yaml.gotmpl
       - ../envs/{{ .Environment.Name }}/0050-celine-services/celine-legal/values.yaml.gotmpl
     labels:
@@ -414,6 +421,7 @@ releases:
     values:
       - ../defaults/0050-celine-services/celine-frontend-onboarding/values.yaml.gotmpl
       - ../defaults/0050-celine-services/security-headers.yaml.gotmpl
+      - ../defaults/0050-celine-services/ingress-mode.yaml.gotmpl
       - ../defaults/0050-celine-services/pod-disruption.yaml.gotmpl
       - ../envs/{{ .Environment.Name }}/0050-frontends/celine-frontend-onboarding/values.yaml.gotmpl
     labels:

@@ -152,6 +152,11 @@ tasks:
     cmds:
       - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/ingress-routing -v {{.CLI_ARGS}}
 
+  test:traefik-mode:
+    desc: "Render the public hosts with ingress_controller.annotations traefik and check each nginx annotation became a same-namespace Middleware (forward auth, security headers equal to the ConfigMap, redirects, strip prefix) and every path reaches the Ingress nginx mode picks"
+    cmds:
+      - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/traefik-mode -v {{.CLI_ARGS}}
+
   test:policies-shell:
     desc: "Render the policies-shell chart and check syncBase (a deployment's own base declaration), keycloak.adminPassword, the platform-admin temporary passwords and master's credentials (bootstrap init container only; the shell too only with shell.masterCredentials)"
     cmds:

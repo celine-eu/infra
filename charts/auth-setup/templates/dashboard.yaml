@@ -56,11 +56,24 @@ kind: Ingress
 metadata:
   name: dashboard
   annotations:
+    {{- $t := .Values.traefik | default dict }}
+    {{- if $t.enabled }}
+    {{- /* Traefik mode: forward auth by the namespace's oauth2-proxy Middleware, every path to
+           / (nginx: rewrite-target /) by the replacePath Middleware below. */}}
+    {{- if $t.clusterIssuer }}
+    cert-manager.io/cluster-issuer: {{ $t.clusterIssuer }}
+    {{- else }}
+    cert-manager.io/issuer: {{ .Values.issuer | default "celine-tls" }}
+    {{- end }}
+    traefik.ingress.kubernetes.io/router.entrypoints: {{ $t.entrypoint | default "websecure" }}
+    traefik.ingress.kubernetes.io/router.middlewares: {{ printf "%s-%s@kubernetescrd,%s-dashboard-rewrite@kubernetescrd" .Release.Namespace ($t.authMiddleware | default "oauth2-proxy-auth") .Release.Namespace | quote }}
+    {{- else }}
     cert-manager.io/issuer: {{ .Values.issuer | default "celine-tls" }}
     nginx.ingress.kubernetes.io/rewrite-target: /
     nginx.ingress.kubernetes.io/auth-url: "https://sso.{{ .Values.domain }}/oauth2/auth"
     nginx.ingress.kubernetes.io/auth-signin: "https://sso.{{ .Values.domain }}/oauth2/start?rd=$scheme://$host$request_uri"
     nginx.ingress.kubernetes.io/auth-response-headers: "Authorization, X-Auth-Request-Email, X-Auth-Request-User"
+    {{- end }}
 spec:
   ingressClassName: {{ $.Values.ingressClassName | default "nginx" }}
   rules:
@@ -78,4 +91,14 @@ spec:
     - hosts:
         - dashboard.{{ .Values.domain }}
       secretName: dashboard-tls
+{{- if (.Values.traefik | default dict).enabled }}
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: dashboard-rewrite
+spec:
+  replacePath:
+    path: /
+{{- end }}
 {{- end }}

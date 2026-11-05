@@ -1,3 +1,5 @@
+{{- $tk := include "celine-services.traefik.on" . }}
+{{- $fn := include "celine-services.fullname" . }}
 {{- if .Values.ingress.enabled }}
 ---
 apiVersion: networking.k8s.io/v1
@@ -7,6 +9,10 @@ metadata:
   labels:
     {{- include "celine-services.labels" . | nindent 4 }}
   annotations:
+    {{- if $tk }}
+    {{- include "celine-services.traefik.annotations" (dict "root" . "middlewares" (list (include "celine-services.securityHeaders.middleware" .) (ternary (include "celine-services.traefik.authMiddleware" .) "" (.Values.ingress.auth.enabled | default false)))) | nindent 4 }}
+    {{- with include "celine-services.traefik.extraAnnotations" (dict "root" . "annotations" .Values.ingress.annotations) }}{{ . | nindent 4 }}{{ end }}
+    {{- else }}
     cert-manager.io/issuer: {{ .Values.ingress.issuer | default "celine-tls" }}
     {{- with include "celine-services.securityHeaders.annotation" . }}{{ . | nindent 4 }}{{ end }}
     {{- if .Values.ingress.auth.enabled }}
@@ -20,6 +26,7 @@ metadata:
     {{- end }}
     {{- with .Values.ingress.annotations }}
     {{- toYaml . | nindent 4 }}
+    {{- end }}
     {{- end }}
 spec:
   ingressClassName: {{ $.Values.ingressClassName | default "nginx" }}
@@ -64,10 +71,14 @@ metadata:
   labels:
     {{- include "celine-services.labels" . | nindent 4 }}
   annotations:
+    {{- if $tk }}
+    {{- include "celine-services.traefik.annotations" (dict "root" . "middlewares" (list (include "celine-services.securityHeaders.middleware" .) (printf "%s-signout" $fn))) | nindent 4 }}
+    {{- else }}
     cert-manager.io/issuer: {{ .Values.ingress.issuer | default "celine-tls" }}
     {{- with include "celine-services.securityHeaders.annotation" . }}{{ . | nindent 4 }}{{ end }}
     nginx.ingress.kubernetes.io/permanent-redirect: "https://sso.{{ .Values.ingress.domain }}/oauth2/sign_out?rd=https://{{ .Values.ingress.host }}/keycloak-logout"
     nginx.ingress.kubernetes.io/permanent-redirect-code: "302"
+    {{- end }}
 spec:
   ingressClassName: {{ $.Values.ingressClassName | default "nginx" }}
   rules:
@@ -89,6 +100,20 @@ spec:
         - {{ .Values.ingress.host }}
       secretName: {{ .Values.ingress.tls.secretName | default (printf "%s-tls" (include "celine-services.fullname" .)) }}
   {{- end }}
+{{- if $tk }}
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ include "celine-services.fullname" . }}-signout
+  labels:
+    {{- include "celine-services.labels" . | nindent 4 }}
+spec:
+  redirectRegex:
+    regex: "^.*$"
+    replacement: "https://sso.{{ .Values.ingress.domain }}/oauth2/sign_out?rd=https://{{ .Values.ingress.host }}/keycloak-logout"
+    permanent: false
+{{- end }}
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -97,10 +122,14 @@ metadata:
   labels:
     {{- include "celine-services.labels" . | nindent 4 }}
   annotations:
+    {{- if $tk }}
+    {{- include "celine-services.traefik.annotations" (dict "root" . "middlewares" (list (include "celine-services.securityHeaders.middleware" .) (printf "%s-keycloak-logout" $fn))) | nindent 4 }}
+    {{- else }}
     cert-manager.io/issuer: {{ .Values.ingress.issuer | default "celine-tls" }}
     {{- with include "celine-services.securityHeaders.annotation" . }}{{ . | nindent 4 }}{{ end }}
     nginx.ingress.kubernetes.io/permanent-redirect: "{{ .Values.ingress.keycloakRealmUrl | default (printf "https://keycloak.%s/realms/celine" .Values.ingress.domain) }}/protocol/openid-connect/logout?client_id=oauth2_proxy&post_logout_redirect_uri=https://{{ .Values.ingress.host }}/"
     nginx.ingress.kubernetes.io/permanent-redirect-code: "302"
+    {{- end }}
 spec:
   ingressClassName: {{ $.Values.ingressClassName | default "nginx" }}
   rules:
@@ -120,4 +149,18 @@ spec:
         - {{ .Values.ingress.host }}
       secretName: {{ .Values.ingress.tls.secretName | default (printf "%s-tls" (include "celine-services.fullname" .)) }}
   {{- end }}
+{{- if $tk }}
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ include "celine-services.fullname" . }}-keycloak-logout
+  labels:
+    {{- include "celine-services.labels" . | nindent 4 }}
+spec:
+  redirectRegex:
+    regex: "^.*$"
+    replacement: "{{ .Values.ingress.keycloakRealmUrl | default (printf "https://keycloak.%s/realms/celine" .Values.ingress.domain) }}/protocol/openid-connect/logout?client_id=oauth2_proxy&post_logout_redirect_uri=https://{{ .Values.ingress.host }}/"
+    permanent: false
+{{- end }}
 {{- end }}

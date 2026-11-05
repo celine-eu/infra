@@ -278,6 +278,11 @@ initContainers:
       allowPrivilegeEscalation: false
       capabilities:
         drop: [ALL]
+    {{- /* `migrate.resources`: unset, the namespace's LimitRange decides (if any). */}}
+    {{- with (.Values.migrate | default dict).resources }}
+    resources:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
     env:
       {{- include "celine-services.postureEnv" . | nindent 6 }}
       {{- include "celine-services.postgresEnv" . | nindent 6 }}
@@ -368,6 +373,8 @@ spec:
 
 {{- define "celine-services.ingress" -}}
 {{- if .Values.ingress.enabled }}
+{{- $traefik := include "celine-services.traefik.on" . }}
+{{- $fullname := include "celine-services.fullname" . }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -375,6 +382,10 @@ metadata:
   labels:
     {{- include "celine-services.labels" . | nindent 4 }}
   annotations:
+    {{- if $traefik }}
+    {{- include "celine-services.traefik.annotations" (dict "root" . "middlewares" (list (ternary (include "celine-services.traefik.authMiddleware" .) "" (.Values.ingress.auth.enabled | default false)) (printf "%s-rewrite" $fullname))) | nindent 4 }}
+    {{- with include "celine-services.traefik.extraAnnotations" (dict "root" . "annotations" .Values.ingress.annotations) }}{{ . | nindent 4 }}{{ end }}
+    {{- else }}
     cert-manager.io/issuer: {{ .Values.ingress.issuer | default "celine-tls" }}
     nginx.ingress.kubernetes.io/rewrite-target: /
     {{- if .Values.ingress.auth.enabled }}
@@ -388,6 +399,7 @@ metadata:
     {{- end }}
     {{- with .Values.ingress.annotations }}
     {{- toYaml . | nindent 4 }}
+    {{- end }}
     {{- end }}
 spec:
   ingressClassName: {{ $.Values.ingressClassName | default "nginx" }}
@@ -418,9 +430,13 @@ metadata:
   labels:
     {{- include "celine-services.labels" . | nindent 4 }}
   annotations:
+    {{- if $traefik }}
+    {{- include "celine-services.traefik.annotations" (dict "root" . "middlewares" (list (printf "%s-signout" $fullname))) | nindent 4 }}
+    {{- else }}
     cert-manager.io/issuer: {{ .Values.ingress.issuer | default "celine-tls" }}
     nginx.ingress.kubernetes.io/permanent-redirect: "https://sso.{{ .Values.ingress.domain }}/oauth2/sign_out?rd=https://{{ .Values.ingress.host }}/keycloak-logout"
     nginx.ingress.kubernetes.io/permanent-redirect-code: "302"
+    {{- end }}
 spec:
   ingressClassName: {{ $.Values.ingressClassName | default "nginx" }}
   rules:
@@ -454,9 +470,13 @@ metadata:
   labels:
     {{- include "celine-services.labels" . | nindent 4 }}
   annotations:
+    {{- if $traefik }}
+    {{- include "celine-services.traefik.annotations" (dict "root" . "middlewares" (list (printf "%s-keycloak-logout" $fullname))) | nindent 4 }}
+    {{- else }}
     cert-manager.io/issuer: {{ .Values.ingress.issuer | default "celine-tls" }}
     nginx.ingress.kubernetes.io/permanent-redirect: "{{ .Values.ingress.keycloakRealmUrl | default (printf "https://keycloak.%s/realms/celine" .Values.ingress.domain) }}/protocol/openid-connect/logout?client_id=oauth2_proxy&post_logout_redirect_uri=https://{{ .Values.ingress.host }}/"
     nginx.ingress.kubernetes.io/permanent-redirect-code: "302"
+    {{- end }}
 spec:
   ingressClassName: {{ $.Values.ingressClassName | default "nginx" }}
   rules:
@@ -476,6 +496,25 @@ spec:
         - {{ .Values.ingress.host }}
       secretName: {{ .Values.ingress.tls.secretName | default (printf "%s-tls" (include "celine-services.fullname" .)) }}
   {{- end }}
+{{- end }}
+{{- if $traefik }}
+---
+# rewrite-target: / (every path to the service's root), as the nginx mode.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ $fullname }}-rewrite
+  labels:
+    {{- include "celine-services.labels" . | nindent 4 }}
+spec:
+  replacePath:
+    path: /
+{{- if .Values.ingress.auth.enabled }}
+---
+{{ include "celine-services.traefik.redirectMiddleware" (dict "root" . "name" (printf "%s-signout" $fullname) "target" (printf "https://sso.%s/oauth2/sign_out?rd=https://%s/keycloak-logout" .Values.ingress.domain .Values.ingress.host)) }}
+---
+{{ include "celine-services.traefik.redirectMiddleware" (dict "root" . "name" (printf "%s-keycloak-logout" $fullname) "target" (printf "%s/protocol/openid-connect/logout?client_id=oauth2_proxy&post_logout_redirect_uri=https://%s/" (.Values.ingress.keycloakRealmUrl | default (printf "https://keycloak.%s/realms/celine" .Values.ingress.domain)) .Values.ingress.host)) }}
+{{- end }}
 {{- end }}
 {{- end }}
 {{- end }}
@@ -620,7 +659,143 @@ metadata:
 data:
   {{- include "celine-services.securityHeaders.dataWith" (dict "root" $ "csp" .) | nindent 2 }}
 {{- end }}
+{{- if include "celine-services.traefik.on" . }}
+---
+{{ include "celine-services.traefik.headersMiddleware" (dict "root" . "name" (include "celine-services.securityHeaders.name" .) "data" (include "celine-services.securityHeaders.data" .)) }}
+{{- with (.Values.securityHeaders | default dict).apiCsp }}
+---
+{{ include "celine-services.traefik.headersMiddleware" (dict "root" $ "name" (include "celine-services.securityHeaders.apiName" $) "data" (include "celine-services.securityHeaders.dataWith" (dict "root" $ "csp" .))) }}
 {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{/* The headers Middleware an Ingress chains in Traefik mode; nothing when disabled. */}}
+{{- define "celine-services.securityHeaders.middleware" -}}
+{{- if include "celine-services.securityHeaders.enabled" . -}}
+{{ include "celine-services.securityHeaders.name" . }}
+{{- end }}
+{{- end }}
+
+{{/* The same for the host's API Ingress (`apiAnnotation`). */}}
+{{- define "celine-services.securityHeaders.apiMiddleware" -}}
+{{- if include "celine-services.securityHeaders.enabled" . -}}
+{{- if (.Values.securityHeaders | default dict).apiCsp -}}
+{{ include "celine-services.securityHeaders.apiName" . }}
+{{- else -}}
+{{ include "celine-services.securityHeaders.name" . }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+
+{{/* ----------------------------------------------------------------------------
+  Traefik mode — `.Values.traefik.enabled` (infra: `ingress_controller.annotations:
+  traefik`, defaults/0050-celine-services/ingress-mode.yaml.gotmpl). For a Traefik that
+  runs only its Kubernetes Ingress and CRD providers, where nginx.ingress.kubernetes.io/*
+  annotations do nothing. What they did becomes Middlewares in the release's namespace,
+  chained by `router.middlewares` (a tenant may chain none of another namespace):
+
+    auth-url + auth-signin   traefik.authMiddleware       (oauth2-proxy's root: 302 to sign-in)
+    auth-url only            traefik.authCheckMiddleware  (its /oauth2/auth: a bare 401)
+    custom-headers           a headers Middleware with the ConfigMap's headers
+    permanent-redirect       a redirectRegex Middleware, 302
+    rewrite-target /$2       a Prefix path and a stripPrefix Middleware
+    proxy-buffer-size, proxy-body-size: nothing (Traefik has neither limit)
+
+  Off (the default), nothing here renders and every Ingress keeps its nginx annotations.
+
+  .Values.traefik:
+    enabled              false
+    entrypoint           websecure
+    clusterIssuer        cert-manager ClusterIssuer; empty: the namespace's `ingress.issuer`
+    authMiddleware       oauth2-proxy-auth
+    authCheckMiddleware  oauth2-proxy-auth-check
+----------------------------------------------------------------------------- */}}
+
+{{- define "celine-services.traefik.on" -}}
+{{- if (.Values.traefik | default dict).enabled }}true{{ end }}
+{{- end }}
+
+{{/* Annotations of a Traefik-mode Ingress, for (dict "root" . "middlewares" (list <name>…));
+     empty names are skipped. */}}
+{{- define "celine-services.traefik.annotations" -}}
+{{- $root := .root }}
+{{- $t := $root.Values.traefik | default dict }}
+{{- $issuer := (($root.Values.ingress | default dict).issuer) | default ($root.Values.issuer | default "celine-tls") }}
+{{- if $t.clusterIssuer }}
+cert-manager.io/cluster-issuer: {{ $t.clusterIssuer }}
+{{- else }}
+cert-manager.io/issuer: {{ $issuer }}
+{{- end }}
+traefik.ingress.kubernetes.io/router.entrypoints: {{ $t.entrypoint | default "websecure" }}
+{{- $refs := list }}
+{{- range .middlewares }}
+{{- if . }}{{ $refs = append $refs (printf "%s-%s@kubernetescrd" $root.Release.Namespace .) }}{{ end }}
+{{- end }}
+{{- with $refs }}
+traefik.ingress.kubernetes.io/router.middlewares: {{ join "," . | quote }}
+{{- end }}
+{{- end }}
+
+{{/* The environment's annotations of an Ingress (`ingress.annotations` and the like),
+     without nginx.ingress.kubernetes.io/* in Traefik mode; for (dict "root" . "annotations" <map>). */}}
+{{- define "celine-services.traefik.extraAnnotations" -}}
+{{- $out := dict }}
+{{- range $k, $v := .annotations | default dict }}
+{{- if not (and (include "celine-services.traefik.on" $.root) (hasPrefix "nginx.ingress.kubernetes.io/" $k)) }}{{ $_ := set $out $k $v }}{{ end }}
+{{- end }}
+{{- with $out }}{{ toYaml . }}{{ end }}
+{{- end }}
+
+{{- define "celine-services.traefik.authMiddleware" -}}
+{{- (.Values.traefik | default dict).authMiddleware | default "oauth2-proxy-auth" }}
+{{- end }}
+
+{{- define "celine-services.traefik.authCheckMiddleware" -}}
+{{- (.Values.traefik | default dict).authCheckMiddleware | default "oauth2-proxy-auth-check" }}
+{{- end }}
+
+{{/* A headers Middleware: (dict "root" . "name" <name> "data" <YAML name: value>). */}}
+{{- define "celine-services.traefik.headersMiddleware" -}}
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ .name }}
+  labels:
+    {{- include "celine-services.labels" .root | nindent 4 }}
+spec:
+  headers:
+    customResponseHeaders:
+      {{- .data | nindent 6 }}
+{{- end }}
+
+{{/* A redirect Middleware, 302 as the nginx permanent-redirect-code: (dict "root" . "name" <name> "target" <url>). */}}
+{{- define "celine-services.traefik.redirectMiddleware" -}}
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ .name }}
+  labels:
+    {{- include "celine-services.labels" .root | nindent 4 }}
+spec:
+  redirectRegex:
+    regex: "^.*$"
+    replacement: {{ .target | quote }}
+    permanent: false
+{{- end }}
+
+{{/* A stripPrefix Middleware: (dict "root" . "name" <name> "prefixes" (list …)). */}}
+{{- define "celine-services.traefik.stripPrefixMiddleware" -}}
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ .name }}
+  labels:
+    {{- include "celine-services.labels" .root | nindent 4 }}
+spec:
+  stripPrefix:
+    prefixes: {{ .prefixes | toJson }}
 {{- end }}
 
 

@@ -1,3 +1,5 @@
+{{- $tk := include "celine-services.traefik.on" . }}
+{{- $fn := include "celine-services.fullname" . }}
 {{- if .Values.ingress.enabled }}
 {{- $fullname := include "celine-services.fullname" . }}
 ---
@@ -9,10 +11,15 @@ metadata:
   labels:
     {{- include "celine-services.labels" . | nindent 4 }}
   annotations:
+    {{- if $tk }}
+    {{- include "celine-services.traefik.annotations" (dict "root" . "middlewares" (list (include "celine-services.securityHeaders.middleware" .))) | nindent 4 }}
+    {{- with include "celine-services.traefik.extraAnnotations" (dict "root" . "annotations" .Values.ingress.annotations) }}{{ . | nindent 4 }}{{ end }}
+    {{- else }}
     cert-manager.io/issuer: {{ .Values.ingress.issuer | default "celine-tls" }}
     {{- with include "celine-services.securityHeaders.annotation" . }}{{ . | nindent 4 }}{{ end }}
     {{- with .Values.ingress.annotations }}
     {{- toYaml . | nindent 4 }}
+    {{- end }}
     {{- end }}
 spec:
   ingressClassName: {{ $.Values.ingressClassName | default "nginx" }}

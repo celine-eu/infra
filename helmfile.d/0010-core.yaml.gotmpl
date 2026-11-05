@@ -42,11 +42,16 @@ repositories:
     url: https://traefik.github.io/charts
 
 releases:
+  # The CloudNativePG operator, cluster-wide. `cnpg.enabled: false` (default true): the
+  # cluster already runs one (a platform's), so postgres-db's Cluster uses it and nothing
+  # here installs, upgrades or needs the operator. Never set false where this release is
+  # installed: helmfile would remove it.
   - name: cnpg
     namespace: cnpg
     chart: cnpg/cloudnative-pg
     version: 0.26.0
     createNamespace: true
+    installed: {{ .Values | dig "cnpg" "enabled" true }}
     missingFileHandler: Warn
     hooks:
       - events: [postsync]
@@ -93,8 +98,10 @@ releases:
     values:
       - ../defaults/0010-core/postgres-db/values.yaml.gotmpl
       - ../envs/{{ .Environment.Name }}/0010-core/postgres-db/values.yaml.gotmpl
+    {{- if (.Values | dig "cnpg" "enabled" true) }}
     needs:
       - cnpg/cnpg
+    {{- end }}
     labels:
       group: core
 

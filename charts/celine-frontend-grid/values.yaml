@@ -59,7 +59,9 @@ securityHeaders:
       manifest-src: "'self'"
       object-src: "'none'"
       base-uri: "'self'"
-      form-action: "'self' https://sso.{{ .Values.ingress.domain }} https://keycloak.{{ .Values.ingress.domain }}"
+      # Keycloak's origin: `ingress.keycloakOrigin` (infra: `keycloak.public_url`), else
+      # https://keycloak.<domain>.
+      form-action: "'self' https://sso.{{ .Values.ingress.domain }} {{ .Values.ingress.keycloakOrigin | default (printf \"https://keycloak.%s\" .Values.ingress.domain) }}"
       frame-ancestors: "'none'"
 
 healthCheck:

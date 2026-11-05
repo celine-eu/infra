@@ -83,3 +83,17 @@ resources:
 
 # IngressClass of every Ingress (`ingress_controller.class`, default nginx).
 ingressClassName: {{ .Values | dig "ingress_controller" "class" "nginx" | quote }}
+
+# How the Ingresses are written: as ingress-mode.yaml.gotmpl (the public hosts) says.
+{{- $ic := .Values | dig "ingress_controller" (dict) | default (dict) }}
+traefik:
+  enabled: {{ eq ($ic | dig "annotations" "nginx" | toString) "traefik" }}
+  entrypoint: {{ $ic | dig "entrypoint" "websecure" | quote }}
+  clusterIssuer: {{ .Values | dig "tls_setup" "ingress_cluster_issuer" "" | quote }}
+
+# The `migrate` init container's resources (`celine_services.migrate_resources`), for a
+# namespace whose LimitRange would otherwise give it a default limit. Unset: none.
+{{- with .Values | dig "celine_services" "migrate_resources" nil }}
+migrate:
+  resources: {{ toJson . }}
+{{- end }}
