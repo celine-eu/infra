@@ -1,0 +1,198 @@
+{{- /* Relays (sync_tables >= 0.8.0): one per sink. The flows POST each run event to their
+environment's relay; the relay pushes the tables to its sink on min/max_interval and the
+run events after them, and the sink publishes those events (sink.events). One config for
+every relay; each relay mounts only its own sink's TLS material. No Ingress: the relay
+takes no token, its NetworkPolicy admitting only the flows' namespace is its boundary.
+A relay replaces the push CronJob of the same key (push-source.yaml leaves it out). */}}
+{{- $relays := dict }}
+{{- range $key, $r := .Values.relays }}
+{{- if ne (toString (dig "enabled" true $r)) "false" }}
+{{- if not (regexMatch "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$" $key) }}
+{{- fail (printf "sync-tables: relays key %q is not a DNS label" $key) }}
+{{- end }}
+{{- $_ := set $relays $key $r }}
+{{- end }}
+{{- end }}
+{{- if $relays }}
+{{- $rc := .Values.relay }}
+{{- $sourceEnv := required "sync-tables: relay.sourceEnv is required with relays" $rc.sourceEnv }}
+{{- $flowsNs := required "sync-tables: relay.flowsNamespace is required with relays" $rc.flowsNamespace }}
+{{- $src := .Values.pushSource }}
+{{- $port := int ($rc.port | default 8080) }}
+{{- /* The one config every relay loads. */}}
+{{- $edges := list }}
+{{- $sinks := dict }}
+{{- range $key, $r := $relays }}
+{{- $to := $r.env | default $key }}
+{{- $edges = append $edges (dict "from" $sourceEnv "to" $to "transports" (list "push")) }}
+{{- $profile := fromYaml (required (printf "sync-tables: relays.%s.profile is required" $key) $r.profile) }}
+{{- if not $profile.sources }}
+{{- fail (printf "sync-tables: relays.%s.profile lists no sources" $key) }}
+{{- end }}
+{{- if not (hasPrefix "wss://" (required (printf "sync-tables: relays.%s.sinkUrl is required" $key) $r.sinkUrl)) }}
+{{- fail (printf "sync-tables: relays.%s.sinkUrl must be wss://, got %s" $key $r.sinkUrl) }}
+{{- end }}
+{{- $entry := dict "url" $r.sinkUrl "ca" (printf "/run/sync/%s/ca.crt" $key) "cert" (printf "/run/sync/%s/tls.crt" $key) "key" (printf "/run/sync/%s/tls.key" $key) "token_file" (printf "/run/sync/%s/token" $key) "sources" $profile.sources }}
+{{- with $r.env }}{{ $_ := set $entry "env" . }}{{ end }}
+{{- with $r.minInterval }}{{ $_ := set $entry "min_interval" . }}{{ end }}
+{{- with $r.maxInterval }}{{ $_ := set $entry "max_interval" . }}{{ end }}
+{{- with $r.pendingMax }}{{ $_ := set $entry "pending_max" . }}{{ end }}
+{{- with $r.allowSchemas }}{{ $_ := set $entry "allow_schemas" . }}{{ end }}
+{{- $_ := set $sinks $key $entry }}
+{{- end }}
+{{- $defaults := dict "min_interval" ($rc.minInterval | default "30m") "max_interval" ($rc.maxInterval | default "30m") }}
+{{- with $rc.pendingMax }}{{ $_ := set $defaults "pending_max" . }}{{ end }}
+{{- $config := dict "source" (dict "env" $sourceEnv "db" (dict "url" "${DB_DEV}")) "edges" $edges "defaults" $defaults "sinks" $sinks }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-relay-config
+  labels:
+    {{- include "sync-tables.labels" . | nindent 4 }}
+    app.kubernetes.io/component: relay
+data:
+  config.yaml: |
+    {{- toYaml $config | nindent 4 }}
+{{- range $key, $r := $relays }}
+{{- $name := printf "%s-relay-%s" $.Release.Name $key }}
+---
+# The client side of the mutual TLS to this relay's sink, and its token.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $name }}-tls
+  labels:
+    {{- include "sync-tables.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: relay
+type: Opaque
+stringData:
+  ca.crt: {{ required (printf "sync-tables: relays.%s.ca is required" $key) $r.ca | quote }}
+  tls.crt: {{ required (printf "sync-tables: relays.%s.clientCert is required" $key) $r.clientCert | quote }}
+  tls.key: {{ required (printf "sync-tables: relays.%s.clientKey is required" $key) $r.clientKey | quote }}
+  token: {{ required (printf "sync-tables: relays.%s.token is required" $key) $r.token | quote }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "sync-tables.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: relay
+    sync-tables/sink: {{ $key }}
+spec:
+  replicas: 1
+  # One push at a time per sink (plan decision 5): never two relays for one sink.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: sync-tables
+      app.kubernetes.io/instance: {{ $.Release.Name }}
+      app.kubernetes.io/component: relay
+      sync-tables/sink: {{ $key }}
+  template:
+    metadata:
+      labels:
+        {{- include "sync-tables.labels" $ | nindent 8 }}
+        app.kubernetes.io/component: relay
+        sync-tables/sink: {{ $key }}
+      annotations:
+        checksum/config: {{ toYaml $config | sha256sum }}
+        checksum/tls: {{ printf "%s%s%s" $r.ca $r.clientCert $r.token | sha256sum }}
+    spec:
+      {{- include "sync-tables.podSpecCommon" $ | nindent 6 }}
+      containers:
+        - name: relay
+          image: {{ include "sync-tables.image" $ }}
+          imagePullPolicy: {{ $.Values.imagePullPolicy }}
+          args: ["relay", "--config", "/etc/sync/config.yaml", "--sink", {{ $key | quote }}, "--listen", {{ printf "0.0.0.0:%d" $port | quote }}]
+          env:
+            - name: DB_DEV
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "sync-tables: pushSource.sourceSecret.name is required with relays" $src.sourceSecret.name }}
+                  key: {{ $src.sourceSecret.key }}
+          ports:
+            - { name: events, containerPort: {{ $port }} }
+          readinessProbe:
+            httpGet: { path: /healthz, port: events }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthz, port: events }
+            periodSeconds: 30
+            failureThreshold: 4
+          securityContext:
+            {{- toYaml $.Values.securityContext | nindent 12 }}
+          {{- with ($r.resources | default $src.resources) }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - { name: config, mountPath: /etc/sync, readOnly: true }
+            - { name: tls, mountPath: {{ printf "/run/sync/%s" $key }}, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: config
+          configMap:
+            name: {{ $.Release.Name }}-relay-config
+        - name: tls
+          secret:
+            secretName: {{ $name }}-tls
+            defaultMode: 0440
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "sync-tables.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: relay
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: sync-tables
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/component: relay
+    sync-tables/sink: {{ $key }}
+  ports:
+    - { name: events, port: {{ $port }}, targetPort: events }
+---
+# In: the flows' namespace only (the relay takes no token). Out: DNS, the source database,
+# and HTTPS to the sink.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "sync-tables.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: relay
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: sync-tables
+      app.kubernetes.io/instance: {{ $.Release.Name }}
+      app.kubernetes.io/component: relay
+      sync-tables/sink: {{ $key }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $flowsNs }}
+      ports:
+        - { protocol: TCP, port: {{ $port }} }
+  egress:
+    {{- include "sync-tables.dnsEgress" $ | nindent 4 }}
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- toYaml $src.networkPolicy.databasePodSelector | nindent 14 }}
+      ports:
+        - { protocol: TCP, port: 5432 }
+    - ports:
+        - { protocol: TCP, port: 443 }
+{{- end }}
+{{- end }}

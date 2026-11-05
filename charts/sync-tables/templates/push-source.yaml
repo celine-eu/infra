@@ -6,7 +6,9 @@
 {{- $targets = append $targets (dict "name" (printf "%s-push" .Release.Name) "p" .Values.pushSource) }}
 {{- end }}
 {{- range $key, $t := .Values.pushTargets }}
-{{- if ne (toString (dig "enabled" true $t)) "false" }}
+{{- /* A relay of the same key replaces this CronJob (relay.yaml). */}}
+{{- $relayOn := and (hasKey ($.Values.relays | default dict) $key) (ne (toString (dig "enabled" true (index $.Values.relays $key))) "false") }}
+{{- if and (ne (toString (dig "enabled" true $t)) "false") (not $relayOn) }}
 {{- if not (regexMatch "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$" $key) }}
 {{- fail (printf "sync-tables: pushTargets key %q is not a DNS label" $key) }}
 {{- end }}

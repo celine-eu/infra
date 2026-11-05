@@ -17,6 +17,15 @@ makes every push fail instead of opening the route. See values.yaml `sink.ingres
 {{- end }}
 {{- /* The header the ingress forwards the verified client certificate in. */}}
 {{- $certHeader := ternary "X-Forwarded-Tls-Client-Cert" "ssl-client-cert" $traefik }}
+{{- /* sync_tables >= 0.8.0: publish the run events a push carries (opt-in). */}}
+{{- $ev := $s.events | default dict }}
+{{- $events := $ev.enabled | default false }}
+{{- if $events }}
+{{- $sec := dig "oidc" "clientSecret" (dict) $ev }}
+{{- if or (not $sec.name) (not $sec.key) }}
+{{- fail "sync-tables: sink.events.oidc.clientSecret (name, key of an existing Secret) is required with events" }}
+{{- end }}
+{{- end }}
 ---
 # The push CA: the ingress verifies client certificates against it, and the sink checks
 # the forwarded certificate against it again.
@@ -88,7 +97,7 @@ spec:
         - name: sink
           image: {{ include "sync-tables.image" . }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
-          args: ["receive", "--tls-terminated-upstream", "--require-upstream-client-cert", {{ $certHeader | quote }}]
+          args: ["receive", "--tls-terminated-upstream", "--require-upstream-client-cert", {{ $certHeader | quote }}{{ if $events }}, "--events"{{ end }}]
           env:
             - name: SYNC_SINK_DSN
               valueFrom:
@@ -105,6 +114,25 @@ spec:
               value: {{ printf "0.0.0.0:%v" $s.listenPort | quote }}
             - name: SYNC_HEALTH_PORT
               value: {{ $s.healthPort | quote }}
+            {{- with $s.acceptFrom }}
+            - name: SYNC_ACCEPT_FROM
+              value: {{ join "," . | quote }}
+            {{- end }}
+            {{- if $events }}
+            {{- with $ev.env }}
+            - { name: CELINE_ENV, value: {{ . | quote }} }
+            {{- end }}
+            - { name: CELINE_MQTT_HOST, value: {{ required "sync-tables: sink.events.mqtt.host is required with events" (dig "mqtt" "host" "" $ev) | quote }} }
+            - { name: CELINE_MQTT_PORT, value: {{ dig "mqtt" "port" 1883 $ev | quote }} }
+            - { name: CELINE_MQTT_USE_TLS, value: {{ dig "mqtt" "useTls" false $ev | toString | quote }} }
+            - { name: CELINE_OIDC_BASE_URL, value: {{ required "sync-tables: sink.events.oidc.baseUrl is required with events" (dig "oidc" "baseUrl" "" $ev) | quote }} }
+            - { name: CELINE_OIDC_CLIENT_ID, value: {{ dig "oidc" "clientId" "svc-sync-tables-sink" $ev | quote }} }
+            - name: CELINE_OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $ev.oidc.clientSecret.name }}
+                  key: {{ $ev.oidc.clientSecret.key }}
+            {{- end }}
             {{- include "sync-tables.authLimitsEnv" ($s.authLimits | default dict) | nindent 12 }}
           ports:
             - { name: sync, containerPort: {{ $s.listenPort }} }
@@ -306,5 +334,11 @@ spec:
               {{- toYaml $s.networkPolicy.databasePodSelector | nindent 14 }}
       ports:
         - { protocol: TCP, port: 5432 }
+    {{- if $events }}
+    # The run events: the broker, and the issuer for the client's token.
+    - ports:
+        - { protocol: TCP, port: {{ dig "mqtt" "port" 1883 $ev }} }
+        - { protocol: TCP, port: 443 }
+    {{- end }}
 {{- end }}
 {{- end }}

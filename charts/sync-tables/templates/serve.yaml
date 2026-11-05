@@ -92,6 +92,10 @@ spec:
               value: {{ printf "0.0.0.0:%v" $s.listenPort | quote }}
             - name: SYNC_HEALTH_PORT
               value: {{ $s.healthPort | quote }}
+            {{- with $s.serveTo }}
+            - name: SYNC_SERVE_TO
+              value: {{ join "," . | quote }}
+            {{- end }}
             {{- include "sync-tables.authLimitsEnv" ($s.authLimits | default dict) | nindent 12 }}
           ports:
             - { name: sync, containerPort: {{ $s.listenPort }} }

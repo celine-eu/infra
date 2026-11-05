@@ -83,6 +83,26 @@ sink:
     # Pods the sink may reach on 5432: the database it writes.
     databasePodSelector:
       cnpg.io/cluster: postgis1
+  # sync_tables >= 0.8.0. The source environments this sink accepts (SYNC_ACCEPT_FROM); the
+  # 0.8.0 image refuses to start without it. Empty: not passed (older images).
+  acceptFrom: []
+  # sync_tables >= 0.8.0: publish the run events a push carries on this environment's broker,
+  # on celine/pipelines/runs/<namespace>, after the push's tables are committed (--events).
+  # The client is celine-policies' `svc-sync-tables-sink` (pipelines.runs.write only); its
+  # secret comes from an existing Secret. Opens egress to the broker's port and 443 (issuer).
+  events:
+    enabled: false
+    env: ""                       # CELINE_ENV for celine-sdk's posture; empty: not set
+    mqtt:
+      host: ""                    # required with events
+      port: 1883
+      useTls: false
+    oidc:
+      baseUrl: ""                 # required with events: the realm's issuer URL
+      clientId: svc-sync-tables-sink
+      clientSecret:               # required with events: an existing Secret's name and key
+        name: ""
+        key: ""
 
 serve:
   enabled: false
@@ -119,6 +139,9 @@ serve:
     # Pods the serving source may reach on 5432: the database it reads.
     databasePodSelector:
       cnpg.io/cluster: postgis1
+  # sync_tables >= 0.8.0: the target environments it serves (SYNC_SERVE_TO); the 0.8.0
+  # image refuses to start without it. Empty: not passed (older images).
+  serveTo: []
 
 pushSource:
   enabled: false
@@ -137,6 +160,10 @@ pushSource:
   profile: ""                     # required: the profile YAML (the table list), as a string
   activeDeadlineSeconds: 7200
   resources: {}
+  # sync_tables >= 0.8.0: the edges this side declares, e.g. [{from: dev, to: prod,
+  # transports: [push]}]; mounted as config.yaml with `source_db` and passed as --config (the
+  # 0.8.0 image refuses a push without them). Empty: not passed (older images).
+  edges: []
   networkPolicy:
     enabled: true
     databasePodSelector:
@@ -147,3 +174,22 @@ pushSource:
 # entry overrides `pushSource`'s keys and is rendered as <release>-push-<key>; `enabled: false`
 # leaves it out. Independent of pushSource.enabled. Empty: none.
 pushTargets: {}
+
+# Relays (sync_tables >= 0.8.0): one per sink, replacing the push CronJob of the same key.
+# The flows POST each run event to their environment's relay (RUN_EVENTS_URLS =
+# http://<release>-relay-<key>.<namespace>:<port>/events); the relay pushes the tables to its
+# sink on min/max_interval and the run events after them. No Ingress and no token: the
+# NetworkPolicy admits only `relay.flowsNamespace`. The relays read the source with
+# `pushSource.sourceSecret` and reach it with `pushSource.networkPolicy.databasePodSelector`.
+relay:
+  sourceEnv: ""                   # required with relays: the source database's marker (dev)
+  flowsNamespace: ""              # required with relays: the only namespace that may POST
+  port: 8080
+  minInterval: 30m                # every relay's default; plan decision 15
+  maxInterval: 30m
+  pendingMax: null                # tool default when unset
+# {<key>: {sinkUrl, ca, clientCert, clientKey, token, profile, env?, minInterval?,
+#  maxInterval?, pendingMax?, allowSchemas?, resources?, enabled?}}. The key is the sink's
+# environment unless `env` says otherwise; `profile` is the table list as YAML text
+# (`sources: [...]`). `enabled: false` leaves it out and keeps its push CronJob.
+relays: {}

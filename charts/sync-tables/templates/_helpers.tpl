@@ -115,6 +115,11 @@ metadata:
 data:
   profile.yaml: |
     {{- required "sync-tables: pushSource.profile is required" $p.profile | nindent 4 }}
+  {{- with $p.edges }}
+  {{- /* sync_tables >= 0.8.0: a push needs the edges this side declares (--config). */}}
+  config.yaml: |
+    {{- dict "source_db" (dict "url" "${DB_DEV}") "edges" . | toYaml | nindent 4 }}
+  {{- end }}
 ---
 apiVersion: batch/v1
 kind: CronJob
@@ -142,6 +147,9 @@ spec:
             app.kubernetes.io/component: push-source
           annotations:
             checksum/profile: {{ $p.profile | sha256sum }}
+            {{- with $p.edges }}
+            checksum/config: {{ toJson . | sha256sum }}
+            {{- end }}
         spec:
           restartPolicy: Never
           {{- include "sync-tables.podSpecCommon" $root | nindent 10 }}
@@ -149,7 +157,7 @@ spec:
             - name: push-source
               image: {{ include "sync-tables.image" $root }}
               imagePullPolicy: {{ $root.Values.imagePullPolicy }}
-              args: ["--from", {{ $p.from | quote }}, "--to", {{ $p.to | quote }}, "--profile", "/etc/sync/profile.yaml"]
+              args: ["--from", {{ $p.from | quote }}, "--to", {{ $p.to | quote }}, "--profile", "/etc/sync/profile.yaml"{{ if $p.edges }}, "--config", "/etc/sync/config.yaml"{{ end }}]
               env:
                 - name: SYNC_SINK_URL
                   value: {{ $p.sinkUrl | quote }}
