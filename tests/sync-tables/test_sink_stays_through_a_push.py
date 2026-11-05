@@ -62,15 +62,16 @@ def _state(tmp: Path, env: str, override: str) -> Path:
     return path
 
 
-def render(override: str, env: str = "example") -> dict[str, dict]:
-    """Render the sync-tables release; return its objects by `<kind>/<name>`."""
+def render(override: str, env: str = "example", release: str = RELEASE) -> dict[str, dict]:
+    """Render one release of the group (sync-tables by default); return its objects by
+    `<kind>/<name>`."""
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
         state = _state(tmp, env, override)
         environ = {**os.environ, "HELM_CONFIG_HOME": str(tmp / "hc"), "HELM_CACHE_HOME": str(tmp / "hcache")}
         result = subprocess.run(
             ["helmfile", "-f", str(state), "-e", env, "template", "-q", "--skip-deps",
-             "-l", f"name={RELEASE}"],
+             "-l", f"name={release}"],
             capture_output=True, text=True, env=environ, timeout=600, check=False,
         )
     assert result.returncode == 0, result.stderr

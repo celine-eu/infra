@@ -100,9 +100,10 @@ sink:
     oidc:
       baseUrl: ""                 # required with events: the realm's issuer URL
       clientId: svc-sync-tables-sink
-      clientSecret:               # required with events: an existing Secret's name and key
-        name: ""
+      clientSecret:               # with events, this or clientSecretValue: an existing
+        name: ""                  #  Secret's name and key
         key: ""
+      clientSecretValue: ""       # the secret itself: rendered as <release>-sink-oidc
 
 serve:
   enabled: false

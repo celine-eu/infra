@@ -29,7 +29,10 @@
 #         env: ""                       # CELINE_ENV (celine-sdk posture)
 #         mqtt: { host: "", port: 1883, use_tls: false }
 #         oidc: { base_url: "", client_id: svc-sync-tables-sink,
-#                 client_secret: { name: "", key: "" } }   # an existing Secret
+#                 client_secret: { name: "", key: "" } }   # an existing Secret, or:
+#         client_secret: ""             # secret: svc-sync-tables-sink's secret in this realm;
+#                                       # the chart renders it as a Secret, and policies-shell
+#                                       # syncs it to the realm (SVC_SYNC_TABLES_SINK_SECRET)
 #     push_source:                      # the environment that sends (staging)
 #       enabled: false
 #       schedule: "*/30 * * * *"
@@ -125,6 +128,7 @@ sink:
       baseUrl: {{ $ev | dig "oidc" "base_url" "" | quote }}
       clientId: {{ $ev | dig "oidc" "client_id" "svc-sync-tables-sink" | quote }}
       clientSecret: {{ $ev | dig "oidc" "client_secret" (dict "name" "" "key" "") | toJson }}
+      clientSecretValue: {{ $ev | dig "client_secret" "" | toString | quote }}
 
 serve:
   enabled: {{ $serve | dig "enabled" false }}
