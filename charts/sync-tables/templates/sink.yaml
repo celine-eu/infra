@@ -20,10 +20,19 @@ makes every push fail instead of opening the route. See values.yaml `sink.ingres
 {{- /* sync_tables >= 0.8.0: publish the run events a push carries (opt-in). */}}
 {{- $ev := $s.events | default dict }}
 {{- $events := $ev.enabled | default false }}
+{{- $oidcSecret := dict }}
 {{- if $events }}
-{{- $sec := dig "oidc" "clientSecret" (dict) $ev }}
-{{- if or (not $sec.name) (not $sec.key) }}
-{{- fail "sync-tables: sink.events.oidc.clientSecret (name, key of an existing Secret) is required with events" }}
+{{- $sec := dig "oidc" "clientSecret" (dict) $ev | default dict }}
+{{- $value := dig "oidc" "clientSecretValue" "" $ev | toString }}
+{{- if and $value (or $sec.name $sec.key) }}
+{{- fail "sync-tables: sink.events.oidc: clientSecretValue (client_secret) or clientSecret (an existing Secret), not both" }}
+{{- end }}
+{{- if $value }}
+{{- $oidcSecret = dict "name" (printf "%s-oidc" $name) "key" "client-secret" "value" $value }}
+{{- else if and $sec.name $sec.key }}
+{{- $oidcSecret = dict "name" $sec.name "key" $sec.key }}
+{{- else }}
+{{- fail "sync-tables: sink.events needs the client secret: sync_tables.sink.events.client_secret (oidc.clientSecretValue), or oidc.clientSecret {name, key} of an existing Secret" }}
 {{- end }}
 {{- end }}
 ---
@@ -53,6 +62,20 @@ stringData:
   tls.key: {{ required "sync-tables: sink.serverKey is required" $s.serverKey | quote }}
 ---
 {{ include "sync-tables.tokensSecret" (dict "root" . "name" $name "role" "sink" "v" $s) }}
+{{- with $oidcSecret.value }}
+---
+# svc-sync-tables-sink's secret, for the run events' publisher (the same value policies-shell
+# syncs to the realm).
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $oidcSecret.name }}
+  labels:
+    {{- include "sync-tables.labels" $ | nindent 4 }}
+type: Opaque
+stringData:
+  {{ $oidcSecret.key }}: {{ . | quote }}
+{{- end }}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -130,8 +153,8 @@ spec:
             - name: CELINE_OIDC_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: {{ $ev.oidc.clientSecret.name }}
-                  key: {{ $ev.oidc.clientSecret.key }}
+                  name: {{ $oidcSecret.name }}
+                  key: {{ $oidcSecret.key }}
             {{- end }}
             {{- include "sync-tables.authLimitsEnv" ($s.authLimits | default dict) | nindent 12 }}
           ports:
