@@ -109,7 +109,7 @@ cluster:
 jobResources: {{ toJson . }}
 {{- end }}
 
-{{- /* `postgres_db.sync_environment` (dev | prod): the marker sync_tables requires on
+{{- /* `postgres_db.sync_environment` (dev | prod | staging | preprod): the marker sync_tables requires on
        `datasets`, written by its owner. No default: unset, no marker, every sync refused. */}}
 {{- with .Environment.Values | dig "postgres_db" "sync_environment" nil }}
 envMarker:

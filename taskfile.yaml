@@ -117,6 +117,11 @@ tasks:
     cmds:
       - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/mqtt-ingestor -v {{.CLI_ARGS}}
 
+  test:pg-freezer:
+    desc: "Render pg-freezer and check its security contexts and extra volumes (set: on the CronJob's pod; unset: none)"
+    cmds:
+      - PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest --with pyyaml pytest -p no:cacheprovider tests/pg-freezer -v {{.CLI_ARGS}}
+
   test:prefect-pipelines:
     desc: "Render prefect-pipelines and check a flow's secret env (global.extraSecrets) lives only in the prefect-pipelines-secrets Secret, read by secretKeyRef after the global env, and reaches flow runs as secretKeyRef in job_variables, never as a value; global.paused; security contexts and volumes on the deploy Jobs, cleanup Job and shells; the pinned official kubectl"
     cmds:

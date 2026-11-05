@@ -73,6 +73,13 @@ extraEnv: []
 # Image pull secrets
 imagePullSecrets: []
 
+# Pod and container security contexts, and extra volumes (e.g. Pod Security `restricted`
+# with a writable /tmp). Empty: none set.
+podSecurityContext: {}
+securityContext: {}
+extraVolumes: []
+extraVolumeMounts: []
+
 # Node selector, tolerations, affinity
 nodeSelector: {}
 tolerations: []

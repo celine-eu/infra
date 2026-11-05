@@ -22,6 +22,10 @@ spec:
         spec:
           restartPolicy: Never
           serviceAccountName: {{ include "pg-freezer.serviceAccountName" . }}
+          {{- with .Values.podSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           {{- with .Values.imagePullSecrets }}
           imagePullSecrets:
             {{- toYaml . | nindent 12 }}
@@ -30,6 +34,10 @@ spec:
             - name: pg-freezer
               image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
               imagePullPolicy: {{ .Values.image.pullPolicy }}
+              {{- with .Values.securityContext }}
+              securityContext:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
               args:
                 - run
                 - --config
@@ -48,6 +56,9 @@ spec:
                 - name: config
                   mountPath: /etc/pg-freezer
                   readOnly: true
+                {{- with .Values.extraVolumeMounts }}
+                {{- toYaml . | nindent 16 }}
+                {{- end }}
               env:
                 - name: LOG_FORMAT
                   value: "json"
@@ -79,6 +90,9 @@ spec:
             - name: config
               configMap:
                 name: {{ include "pg-freezer.fullname" . }}-config
+            {{- with .Values.extraVolumes }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           {{- with .Values.nodeSelector }}
           nodeSelector:
             {{- toYaml . | nindent 12 }}

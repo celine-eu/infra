@@ -4,8 +4,8 @@
        does not survive. Without `envMarker.environment` there is no Job and no marker. */}}
 {{- with .Values.envMarker }}
 {{- if .environment }}
-{{- if not (has .environment (list "dev" "prod")) }}
-{{- fail (printf "envMarker.environment must be dev or prod, got %v" .environment) }}
+{{- if not (has .environment (list "dev" "prod" "staging" "preprod")) }}
+{{- fail (printf "envMarker.environment must be dev, prod, staging or preprod, got %v" .environment) }}
 {{- end }}
 apiVersion: batch/v1
 kind: Job
