@@ -65,6 +65,11 @@
 #       ingress_namespace: ingress      # where the ingress controller runs (NetworkPolicy)
 #       client_certs: true              # false: server TLS only, for a host reachable only
 #                                       # from a private network (the network is the gate)
+#       ingress_flavor: ""              # "" / nginx: auth-tls-* annotations; traefik: a
+#                                       # TLSOption bound to the Ingress by annotation
+#       cluster_issuer: ""              # cert-manager ClusterIssuer for the host's certificate,
+#                                       # instead of server_cert/server_key (clients trust its CA)
+#       database_pod_selector: {cnpg.io/cluster: postgis1}   # the database's pods (NetworkPolicy)
 #       auth_limits: {}                 # optional: failMax, failWindow, lockout, failGlobalMax
 #       tokens: {}                      # secret: {holder: token}, one per developer
 #       ca: ""                          # secret: PEM, the pull CA, with client_certs; never
@@ -138,6 +143,9 @@ serve:
   allowSchemas: {{ $serve | dig "allow_schemas" (list) | toJson }}
   allowSourceRanges: {{ $serve | dig "allow_source_ranges" "" | quote }}
   clientCerts: {{ $serve | dig "client_certs" true }}
+  ingressFlavor: {{ $serve | dig "ingress_flavor" "" | quote }}
+  certManager:
+    clusterIssuer: {{ $serve | dig "cluster_issuer" "" | quote }}
   {{- with $serve | dig "auth_limits" nil }}
   authLimits: {{ . | toJson }}
   {{- end }}
@@ -149,6 +157,7 @@ serve:
   resources: {{ $serve | dig "resources" (dict) | toJson }}
   networkPolicy:
     ingressNamespace: {{ $serve | dig "ingress_namespace" "ingress" | quote }}
+    databasePodSelector: {{ $serve | dig "database_pod_selector" (dict "cnpg.io/cluster" "postgis1") | toJson }}
   serveTo: {{ $serve | dig "serve_to" (list) | toJson }}
 
 pushSource:

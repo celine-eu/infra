@@ -9,6 +9,11 @@ private network: that network is the gate. */}}
 {{- if not $s.allowSchemas }}
 {{- fail "sync-tables: serve.allowSchemas must name at least one schema" }}
 {{- end }}
+{{- if not (has ($s.ingressFlavor | default "nginx") (list "traefik" "nginx")) }}
+{{- fail (printf "sync-tables: serve.ingressFlavor must be traefik or nginx, got %q" $s.ingressFlavor) }}
+{{- end }}
+{{- $traefik := eq $s.ingressFlavor "traefik" }}
+{{- $issuer := dig "certManager" "clusterIssuer" "" $s }}
 {{- if $s.clientCerts }}
 ---
 # The pull CA, which the ingress verifies client certificates against.
@@ -22,6 +27,7 @@ type: Opaque
 stringData:
   ca.crt: {{ required "sync-tables: serve.ca is required with serve.clientCerts" $s.ca | quote }}
 {{- end }}
+{{- if not $issuer }}
 ---
 # The serving host's certificate, signed by the pull CA: served by the ingress, not by
 # cert-manager, so a pulling client can trust the pull CA alone.
@@ -35,6 +41,7 @@ type: kubernetes.io/tls
 stringData:
   tls.crt: {{ required "sync-tables: serve.serverCert is required" $s.serverCert | quote }}
   tls.key: {{ required "sync-tables: serve.serverKey is required" $s.serverKey | quote }}
+{{- end }}
 ---
 {{ include "sync-tables.tokensSecret" (dict "root" . "name" $name "role" "serve" "v" $s) }}
 ---
@@ -149,6 +156,19 @@ metadata:
   labels:
     {{- include "sync-tables.labels" . | nindent 4 }}
   annotations:
+    {{- with $issuer }}
+    cert-manager.io/cluster-issuer: {{ . | quote }}
+    {{- end }}
+    {{- if $traefik }}
+    traefik.ingress.kubernetes.io/router.entrypoints: {{ $s.traefik.entryPoint | quote }}
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    {{- if $s.clientCerts }}
+    traefik.ingress.kubernetes.io/router.tls.options: {{ printf "%s-%s@kubernetescrd" .Release.Namespace $name | quote }}
+    {{- end }}
+    {{- if $s.allowSourceRanges }}
+    traefik.ingress.kubernetes.io/router.middlewares: {{ printf "%s-%s-allow@kubernetescrd" .Release.Namespace $name | quote }}
+    {{- end }}
+    {{- else }}
     {{- if $s.clientCerts }}
     nginx.ingress.kubernetes.io/auth-tls-secret: {{ printf "%s/%s-ca" .Release.Namespace $name | quote }}
     nginx.ingress.kubernetes.io/auth-tls-verify-client: "on"
@@ -159,6 +179,7 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-body-size: {{ $s.proxyBodySize | quote }}
     {{- with $s.allowSourceRanges }}
     nginx.ingress.kubernetes.io/whitelist-source-range: {{ . | quote }}
+    {{- end }}
     {{- end }}
 spec:
   ingressClassName: {{ $s.ingressClassName }}
@@ -175,6 +196,40 @@ spec:
               service:
                 name: {{ $name }}
                 port: { name: sync }
+{{- if $traefik }}
+{{- if $s.clientCerts }}
+---
+# Traefik: a client certificate from the pull CA is required at the handshake for this
+# host (sniStrict: no handshake without the host's name). Bound by the Ingress annotation.
+apiVersion: traefik.io/v1alpha1
+kind: TLSOption
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "sync-tables.labels" . | nindent 4 }}
+spec:
+  minVersion: VersionTLS12
+  sniStrict: true
+  clientAuth:
+    secretNames: [{{ printf "%s-ca" $name | quote }}]
+    clientAuthType: RequireAndVerifyClientCert
+{{- end }}
+{{- if $s.allowSourceRanges }}
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ $name }}-allow
+  labels:
+    {{- include "sync-tables.labels" . | nindent 4 }}
+spec:
+  ipAllowList:
+    sourceRange:
+      {{- range splitList "," $s.allowSourceRanges }}
+      - {{ trim . | quote }}
+      {{- end }}
+{{- end }}
+{{- end }}
 {{- if $s.networkPolicy.enabled }}
 ---
 # In: the ingress controller only. Out: DNS and the database it reads.

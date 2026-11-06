@@ -267,30 +267,34 @@ spec:
   passTLSClientCert:
     pem: true
 ---
-apiVersion: traefik.io/v1alpha1
-kind: IngressRoute
+# A plain Ingress (what a tenant may create, and what host admission checks), bound to the
+# TLSOption and the two Middlewares by Traefik's Ingress annotations.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
 metadata:
   name: {{ $name }}
   labels:
     {{- include "sync-tables.labels" . | nindent 4 }}
   annotations:
-    kubernetes.io/ingress.class: {{ $s.ingressClassName | quote }}
+    traefik.ingress.kubernetes.io/router.entrypoints: {{ $s.traefik.entryPoint | quote }}
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.tls.options: {{ printf "%s-%s@kubernetescrd" .Release.Namespace $name | quote }}
+    traefik.ingress.kubernetes.io/router.middlewares: {{ printf "%s-%s-allow@kubernetescrd,%s-%s-client-cert@kubernetescrd" .Release.Namespace $name .Release.Namespace $name | quote }}
 spec:
-  entryPoints: [{{ $s.traefik.entryPoint | quote }}]
-  routes:
-    - kind: Rule
-      match: {{ printf "Host(`%s`) && Path(`%s`)" (required "sync-tables: sink.host is required" $s.host) $s.path | quote }}
-      middlewares:
-        - name: {{ $name }}-allow
-        - name: {{ $name }}-client-cert
-      services:
-        - name: {{ $name }}
-          port: sync
+  ingressClassName: {{ $s.ingressClassName }}
   tls:
-    secretName: {{ $name }}-tls
-    options:
-      name: {{ $name }}
-      namespace: {{ .Release.Namespace }}
+    - hosts: [{{ required "sync-tables: sink.host is required" $s.host | quote }}]
+      secretName: {{ $name }}-tls
+  rules:
+    - host: {{ $s.host | quote }}
+      http:
+        paths:
+          - path: {{ $s.path }}
+            pathType: Exact
+            backend:
+              service:
+                name: {{ $name }}
+                port: { name: sync }
 {{- else }}
 ---
 apiVersion: networking.k8s.io/v1

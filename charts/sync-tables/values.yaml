@@ -43,10 +43,11 @@ sink:
   path: /sync/v1
   ingressClassName: nginx
   # How the ingress checks client certificates; required, no default:
-  # - traefik: a native IngressRoute, a TLSOption requiring a client certificate from
-  #   the push CA, an ipAllowList (allowSourceRanges, required) and passTLSClientCert. Needs
-  #   Traefik's kubernetesCRD provider. Use it on Traefik even where the NGINX provider is
-  #   on: that provider is not relied on for client certificates.
+  # - traefik: an Ingress bound by Traefik's annotations to a TLSOption requiring a client
+  #   certificate from the push CA, an ipAllowList (allowSourceRanges, required) and
+  #   passTLSClientCert. Needs Traefik's kubernetesCRD provider (for the TLSOption and the
+  #   Middlewares). Use it on Traefik even where the NGINX provider is on: that provider is
+  #   not relied on for client certificates.
   # - nginx: an Ingress with ingress-nginx's auth-tls-* annotations.
   # Either way the ingress forwards the client certificate it verified and the sink checks
   # it again against the push CA (--require-upstream-client-cert): an ingress that stops
@@ -118,9 +119,19 @@ serve:
   # Require a client certificate from `ca` at the ingress. Off: server TLS only, and the
   # network the host is reachable from is the gate (an internal-only host).
   clientCerts: true
+  # How the ingress checks client certificates: "" or nginx, ingress-nginx's auth-tls-*
+  # annotations; traefik, a TLSOption (and an ipAllowList with allowSourceRanges) bound to
+  # the Ingress by Traefik's annotations (needs its kubernetesCRD provider).
+  ingressFlavor: ""
+  traefik:
+    entryPoint: websecure
   ca: ""                          # PEM, the pull CA; required with clientCerts
-  serverCert: ""                  # required: PEM, signed by the pull CA (served by the ingress)
-  serverKey: ""                   # required: PEM
+  # The serving host's certificate: serverCert/serverKey (signed by the pull CA), or, with
+  # certManager.clusterIssuer, issued by cert-manager (clients then trust that issuer's CA).
+  certManager:
+    clusterIssuer: ""
+  serverCert: ""                  # PEM, signed by the pull CA (served by the ingress); required without certManager
+  serverKey: ""                   # PEM; required without certManager
   allowSchemas: []                # required: the only schemas it reads, one per entry
   allowSourceRanges: ""           # optional: CIDRs allowed to reach the route, comma-separated
   proxyTimeoutSeconds: 3600       # one table per transaction can run long
