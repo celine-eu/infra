@@ -120,3 +120,49 @@ def test_serve_rejects_an_unknown_flavor():
         _render(*SERVE, "serve.ingressFlavor=haproxy", f"serve.serverCert={PEM}",
                 f"serve.serverKey={KEY}")
     assert "serve.ingressFlavor must be traefik or nginx" in e.value.stderr
+
+
+# A Traefik without the plain Kubernetes Ingress provider (prod on GKE, 2026-11-09: only
+# kubernetesCRD and the ingress-nginx compatibility provider) reads no
+# `traefik.ingress.kubernetes.io/router.*` annotation, so the sink's route there stays a
+# native IngressRoute: sink.traefik.route=ingressroute.
+
+
+def test_sink_traefik_ingressroute_is_the_native_route():
+    docs = _render(*SINK, "sink.ingressFlavor=traefik", "sink.allowSourceRanges=192.0.2.1/32",
+                   "sink.traefik.route=ingressroute")
+    assert not [d for d in docs if d["kind"] == "Ingress"]
+    route = _one(docs, "IngressRoute", "st-sink")
+    assert route["metadata"]["annotations"]["kubernetes.io/ingress.class"] == "traefik"
+    assert route["spec"]["entryPoints"] == ["websecure"]
+    (rule,) = route["spec"]["routes"]
+    assert rule["match"] == "Host(`sync.example.org`) && Path(`/sync/v1`)"
+    assert rule["middlewares"] == [{"name": "st-sink-allow"}, {"name": "st-sink-client-cert"}]
+    assert rule["services"] == [{"name": "st-sink", "port": "sync"}]
+    assert route["spec"]["tls"] == {"secretName": "st-sink-tls",
+                                    "options": {"name": "st-sink", "namespace": "ns"}}
+    opt = _one(docs, "TLSOption", "st-sink")
+    assert opt["spec"]["clientAuth"]["clientAuthType"] == "RequireAndVerifyClientCert"
+    assert _one(docs, "Middleware", "st-sink-client-cert")["spec"]["passTLSClientCert"]["pem"]
+
+
+def test_sink_traefik_route_defaults_to_an_ingress():
+    docs = _render(*SINK, "sink.ingressFlavor=traefik", "sink.allowSourceRanges=192.0.2.1/32")
+    assert not [d for d in docs if d["kind"] == "IngressRoute"]
+    _one(docs, "Ingress", "st-sink")
+
+
+def test_sink_traefik_rejects_an_unknown_route():
+    with pytest.raises(subprocess.CalledProcessError) as e:
+        _render(*SINK, "sink.ingressFlavor=traefik", "sink.allowSourceRanges=192.0.2.1/32",
+                "sink.traefik.route=gateway")
+    assert "sink.traefik.route must be ingress or ingressroute" in e.value.stderr
+
+
+DEFAULTS = (Path(__file__).resolve().parents[2] / "defaults" / "0050-celine-services"
+            / "sync-tables" / "values.yaml.gotmpl")
+
+
+def test_defaults_pass_the_environment_route_to_the_chart():
+    text = DEFAULTS.read_text()
+    assert '{{ $sink | dig "traefik_route" "ingress" | quote }}' in text

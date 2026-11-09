@@ -10,8 +10,10 @@
 #       host: sync.<domain>
 #       dsn_secret: { name: "", key: connection-string }   # the mirror role's DSN, required
 #       allow_schemas: []               # required: the only schemas it writes
-#       ingress_flavor: ""              # required: traefik (native IngressRoute + TLSOption,
+#       ingress_flavor: ""              # required: traefik (Ingress or IngressRoute + TLSOption,
 #                                       # needs ingress_controller.crd_provider) or nginx
+#       traefik_route: ingress          # traefik: ingress (annotations, needs Traefik's
+#                                       # kubernetesIngress provider) or ingressroute (native)
 #       allow_source_ranges: ""         # the source's egress CIDRs; required with traefik
 #       ingress_namespace: ingress      # where the ingress controller runs (NetworkPolicy)
 #       auth_limits: {}                 # optional: failMax, failWindow, lockout, failGlobalMax
@@ -105,6 +107,8 @@ sink:
   ingressClassName: {{ .Values | dig "ingress_controller" "class" "nginx" | quote }}
   host: {{ $sink | dig "host" (printf "sync.%s" (.Environment.Values | dig "domain" "")) | quote }}
   ingressFlavor: {{ $sink | dig "ingress_flavor" "" | quote }}
+  traefik:
+    route: {{ $sink | dig "traefik_route" "ingress" | quote }}
   dsnSecret: {{ $sink | dig "dsn_secret" (dict "name" "" "key" "connection-string") | toJson }}
   allowSchemas: {{ $sink | dig "allow_schemas" (list) | toJson }}
   allowSourceRanges: {{ $sink | dig "allow_source_ranges" "" | quote }}

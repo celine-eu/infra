@@ -55,6 +55,10 @@ sink:
   ingressFlavor: ""
   traefik:
     entryPoint: websecure
+    # The route the traefik flavor renders: ingress, a plain Ingress bound by annotations
+    # (needs Traefik's kubernetesIngress provider); ingressroute, a native IngressRoute, for
+    # a Traefik without that provider (it reads no router.* annotation on an Ingress).
+    route: ingress
   # The mirror role's DSN (SYNC_SINK_DSN), from an existing Secret. Required.
   dsnSecret:
     name: ""

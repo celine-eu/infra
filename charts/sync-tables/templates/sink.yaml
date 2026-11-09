@@ -15,6 +15,10 @@ makes every push fail instead of opening the route. See values.yaml `sink.ingres
 {{- if and $traefik (not $s.allowSourceRanges) }}
 {{- fail "sync-tables: sink.allowSourceRanges is required with the traefik flavor (the source's egress address)" }}
 {{- end }}
+{{- $route := $s.traefik.route | default "ingress" }}
+{{- if not (has $route (list "ingress" "ingressroute")) }}
+{{- fail (printf "sync-tables: sink.traefik.route must be ingress or ingressroute, got %q" $route) }}
+{{- end }}
 {{- /* The header the ingress forwards the verified client certificate in. */}}
 {{- $certHeader := ternary "X-Forwarded-Tls-Client-Cert" "ssl-client-cert" $traefik }}
 {{- /* sync_tables >= 0.8.0: publish the run events a push carries (opt-in). */}}
@@ -266,6 +270,35 @@ metadata:
 spec:
   passTLSClientCert:
     pem: true
+{{- if eq $route "ingressroute" }}
+---
+# A native IngressRoute, for a Traefik that reads no plain Ingress annotations (no
+# kubernetesIngress provider: prod on GKE). Same host, path, TLSOption and Middlewares.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "sync-tables.labels" . | nindent 4 }}
+  annotations:
+    kubernetes.io/ingress.class: {{ $s.ingressClassName | quote }}
+spec:
+  entryPoints: [{{ $s.traefik.entryPoint | quote }}]
+  routes:
+    - kind: Rule
+      match: {{ printf "Host(`%s`) && Path(`%s`)" (required "sync-tables: sink.host is required" $s.host) $s.path | quote }}
+      middlewares:
+        - name: {{ $name }}-allow
+        - name: {{ $name }}-client-cert
+      services:
+        - name: {{ $name }}
+          port: sync
+  tls:
+    secretName: {{ $name }}-tls
+    options:
+      name: {{ $name }}
+      namespace: {{ .Release.Namespace }}
+{{- else }}
 ---
 # A plain Ingress (what a tenant may create, and what host admission checks), bound to the
 # TLSOption and the two Middlewares by Traefik's Ingress annotations.
@@ -295,6 +328,7 @@ spec:
               service:
                 name: {{ $name }}
                 port: { name: sync }
+{{- end }}
 {{- else }}
 ---
 apiVersion: networking.k8s.io/v1
