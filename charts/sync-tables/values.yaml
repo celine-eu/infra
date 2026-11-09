@@ -109,6 +109,11 @@ sink:
         name: ""                  #  Secret's name and key
         key: ""
       clientSecretValue: ""       # the secret itself: rendered as <release>-sink-oidc
+      # Further NetworkPolicy egress rules to reach the issuer, after the 443 rule. An issuer
+      # whose public name resolves to this cluster's own ingress LoadBalancer is reached on
+      # the controller's pod port (e.g. Traefik's websecure 8443 in namespace ingress), which
+      # a port-443 rule does not match.
+      egress: []
 
 serve:
   enabled: false

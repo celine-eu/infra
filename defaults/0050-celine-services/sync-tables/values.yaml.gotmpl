@@ -138,6 +138,7 @@ sink:
       clientId: {{ $ev | dig "oidc" "client_id" "svc-sync-tables-sink" | quote }}
       clientSecret: {{ $ev | dig "oidc" "client_secret" (dict "name" "" "key" "") | toJson }}
       clientSecretValue: {{ $ev | dig "client_secret" "" | toString | quote }}
+      egress: {{ $ev | dig "oidc" "egress" (list) | toJson }}
 
 serve:
   enabled: {{ $serve | dig "enabled" false }}

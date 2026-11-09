@@ -133,6 +133,38 @@ def test_events_open_the_sinks_egress_to_the_broker_and_the_issuer():
     assert {8883, 443} <= ports
 
 
+# An issuer whose public name resolves to the cluster's own ingress LoadBalancer (prod on GKE,
+# 2026-11-09) is reached on the ingress controller's pod port (Traefik's websecure, 8443), which
+# the 443 rule does not match: the issuer's extra egress rules, events.oidc.egress.
+TRAEFIK_8443 = {"to": [{"namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "ingress"}},
+                        "podSelector": {"matchLabels": {"app.kubernetes.io/name": "traefik"}}}],
+                "ports": [{"protocol": "TCP", "port": 8443}]}
+
+
+def test_events_add_the_issuers_extra_egress_rules():
+    ev = {**EVENTS, "oidc": {**EVENTS["oidc"], "egress": [TRAEFIK_8443]}}
+    np = by(docs({**BASE, "sink": {**SINK, "events": ev}}), "NetworkPolicy")["st-sink"]
+    assert TRAEFIK_8443 in np["spec"]["egress"]
+    ports = {p["port"] for rule in np["spec"]["egress"] for p in rule.get("ports", [])}
+    assert {8883, 443, 8443} <= ports
+
+
+def test_events_without_extra_issuer_egress_keep_their_rules():
+    np = by(docs({**BASE, "sink": {**SINK, "events": EVENTS}}), "NetworkPolicy")["st-sink"]
+    assert 8443 not in {p["port"] for rule in np["spec"]["egress"] for p in rule.get("ports", [])}
+
+
+def test_the_issuers_extra_egress_needs_events():
+    np = by(docs({**BASE, "sink": {**SINK, "events": {"oidc": {"egress": [TRAEFIK_8443]}}}}),
+            "NetworkPolicy")["st-sink"]
+    assert TRAEFIK_8443 not in np["spec"]["egress"]
+
+
+def test_defaults_pass_the_issuers_egress_to_the_chart():
+    defaults = (CHART.parents[1] / "defaults/0050-celine-services/sync-tables/values.yaml.gotmpl").read_text()
+    assert 'egress: {{ $ev | dig "oidc" "egress" (list) | toJson }}' in defaults
+
+
 def test_events_without_a_client_secret_stop_the_render():
     bad = {**EVENTS, "oidc": {**EVENTS["oidc"], "clientSecret": {"name": "", "key": "secret"}}}
     r = render({**BASE, "sink": {**SINK, "events": bad}})

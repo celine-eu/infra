@@ -400,6 +400,11 @@ spec:
     - ports:
         - { protocol: TCP, port: {{ dig "mqtt" "port" 1883 $ev }} }
         - { protocol: TCP, port: 443 }
+    {{- with dig "oidc" "egress" (list) $ev }}
+    # The issuer as the cluster reaches it, when that is not port 443 (an issuer behind this
+    # cluster's own ingress LoadBalancer is reached on the controller's pod port).
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
     {{- end }}
 {{- end }}
 {{- end }}
