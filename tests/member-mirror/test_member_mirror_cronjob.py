@@ -331,16 +331,16 @@ POLICIES_SHELL = """policies_shell:
 """
 
 
-def _shell_env(override: str, env: str) -> dict[str, dict]:
+def _shell_env(override: str, env: str) -> dict[str, str]:
+    """The shell's client secrets: the chart's Secret `policies-shell-env` (secretEnv)."""
     objects = render(override, env=env, release="policies-shell")
-    (shell,) = [c for c in objects["Deployment/policies-shell"]["spec"]["template"]["spec"]["containers"]
-                if c["name"] == "shell"]
-    return env_of(shell)
+    secret = objects["Secret/policies-shell-env"]
+    return secret.get("stringData") or {k: base64.b64decode(v).decode() for k, v in secret["data"].items()}
 
 
 def test_policies_shell_gets_the_member_mirror_client_secret():
     env = _shell_env(POLICIES_SHELL + "member_mirror:\n  client_secret: realm-own-secret-0123\n", "prod")
-    assert env["SVC_MEMBER_MIRROR_SECRET"]["value"] == "realm-own-secret-0123"
+    assert env["SVC_MEMBER_MIRROR_SECRET"] == "realm-own-secret-0123"
 
 
 def test_policies_shell_outside_dev_has_no_guessable_default():
@@ -349,7 +349,7 @@ def test_policies_shell_outside_dev_has_no_guessable_default():
 
 def test_policies_shell_in_dev_takes_the_dev_default():
     env = _shell_env(POLICIES_SHELL, "dev")
-    assert env["SVC_MEMBER_MIRROR_SECRET"]["value"] == "svc-member-mirror"
+    assert env["SVC_MEMBER_MIRROR_SECRET"] == "svc-member-mirror"
 
 
 # --- the chart refuses prod on its own, whatever renders it -------------------------------

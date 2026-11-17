@@ -128,7 +128,9 @@ def test_passwords_reach_the_bootstrap_container_only():
     assert secret["stringData"] == {"CELINE_KEYCLOAK_ADMIN_TEMP_PASSWORD_TEMPLATE": "{username}.x"}
     cs = containers(ds)
     assert cs["bootstrap"]["envFrom"] == [{"secretRef": {"name": "policies-shell-bootstrap-platform-admins"}}]
-    assert "envFrom" not in cs["shell"] and "envFrom" not in cs["bootstrap-record"]
+    # The shell loads only its own client secrets (secretEnv), never the passwords.
+    assert cs["shell"]["envFrom"] == [{"secretRef": {"name": "policies-shell-env"}}]
+    assert "envFrom" not in cs["bootstrap-record"]
 
 
 def test_a_template_without_the_username_stops_the_render():

@@ -895,7 +895,7 @@ onboarding:
 | `dataspace.dataset_api.extra_env` | appended after the dataset-api chart's own env (chart value `extraEnvAppend`). Each entry needs a `name` and a `value` or `valueFrom` |
 | `dataspace.dataset_api.client_id` | optional: the realm client dataset-api calls other services as (`oidc.service.clientId`), its secret `client_secrets.<client_id>` **required**. The audience it accepts does not change. Unset: `svc-dataset-api` as before |
 | `dataspace.policies_shell.overlays` | **required**, a list of `{name, content}`: mounted into policies-shell and passed to its start-up `celine-policies keycloak sync` as `--overlay`, in list order, after `clients.yaml` (chart value `syncOverlays`; celine-policies 1.7.0 or later). A name given twice stops the render. A changed overlay restarts the shell. Never `--prune` |
-| `dataspace.policies_shell.clients` | **required** list: each realm client id gets its secret as `SVC_<ID>_SECRET` in policies-shell (the id upper-cased, `-` as `_`: `svc-ds-portal` gives `SVC_DS_PORTAL_SECRET`) from `client_secrets.<id>`, **required**. A name the shell already sets stops the render |
+| `dataspace.policies_shell.clients` | **required** list: each realm client id gets its secret as `SVC_<ID>_SECRET` in policies-shell, in the chart's Secret `<release>-env` (`secretEnv`, loaded with envFrom, never a value in the pod spec) (the id upper-cased, `-` as `_`: `svc-ds-portal` gives `SVC_DS_PORTAL_SECRET`) from `client_secrets.<id>`, **required**. A name the shell already sets stops the render |
 
 Removing the file, or setting `dataspace.enabled: false`, renders every environment exactly as
 without the layer.

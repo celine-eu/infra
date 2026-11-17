@@ -18,7 +18,7 @@ spec:
     metadata:
       labels:
         {{- include "celine-policies-shell.selectorLabels" . | nindent 8 }}
-      {{- if or .Values.podAnnotations .Values.syncOverlays .Values.syncBase }}
+      {{- if or .Values.podAnnotations .Values.syncOverlays .Values.syncBase .Values.secretEnv }}
       annotations:
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
@@ -30,6 +30,10 @@ spec:
         {{- if .Values.syncBase }}
         # A changed base declaration restarts the shell, whose start-up sync applies it.
         checksum/sync-base: {{ include "celine-policies-shell.syncBase" . | sha256sum | quote }}
+        {{- end }}
+        {{- if .Values.secretEnv }}
+        # A changed secret value restarts the shell, whose start-up sync applies it.
+        checksum/secret-env: {{ .Values.secretEnv | toYaml | sha256sum | quote }}
         {{- end }}
       {{- end }}
     spec:
@@ -363,6 +367,12 @@ spec:
                   key: {{ default .name .key }}
               {{- end }}
             {{- end }}
+          {{- if .Values.secretEnv }}
+          # The client secrets (secretEnv), from the chart's own Secret: never in the pod spec.
+          envFrom:
+            - secretRef:
+                name: {{ include "celine-policies-shell.fullname" . }}-env
+          {{- end }}
           {{- if or .Values.volumeMounts .Values.syncOverlays .Values.syncBase (include "celine-policies-shell.realmScopedShell" .) }}
           volumeMounts:
             {{- with .Values.volumeMounts }}

@@ -6,7 +6,7 @@
 - sync-tables: the sink's publisher, as a Secret of the chart's own
   (`<release>-sink-oidc`, key `client-secret`), unless the environment names an existing
   Secret (`events.oidc.client_secret: {name, key}`). Both together stop the render.
-- policies-shell: `SVC_SYNC_TABLES_SINK_SECRET`, which clients.yaml sets on the realm. Outside
+- policies-shell: `SVC_SYNC_TABLES_SINK_SECRET` (its Secret `<release>-env`), which clients.yaml sets on the realm. Outside
   dev there is no guessable default: unset, the variable is not set (as svc-member-mirror).
 
     task test:sync-tables
@@ -81,15 +81,15 @@ POLICIES_SHELL = {"policies_shell": {"image_tag": "v9.9.9",
 
 
 def shell_env(extra: dict, env: str) -> dict:
+    """The shell's client secrets: the chart's Secret `policies-shell-env` (secretEnv)."""
     objects = render(yaml.safe_dump({**POLICIES_SHELL, **extra}), env=env, release="policies-shell")
-    (shell,) = [c for c in objects["Deployment/policies-shell"]["spec"]["template"]["spec"]["containers"]
-                if c["name"] == "shell"]
-    return {e["name"]: e for e in shell["env"]}
+    secret = objects["Secret/policies-shell-env"]
+    return secret.get("stringData") or {k: base64.b64decode(v).decode() for k, v in secret["data"].items()}
 
 
 def test_policies_shell_gets_the_sink_client_secret():
     env = shell_env({"sync_tables": {"sink": {"events": {"client_secret": SECRET}}}}, "staging")
-    assert env["SVC_SYNC_TABLES_SINK_SECRET"]["value"] == SECRET
+    assert env["SVC_SYNC_TABLES_SINK_SECRET"] == SECRET
 
 
 def test_policies_shell_outside_dev_has_no_guessable_default():
@@ -97,7 +97,7 @@ def test_policies_shell_outside_dev_has_no_guessable_default():
 
 
 def test_policies_shell_in_dev_takes_the_dev_default():
-    assert shell_env({}, "dev")["SVC_SYNC_TABLES_SINK_SECRET"]["value"] == "svc-sync-tables-sink"
+    assert shell_env({}, "dev")["SVC_SYNC_TABLES_SINK_SECRET"] == "svc-sync-tables-sink"
 
 
 def test_a_dataspace_client_cannot_set_the_sink_secret_twice():

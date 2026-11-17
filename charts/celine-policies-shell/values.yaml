@@ -176,27 +176,26 @@ syncOverlays: []
 syncBase: {}
 
 # --------------------------------------------------------------------------
-# Extra environment variables (plain value or secretKeyRef)
+# Secret environment variables, {NAME: value}: the client secrets the start-up sync
+# substitutes into clients.yaml (the ${VAR:-default} fallbacks there). Rendered into the
+# Secret <fullname>-env and loaded by the shell with envFrom, so no value is in the pod
+# spec or in a diff of the Deployment. A changed value restarts the shell
+# (checksum/secret-env). A name also given in extraEnv takes extraEnv's value.
 # --------------------------------------------------------------------------
-# Client secrets — substituted into clients.yaml during keycloak sync.
-# Values here match the ${VAR:-default} fallbacks defined in clients.yaml.
-# Override via secretKeyRef in production (e.g. from the SOPS-decrypted secret).
-extraEnv:
-  - name: SVC_DT_SECRET
-    value: "svc-digital-twin"
-  - name: SVC_PIPELINES_SECRET
-    value: "svc-pipelines"
-  - name: SVC_DATASET_SECRET
-    value: "svc-dataset-api"
-  - name: SVC_NUDGING_SECRET
-    value: "svc-nudging"
-  - name: SVC_REC_REGISTRY_SECRET
-    value: "svc-rec-registry"
-  - name: SVC_GRID_SECRET
-    value: "svc-grid"
-  - name: CELINE_ADMIN_CLI_SECRET
-    value: "celine-cli"
-# Example secretKeyRef override:
+secretEnv:
+  SVC_DT_SECRET: "svc-digital-twin"
+  SVC_PIPELINES_SECRET: "svc-pipelines"
+  SVC_DATASET_SECRET: "svc-dataset-api"
+  SVC_NUDGING_SECRET: "svc-nudging"
+  SVC_REC_REGISTRY_SECRET: "svc-rec-registry"
+  SVC_GRID_SECRET: "svc-grid"
+  CELINE_ADMIN_CLI_SECRET: "celine-cli"
+
+# --------------------------------------------------------------------------
+# Extra environment variables (plain value or secretKeyRef): settings, not secrets.
+# --------------------------------------------------------------------------
+extraEnv: []
+# Example secretKeyRef entry (a Secret someone else owns):
 #   - name: SVC_DT_SECRET
 #     secret: celine-client-secrets
 #     key: svc-dt-secret

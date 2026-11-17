@@ -130,63 +130,48 @@ keycloak:
   adminClientSecretKey: ""
 
 
-extraEnv:
-  - name: SVC_DT_SECRET
-    value: {{ .Environment.Values | dig "digital_twin" "client_secret" "svc-digital-twin" | quote }}
-  - name: SVC_PIPELINES_SECRET
-    value: {{ .Environment.Values | dig "pipelines" "client_secret" "svc-pipelines" | quote }}
-  - name: SVC_DATASET_SECRET
-    value: {{ .Environment.Values | dig "dataset_api" "client_secret" "svc-dataset-api" | quote }}
-  - name: SVC_NUDGING_SECRET
-    value: {{ .Environment.Values | dig "nudging" "client_secret" "svc-nudging" | quote }}
-  - name: SVC_REC_REGISTRY_SECRET
-    value: {{ .Environment.Values | dig "rec_registry" "client_secret" "svc-rec-registry" | quote }}
-  - name: SVC_FLEXIBILITY_SECRET
-    value: {{ .Environment.Values | dig "flexibility_api" "client_secret" "svc-flexibility" | quote }}
-  - name: SVC_WEBAPP_SECRET
-    value: {{ .Environment.Values | dig "webapp" "client_secret" "svc-webapp" | quote }}
-  - name: SVC_COMMUNITY_SECRET
-    value: {{ .Environment.Values | dig "community" "client_secret" "svc-community" | quote }}
-  - name: SVC_PROVISIONING_SECRET
-    value: {{ .Environment.Values | dig "provisioning" "client_secret" "svc-provisioning" | quote }}
-  - name: SVC_GRID_SECRET
-    value: {{ .Environment.Values | dig "grid" "client_secret" "svc-grid" | quote }}
-  - name: SVC_FORECAST_SECRET
-    value: {{ .Environment.Values | dig "forecasting" "client_secret" "svc-forecast" | quote }}
+{{- /* The client secrets the start-up sync substitutes into clients.yaml: the chart's
+       `secretEnv`, a Secret the shell loads with envFrom, never values in the pod spec. */}}
+secretEnv:
+  SVC_DT_SECRET: {{ .Environment.Values | dig "digital_twin" "client_secret" "svc-digital-twin" | quote }}
+  SVC_PIPELINES_SECRET: {{ .Environment.Values | dig "pipelines" "client_secret" "svc-pipelines" | quote }}
+  SVC_DATASET_SECRET: {{ .Environment.Values | dig "dataset_api" "client_secret" "svc-dataset-api" | quote }}
+  SVC_NUDGING_SECRET: {{ .Environment.Values | dig "nudging" "client_secret" "svc-nudging" | quote }}
+  SVC_REC_REGISTRY_SECRET: {{ .Environment.Values | dig "rec_registry" "client_secret" "svc-rec-registry" | quote }}
+  SVC_FLEXIBILITY_SECRET: {{ .Environment.Values | dig "flexibility_api" "client_secret" "svc-flexibility" | quote }}
+  SVC_WEBAPP_SECRET: {{ .Environment.Values | dig "webapp" "client_secret" "svc-webapp" | quote }}
+  SVC_COMMUNITY_SECRET: {{ .Environment.Values | dig "community" "client_secret" "svc-community" | quote }}
+  SVC_PROVISIONING_SECRET: {{ .Environment.Values | dig "provisioning" "client_secret" "svc-provisioning" | quote }}
+  SVC_GRID_SECRET: {{ .Environment.Values | dig "grid" "client_secret" "svc-grid" | quote }}
+  SVC_FORECAST_SECRET: {{ .Environment.Values | dig "forecasting" "client_secret" "svc-forecast" | quote }}
   # Onboarding has no release yet; its clients still exist on the realm.
-  - name: SVC_ONBOARDING_SECRET
-    value: {{ .Environment.Values | dig "onboarding" "client_secret" "svc-onboarding" | quote }}
-  - name: SVC_ONBOARDING_CLI_SECRET
-    value: {{ .Environment.Values | dig "onboarding" "cli_client_secret" "svc-onboarding-cli" | quote }}
-  - name: CELINE_ADMIN_CLI_SECRET
-    value: {{ .Environment.Values | dig "auth_setup" "clientCLISecret" "celine-cli" | quote }}
+  SVC_ONBOARDING_SECRET: {{ .Environment.Values | dig "onboarding" "client_secret" "svc-onboarding" | quote }}
+  SVC_ONBOARDING_CLI_SECRET: {{ .Environment.Values | dig "onboarding" "cli_client_secret" "svc-onboarding-cli" | quote }}
+  CELINE_ADMIN_CLI_SECRET: {{ .Environment.Values | dig "auth_setup" "clientCLISecret" "celine-cli" | quote }}
   # oauth2_proxy is declared in celine-policies' clients.yaml since 2026-09-14: `sync` sets its
   # secret (the one oauth2-proxy is configured with) and its redirect URIs on this domain.
-  - name: OAUTH2_PROXY_CLIENT_SECRET
-    value: {{ .Environment.Values | dig "auth_setup" "clientSecret" "oauth2_proxy" | quote }}
-  - name: CELINE_DOMAIN
-    value: {{ .Values.domain | quote }}
-  - name: CELINE_URL_SCHEME
-    value: "https"
+  OAUTH2_PROXY_CLIENT_SECRET: {{ .Environment.Values | dig "auth_setup" "clientSecret" "oauth2_proxy" | quote }}
 {{- /* svc-member-mirror (celine-policies clients.yaml, REQ-0021): this realm's own secret,
        `member_mirror.client_secret`. Outside dev no guessable default: unset, the variable is
        not set, and a policies release that declares the client refuses to sync. */}}
 {{- with .Environment.Values | dig "member_mirror" "client_secret" (ternary "svc-member-mirror" "" (eq .Environment.Name "dev")) }}
-  - name: SVC_MEMBER_MIRROR_SECRET
-    value: {{ . | quote }}
+  SVC_MEMBER_MIRROR_SECRET: {{ . | quote }}
 {{- end }}
 {{- /* svc-sync-tables-sink (celine-policies clients.yaml): the secret the sync-tables sink
        publishes run events with, `sync_tables.sink.events.client_secret`. Outside dev no
        guessable default, as svc-member-mirror. */}}
 {{- with .Environment.Values | dig "sync_tables" "sink" "events" "client_secret" (ternary "svc-sync-tables-sink" "" (eq .Environment.Name "dev")) }}
-  - name: SVC_SYNC_TABLES_SINK_SECRET
-    value: {{ . | quote }}
+  SVC_SYNC_TABLES_SINK_SECRET: {{ . | quote }}
 {{- end }}
 {{- range $dsEnv }}
-  - name: {{ .name }}
-    value: {{ .value | quote }}
+  {{ .name }}: {{ .value | quote }}
 {{- end }}
 
+extraEnv:
+  - name: CELINE_DOMAIN
+    value: {{ .Values.domain | quote }}
+  - name: CELINE_URL_SCHEME
+    value: "https"
 {{- if .Values.tls_setup.self_signed }}
   - name: SSL_CERT_FILE
     value: /etc/ssl/celine-ca/ca.crt
