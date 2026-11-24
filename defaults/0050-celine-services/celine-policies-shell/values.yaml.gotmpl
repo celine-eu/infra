@@ -104,6 +104,10 @@ resources:
 {{- fail "keycloak.admin_public needs keycloak.admin_mfa: a console reachable from the network keeps the admin second factor" }}
 {{- end }}
 {{- end }}
+{{- /* Open (decision 4, step-0 spike): with keycloak.admin_public.realms, master's console
+       stays off the public host, so master's Frontend URL could stay on the port-forward,
+       but KC_HOSTNAME_ADMIN is global to the instance and moves anyway. Unchanged until the
+       spike has measured it: the public host whenever admin_public is on. */}}
 {{- $masterFrontendUrl := ternary (.Environment.Values | dig "keycloak" "public_url" (printf "https://keycloak.%s" .Environment.Values.domain)) (printf "http://localhost:%d" (.Environment.Values | dig "keycloak" "admin_forward_port" 18080 | int)) $adminPublicOn }}
 keycloak:
   # The Keycloak Service inside the cluster, never the public host: the public host serves

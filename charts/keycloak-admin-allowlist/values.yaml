@@ -1,0 +1,5 @@
+# The addresses admitted to the admin console, as CIDRs (address/prefix), never one that
+# admits everything (`/0`). infra fills it from `keycloak.admin_public.allow_source_ranges`
+# (defaults/0020-auth/keycloak-admin-allowlist), and installs this chart only with
+# `keycloak.admin_public` behind Traefik. Empty: the render stops.
+sourceRanges: []

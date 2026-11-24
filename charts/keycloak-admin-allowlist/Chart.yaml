@@ -1,0 +1,8 @@
+apiVersion: v2
+name: keycloak-admin-allowlist
+description: >-
+  The allowlist of the Keycloak admin console on the public host behind Traefik
+  (keycloak.admin_public, never in prod): one Traefik ipAllowList Middleware, which the
+  keycloak release's console Ingress names in router.middlewares. Nothing else.
+type: application
+version: 0.1.0

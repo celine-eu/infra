@@ -131,8 +131,11 @@ secrets:
   console and master on this host too, from the allowlist only: a browser impersonation must
   start on the host whose cookies the platform sees. The admin hostname, and master's
   Frontend URL with it (policies-shell), then move to this host and the port-forward no
-  longer serves the console. Prod never renders it, and the allowlist is an ingress-nginx
-  annotation, so another controller stops the render.
+  longer serves the console. Prod never renders it. The allowlist is ingress-nginx's
+  whitelist-source-range annotation or, behind Traefik (`ingress_controller.annotations:
+  traefik`), an ipAllowList Middleware rendered by the release keycloak-admin-allowlist; any
+  other controller stops the render. `keycloak.admin_public.realms` narrows it to the listed realms' consoles: master's
+  console, `/realms/master` and every other realm's console stay off this host.
 */}}
 {{- $realm := .Environment.Values | dig "keycloak" "realm" "celine" }}
 {{- $publicRealms := .Environment.Values | dig "keycloak" "public_realms" (list $realm) }}
@@ -143,6 +146,9 @@ secrets:
 {{- $adminPublic := .Environment.Values | dig "keycloak" "admin_public" (dict) | default (dict) }}
 {{- $adminPublicOn := eq ($adminPublic | dig "enabled" false | toString) "true" }}
 {{- $adminRanges := list }}
+{{- /* keycloak.admin_public.realms: only these realms' consoles (decision 4 (a) of the
+       impersonation plan), never master's. Unset: the whole `/admin` and `/realms/master`. */}}
+{{- $adminRealms := list }}
 {{- if $adminPublicOn }}
 {{- $celineEnv := .Environment.Values | dig "celine_env" .Environment.Name | toString | trim | lower }}
 {{- if or (eq .Environment.Name "prod") (eq $celineEnv "prod") }}
@@ -162,8 +168,23 @@ secrets:
 {{- end }}
 {{- $adminRanges = append $adminRanges $range }}
 {{- end }}
-{{- if ne (.Values | dig "ingress_controller" "class" "nginx" | toString) "nginx" }}
-{{- fail "keycloak.admin_public needs ingress-nginx: the allowlist is its whitelist-source-range annotation, which another controller ignores" }}
+{{- if and (not $traefik) (ne (.Values | dig "ingress_controller" "class" "nginx" | toString) "nginx") }}
+{{- fail "keycloak.admin_public needs ingress-nginx, or Traefik with ingress_controller.annotations: traefik: the allowlist is ingress-nginx's whitelist-source-range annotation or a Traefik ipAllowList Middleware, and another controller ignores both" }}
+{{- end }}
+{{- if hasKey $adminPublic "realms" }}
+{{- $realms := $adminPublic.realms }}
+{{- if not (and (kindIs "slice" $realms) $realms) }}
+{{- fail "keycloak.admin_public.realms, when set, is a non-empty list of realm names, e.g. [celine-staging]" }}
+{{- end }}
+{{- range $realms }}
+{{- if not (regexMatch "^[A-Za-z0-9][A-Za-z0-9._-]*$" (toString .)) }}
+{{- fail (printf "keycloak.admin_public.realms: %q is not a realm name" (toString .)) }}
+{{- end }}
+{{- if eq (toString .) "master" }}
+{{- fail "keycloak.admin_public.realms must not name master: master's console stays on the port-forward" }}
+{{- end }}
+{{- $adminRealms = append $adminRealms (toString .) }}
+{{- end }}
 {{- end }}
 {{- end }}
 {{- $adminUrl := ternary $kcPublic (printf "http://localhost:%d" $adminPort) $adminPublicOn }}
@@ -217,23 +238,57 @@ ingress:
   # The admin console and master on the same host, from the allowlist only
   # (keycloak.admin_public, never in prod). The chart's console Ingress, with the public
   # Ingress's TLS. Off: no such Ingress, `/admin` and `/realms/master` answer 404.
+  # Behind Traefik (ingress_controller.annotations: traefik) the allowlist is the Traefik
+  # Middleware `keycloak-admin-allowlist` (ipAllowList), which the release
+  # keycloak-admin-allowlist renders (charts/keycloak-admin-allowlist): the keycloakx chart
+  # renders no extra manifests, and this release `needs` that one when it is installed.
   console:
     enabled: {{ $adminPublicOn }}
     {{- if $adminPublicOn }}
     ingressClassName: {{ .Values | dig "ingress_controller" "class" "nginx" | quote }}
     annotations:
+      {{- if $traefik }}
+      traefik.ingress.kubernetes.io/router.entrypoints: {{ $ic | dig "entrypoint" "websecure" }}
+      {{- with $ic | dig "tls_options" "" }}
+      traefik.ingress.kubernetes.io/router.tls.options: {{ printf "%s-%s@kubernetescrd" $ns . }}
+      {{- end }}
+      traefik.ingress.kubernetes.io/router.middlewares: {{ printf "%s-keycloak-admin-allowlist@kubernetescrd" $ns }}
+      {{- else }}
       nginx.ingress.kubernetes.io/whitelist-source-range: {{ join "," $adminRanges | quote }}
       nginx.ingress.kubernetes.io/proxy-buffer-size: 128k
       {{- if .Environment.Values | dig "security_headers" "enabled" true }}
       nginx.ingress.kubernetes.io/custom-headers: "{{ .Release.Namespace }}/keycloak-security-headers"
       {{- end }}
+      {{- end }}
     rules:
       - host: "{{ $kcHost }}"
         paths:
+          {{- if $adminRealms }}
+          # Each listed realm's console and its admin REST API. Prefix paths end in `/`:
+          # Traefik reads Prefix as a plain string prefix, so `/admin/realms/celine-staging`
+          # alone would also match `/admin/realms/celine-staging2`.
+          {{- range $adminRealms }}
+          - path: /admin/{{ . }}/
+            pathType: Prefix
+          - path: /admin/realms/{{ . }}
+            pathType: Exact
+          - path: /admin/realms/{{ . }}/
+            pathType: Prefix
+          {{- end }}
+          # The shared admin endpoints a realm console calls, outside any realm's path.
+          # Measured 2026-11-24 on Keycloak 26.8.1 (load, sign-in, users, groups, impersonate):
+          # only /admin/serverinfo; everything else is under the realm's own paths, /resources
+          # and /realms/<realm>. Add here one Exact path each, never a Prefix of /admin.
+          {{- range (list "/admin/serverinfo") }}
+          - path: {{ . }}
+            pathType: Exact
+          {{- end }}
+          {{- else }}
           - path: /admin
             pathType: Prefix
           - path: /realms/master
             pathType: Prefix
+          {{- end }}
     {{- end }}
   # TLS configuration
   tls:
@@ -279,6 +334,11 @@ extraEnv: |
   # console also needs the master realm's Frontend URL set to the same value: the
   # policies-shell bootstrap sets it on every start, from the same admin_forward_port
   # (README, "Keycloak admin access").
+  {{- /* Open (decision 4, step-0 spike): with keycloak.admin_public.realms only named
+         realms' consoles are public, yet KC_HOSTNAME_ADMIN is global to the instance and
+         still moves to the public host. Whether master's console can stay on the
+         port-forward meanwhile is not measured; until it is, this and master's Frontend URL
+         follow the flag as before. */}}
   - name: KC_HOSTNAME_ADMIN
     value: "{{ $adminUrl }}"
   {{- if $realmImport }}

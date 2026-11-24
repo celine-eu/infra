@@ -6,8 +6,11 @@
 - The master realm and the admin console are reached through `kubectl port-forward` on
   http://localhost:<keycloak.admin_forward_port>: KC_HOSTNAME_ADMIN says so, KC_HOSTNAME stays
   the public URL. There is no admin Ingress, unless `keycloak.admin_public` (never in prod)
-  serves `/admin` and `/realms/master` on the public host from an ingress-nginx allowlist;
-  the admin hostname and master's Frontend URL then move to that host.
+  serves `/admin` and `/realms/master` on the public host from an allowlist (ingress-nginx's
+  annotation, or a Traefik ipAllowList Middleware from the release keycloak-admin-allowlist,
+  which the keycloak release needs); with `realms`, only those
+  realms' consoles, never master's. The admin hostname and master's Frontend URL then move to
+  that host.
 - What administers Keycloak from inside the cluster (the policies-shell bootstrap and sync,
   provisioning) uses the Keycloak Service.
 - The admin console signs in to master through master's own URL, so the policies-shell
@@ -49,8 +52,8 @@ SECRET = "0123456789abcdef" * 4  # a placeholder of the required length, nothing
 SECRET_NAME = "policies-shell-bootstrap-client"
 
 
-def render(helmfile: str, release: str, override: str = "", env: str = "dev") -> subprocess.CompletedProcess:
-    """`helmfile template` one release over the dev values, as environment `env`."""
+def helmfile_run(helmfile: str, args: list[str], override: str = "", env: str = "dev") -> subprocess.CompletedProcess:
+    """Run helmfile with `args` on one helmfile, over the dev values, as environment `env`."""
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
         source = (REPO / "helmfile.d" / helmfile).read_text()
@@ -62,10 +65,22 @@ def render(helmfile: str, release: str, override: str = "", env: str = "dev") ->
         (tmp / "helmfile.yaml.gotmpl").write_text(header + source.replace("../", f"{REPO}/"))
         environ = {**os.environ, "HELM_CONFIG_HOME": str(tmp / "hc"), "HELM_CACHE_HOME": str(tmp / "hcache")}
         return subprocess.run(
-            ["helmfile", "-f", str(tmp / "helmfile.yaml.gotmpl"), "-e", env, "template", "-q",
-             "-l", f"name={release}", "--skip-tests"],
-            capture_output=True, text=True, env=environ, timeout=600,
+            ["helmfile", "-f", str(tmp / "helmfile.yaml.gotmpl"), "-e", env, *args],
+            capture_output=True, text=True, env=environ, timeout=600, check=False,
         )
+
+
+def render(helmfile: str, release: str, override: str = "", env: str = "dev") -> subprocess.CompletedProcess:
+    """`helmfile template` one release over the dev values, as environment `env`."""
+    return helmfile_run(helmfile, ["template", "-q", "-l", f"name={release}", "--skip-tests"], override, env)
+
+
+def releases_of(helmfile: str, override: str = "", env: str = "dev") -> dict[str, dict]:
+    """The releases `helmfile build` resolves (name -> release: installed, needs, ...)."""
+    result = helmfile_run(helmfile, ["build"], override, env)
+    assert result.returncode == 0, result.stderr
+    states = [d for d in yaml.safe_load_all(result.stdout) if d and "releases" in d]
+    return {r["name"]: r for state in states for r in state["releases"]}
 
 
 def docs_of(result: subprocess.CompletedProcess) -> list[dict]:
@@ -608,3 +623,223 @@ def test_the_admin_second_factor_cannot_be_off_with_a_public_console():
     result = policies_shell(override, env="staging")
     assert result.returncode != 0
     assert "keycloak.admin_public needs keycloak.admin_mfa" in result.stderr
+
+
+def test_the_nginx_console_ingress_carries_exactly_todays_annotations(keycloak_admin_public):
+    # the Traefik flavor and the realm list must leave the ingress-nginx render as it was
+    console = ingress_named(keycloak_admin_public, CONSOLE_INGRESS)
+    assert console["metadata"]["annotations"] == {WHITELIST: ALLOWED,
+                                                  "nginx.ingress.kubernetes.io/proxy-buffer-size": "128k"}
+    assert not of_kind(keycloak_admin_public, "Middleware")
+
+
+# ---------------------------------------------------------------------------
+# the same console behind Traefik (ingress_controller.annotations: traefik)
+# ---------------------------------------------------------------------------
+# Traefik ignores ingress-nginx's whitelist annotation, so there the allowlist is a Traefik
+# Middleware (`ipAllowList`) bound to the console Ingress with `router.middlewares`. The
+# keycloakx chart renders no extra manifests, so the Middleware is the release
+# keycloak-admin-allowlist's, installed only with keycloak, admin_public and Traefik, and the
+# release keycloak `needs` it then. Not auth-setup's: the environment that runs the shared
+# Keycloak (identity) installs keycloak alone, without auth-setup.
+
+TRAEFIK = ("ingress_controller:\n  class: traefik\n  annotations: traefik\n"
+           "  entrypoint: websecure\n  tls_options: celine-tls\n")
+MIDDLEWARE = "keycloak-admin-allowlist"
+ALLOWLIST_RELEASE = "keycloak-admin-allowlist"
+MIDDLEWARES = "traefik.ingress.kubernetes.io/router.middlewares"
+ENTRYPOINTS = "traefik.ingress.kubernetes.io/router.entrypoints"
+TLS_OPTIONS = "traefik.ingress.kubernetes.io/router.tls.options"
+
+
+def traefik_render(release: str, extra: str = ADMIN_PUBLIC, env: str = "staging") -> subprocess.CompletedProcess:
+    return render("0020-auth.yaml.gotmpl", release, env=env, override="domain: example.org\n" + TRAEFIK + extra)
+
+
+@pytest.fixture(scope="module")
+def keycloak_traefik_admin_public() -> list[dict]:
+    return docs_of(traefik_render("keycloak"))
+
+
+def allowlist_middlewares(docs: list[dict]) -> list[dict]:
+    return [d for d in of_kind(docs, "Middleware") if d["metadata"]["name"] == MIDDLEWARE]
+
+
+def test_traefik_console_ingress_is_bound_to_the_allowlist_middleware(keycloak_traefik_admin_public):
+    console = ingress_named(keycloak_traefik_admin_public, CONSOLE_INGRESS)
+    assert console is not None
+    assert console["spec"]["ingressClassName"] == "traefik"
+    assert [r["host"] for r in console["spec"]["rules"]] == ["keycloak.example.org"]
+    assert paths_of(console) == {"/admin": "Prefix", "/realms/master": "Prefix"}
+    assert console["spec"]["tls"] == [{"hosts": ["keycloak.example.org"], "secretName": "keycloak-tls"}]
+    annotations = console["metadata"]["annotations"]
+    assert annotations[MIDDLEWARES] == f"celine-staging-{MIDDLEWARE}@kubernetescrd"
+    assert not [k for k in annotations if k.startswith("nginx.ingress.kubernetes.io/")]
+
+
+def test_traefik_console_ingress_uses_the_public_ingresss_entrypoint_and_tls_options(keycloak_traefik_admin_public):
+    public = ingress_named(keycloak_traefik_admin_public, PUBLIC_INGRESS)["metadata"]["annotations"]
+    console = ingress_named(keycloak_traefik_admin_public, CONSOLE_INGRESS)["metadata"]["annotations"]
+    assert console[ENTRYPOINTS] == public[ENTRYPOINTS] == "websecure"
+    assert console[TLS_OPTIONS] == public[TLS_OPTIONS] == "celine-staging-celine-tls@kubernetescrd"
+    assert MIDDLEWARES not in public  # the realms' Ingress stays open to everyone
+
+
+def test_traefik_middleware_admits_exactly_the_allowlist():
+    extra = ("keycloak:\n  admin_public:\n    enabled: true\n"
+             "    allow_source_ranges: [192.168.1.47/32, 10.252.1.0/24]\n")
+    docs = docs_of(traefik_render(ALLOWLIST_RELEASE, extra))
+    (middleware,) = allowlist_middlewares(docs)
+    assert len(docs) == 1  # the Middleware and nothing else
+    assert middleware["apiVersion"] == "traefik.io/v1alpha1"
+    assert middleware["spec"] == {"ipAllowList": {"sourceRange": ["192.168.1.47/32", "10.252.1.0/24"]}}
+    labels = middleware["metadata"]["labels"]
+    assert labels["app.kubernetes.io/name"] == "keycloak-admin-allowlist"
+    assert labels["app.kubernetes.io/instance"] == ALLOWLIST_RELEASE
+    assert labels["app.kubernetes.io/managed-by"] == "Helm"
+    assert labels["helm.sh/chart"].startswith("keycloak-admin-allowlist-")
+
+
+# When the release is installed: keycloak, admin_public and Traefik annotations, all three.
+OFF_CASES = {
+    "traefik, admin_public unset": "domain: example.org\n" + TRAEFIK,
+    "traefik, admin_public off": ("domain: example.org\n" + TRAEFIK + "keycloak:\n  admin_public:\n"
+                                  f"    enabled: false\n    allow_source_ranges: [{ALLOWED}]\n"),
+    "nginx, admin_public on": "domain: example.org\n" + ADMIN_PUBLIC,
+    "traefik class, nginx annotations": ("domain: example.org\ningress_controller:\n  class: traefik\n"
+                                         "  annotations: nginx\n" + ADMIN_PUBLIC),
+    "keycloak elsewhere": "domain: example.org\n" + TRAEFIK + ADMIN_PUBLIC + "  enabled: false\n",
+}
+
+
+def test_the_allowlist_release_is_installed_with_keycloak_admin_public_and_traefik():
+    found = releases_of("0020-auth.yaml.gotmpl", "domain: example.org\n" + TRAEFIK + ADMIN_PUBLIC, env="staging")
+    assert found[ALLOWLIST_RELEASE].get("installed", True) is True
+    assert found[ALLOWLIST_RELEASE]["chart"].endswith("/charts/keycloak-admin-allowlist")
+    assert found[ALLOWLIST_RELEASE]["labels"]["group"] == "auth"
+
+
+def test_the_keycloak_release_needs_the_allowlist_release_when_it_is_installed():
+    found = releases_of("0020-auth.yaml.gotmpl", "domain: example.org\n" + TRAEFIK + ADMIN_PUBLIC, env="staging")
+    assert f"celine-staging/{ALLOWLIST_RELEASE}" in found["keycloak"]["needs"]
+    # the allowlist release needs nothing: identity installs it and keycloak alone
+    assert not found[ALLOWLIST_RELEASE].get("needs")
+
+
+@pytest.mark.parametrize("case", list(OFF_CASES))
+def test_otherwise_the_allowlist_release_is_not_installed_and_not_needed(case):
+    found = releases_of("0020-auth.yaml.gotmpl", OFF_CASES[case], env="staging")
+    assert found[ALLOWLIST_RELEASE]["installed"] is False, case
+    assert f"celine-staging/{ALLOWLIST_RELEASE}" not in found["keycloak"].get("needs", []), case
+
+
+def test_traefik_without_admin_public_has_no_console_ingress():
+    for case in ("traefik, admin_public unset", "traefik, admin_public off"):
+        docs = docs_of(render("0020-auth.yaml.gotmpl", "keycloak", env="staging", override=OFF_CASES[case]))
+        assert ingress_named(docs, CONSOLE_INGRESS) is None, case
+
+
+@pytest.mark.parametrize("case", ["traefik, admin_public on", *OFF_CASES])
+def test_auth_setup_never_renders_the_middleware(case):
+    override = OFF_CASES.get(case, "domain: example.org\n" + TRAEFIK + ADMIN_PUBLIC)
+    # auth-setup has Traefik Middlewares of its own (oauth2-proxy); never the allowlist
+    assert not allowlist_middlewares(docs_of(render("0020-auth.yaml.gotmpl", "auth-setup", env="staging",
+                                                    override=override))), case
+
+
+@pytest.mark.parametrize("release", ["keycloak", ALLOWLIST_RELEASE])
+@pytest.mark.parametrize("env,extra", [("prod", ""), ("staging", "celine_env: prod\n"), ("staging", "celine_env: ' Prod'\n")])
+def test_traefik_prod_never_renders_the_admin_console_on_the_public_host(release, env, extra):
+    result = traefik_render(release, extra + ADMIN_PUBLIC, env=env)
+    assert result.returncode != 0
+    assert "keycloak.admin_public is never enabled in prod" in result.stderr
+
+
+@pytest.mark.parametrize("release", ["keycloak", ALLOWLIST_RELEASE])
+@pytest.mark.parametrize("ranges", ["", "    allow_source_ranges: []\n", "    allow_source_ranges: [0.0.0.0/0]\n",
+                                    "    allow_source_ranges: ['::/0']\n", "    allow_source_ranges: [10.0.0.0/8, 0.0.0.0/0]\n",
+                                    "    allow_source_ranges: 192.168.1.47/32\n"])
+def test_traefik_allowlist_is_required_and_never_everyone(release, ranges):
+    result = traefik_render(release, f"keycloak:\n  admin_public:\n    enabled: true\n{ranges}")
+    assert result.returncode != 0
+    assert "keycloak.admin_public.allow_source_ranges" in result.stderr
+
+
+@pytest.mark.parametrize("release", ["keycloak", ALLOWLIST_RELEASE])
+@pytest.mark.parametrize("ranges", ["    allow_source_ranges: [192.168.1.47]\n", "    allow_source_ranges: [not-a-range]\n"])
+def test_traefik_allowlist_entries_are_cidrs(release, ranges):
+    result = traefik_render(release, f"keycloak:\n  admin_public:\n    enabled: true\n{ranges}")
+    assert result.returncode != 0
+    assert "keycloak.admin_public.allow_source_ranges" in result.stderr
+
+
+# ---------------------------------------------------------------------------
+# named realms' consoles only (keycloak.admin_public.realms), never master's
+# ---------------------------------------------------------------------------
+# With `realms`, the public host serves each listed realm's console and its admin REST API,
+# plus the few shared admin endpoints a realm console calls, and nothing of master's. The
+# shared list was measured on Keycloak 26.8.1 (2026-11-24): /admin/serverinfo only.
+
+REALMS = ADMIN_PUBLIC + "    realms: [celine-staging]\n"
+REALM_PATHS = {
+    "/admin/celine-staging/": "Prefix",        # the realm console
+    "/admin/realms/celine-staging": "Exact",   # the realm, through the admin REST API
+    "/admin/realms/celine-staging/": "Prefix", # everything under it
+    "/admin/serverinfo": "Exact",              # shared (measured)
+}
+
+
+@pytest.fixture(scope="module", params=["nginx", "traefik"])
+def realm_console(request) -> list[dict]:
+    if request.param == "traefik":
+        return docs_of(traefik_render("keycloak", REALMS))
+    return docs_of(render("0020-auth.yaml.gotmpl", "keycloak", env="staging", override="domain: example.org\n" + REALMS))
+
+
+def test_with_realms_only_their_consoles_and_the_shared_endpoints_are_routed(realm_console):
+    assert paths_of(ingress_named(realm_console, CONSOLE_INGRESS)) == REALM_PATHS
+
+
+def routed(path: str, paths: dict[str, str]) -> bool:
+    """Whether a path reaches Keycloak, under either controller's reading of Prefix: whole
+    segments (Kubernetes, ingress-nginx) or a plain string prefix (Traefik's PathPrefix)."""
+    for rule, kind in paths.items():
+        if kind == "Exact" and path == rule:
+            return True
+        if kind == "Prefix" and (path == rule or path.startswith(rule)
+                                 or path.startswith(rule.rstrip("/") + "/") or path == rule.rstrip("/")):
+            return True
+    return False
+
+
+@pytest.mark.parametrize("path", ["/admin", "/admin/", "/admin/master/console/", "/admin/master/console/#/master",
+                                  "/admin/realms/master", "/admin/realms/master/users",
+                                  "/realms/master", "/realms/master/protocol/openid-connect/token",
+                                  "/admin/celine-preprod/console/", "/admin/realms/celine-preprod/users",
+                                  "/admin/celine-warehouse/console/", "/admin/realms/celine-staging2/users",
+                                  "/admin/realms", "/admin/serverinfo/x"])
+def test_with_realms_master_and_other_realms_are_never_routed(path, realm_console):
+    console = ingress_named(realm_console, CONSOLE_INGRESS)
+    assert not routed(path, paths_of(console)), path
+    public = ingress_named(realm_console, PUBLIC_INGRESS)
+    assert not any(p.startswith("/realms/master") or p.startswith("/admin") for p in paths_of(public))
+
+
+@pytest.mark.parametrize("path", ["/admin/celine-staging/console/", "/admin/realms/celine-staging",
+                                  "/admin/realms/celine-staging/users", "/admin/serverinfo"])
+def test_with_realms_the_realm_console_is_routed(path, realm_console):
+    assert routed(path, paths_of(ingress_named(realm_console, CONSOLE_INGRESS))), path
+
+
+@pytest.mark.parametrize("realms", ["[master]", "[celine-staging, master]"])
+def test_master_is_never_a_public_console_realm(realms):
+    result = traefik_render("keycloak", ADMIN_PUBLIC + f"    realms: {realms}\n")
+    assert result.returncode != 0
+    assert "keycloak.admin_public.realms must not name master" in result.stderr
+
+
+@pytest.mark.parametrize("realms", ["[]", "celine-staging", "['']"])
+def test_realms_is_a_non_empty_list_of_names(realms):
+    result = traefik_render("keycloak", ADMIN_PUBLIC + f"    realms: {realms}\n")
+    assert result.returncode != 0
+    assert "keycloak.admin_public.realms" in result.stderr

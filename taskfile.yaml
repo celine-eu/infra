@@ -305,6 +305,18 @@ tasks:
           https://*)
             # keycloak.admin_public: the console moved to the public host, the forward would
             # only redirect there (README, "Keycloak admin access").
+            # With keycloak.admin_public.realms the console Ingress serves only those realms'
+            # consoles (`/admin/<realm>/`): read them from it. master's console is not there,
+            # nor on the forward (KC_HOSTNAME_ADMIN is the public host for the whole instance).
+            PATHS=$(kubectl get ingress -n "$NS" {{ .STATEFULSET }}-console \
+              -o jsonpath='{.spec.rules[*].http.paths[*].path}' 2>/dev/null || true)
+            REALMS=$(printf '%s\n' $PATHS | sed -n 's|^/admin/\([^/]*\)/$|\1|p' | grep -vx realms || true)
+            if [ -n "$REALMS" ]; then
+              echo "The admin consoles of $NS are on the public host (keycloak.admin_public.realms), from its allowlist only:"
+              for R in $REALMS; do echo "  $URL/admin/$R/console/"; done
+              echo "master is administered by API and CLI only (policies-shell, bootstrap client): its console is on neither the public host nor the forward."
+              exit 0
+            fi
             echo "The admin console of $NS is on the public host (keycloak.admin_public), from its allowlist only:"
             echo "  $URL/admin/master/console/"
             exit 0;;
