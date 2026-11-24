@@ -121,14 +121,21 @@ spec:
                   print(f"master frontendUrl: {message}")
                   sys.exit(1)
 
-              def settled(read, ok, attempts=10, pause=1.0):
-                  """True once `ok(read())` holds, trying `attempts` times `pause` seconds apart."""
-                  for attempt in range(attempts):
+              # How long a write may take to show in master's reads and issuer: prod's Keycloak
+              # 26.7.3 returned the old map for a read or two (2026-10-19), staging's 26.8.1 for
+              # over ten seconds (2026-11-24). The environment shortens it for the chart's tests.
+              window = float(os.environ.get("MASTER_FRONTEND_URL_SETTLE_SECONDS", "120"))
+              pause = float(os.environ.get("MASTER_FRONTEND_URL_SETTLE_PAUSE", "3"))
+
+              def settled(read, ok):
+                  """True once `ok(read())` holds, reading every `pause` seconds for `window` seconds."""
+                  deadline = time.monotonic() + window
+                  while True:
                       if ok(read()):
                           return True
-                      if attempt < attempts - 1:
-                          time.sleep(pause)
-                  return False
+                      if time.monotonic() + pause > deadline:
+                          return False
+                      time.sleep(pause)
 
               with httpx.Client(timeout=30) as http:
                   r = http.post(f"{base}/realms/master/protocol/openid-connect/token",
@@ -149,16 +156,16 @@ spec:
                       r = http.put(realm_url, headers=headers, json={"attributes": attributes})
                       if r.status_code not in (200, 204):
                           fail(f"writing master: HTTP {r.status_code}")
-                      # A read right after the write can still return the old map (prod,
-                      # Keycloak 26.7.3, 2026-10-19): read again for a few seconds.
+                      # A read right after the write can still return the old map (see
+                      # `window` above): read again until it shows, or the window ends.
                       if not settled(lambda: http.get(realm_url, headers=headers),
                                      lambda r: r.status_code == 200 and (r.json().get("attributes") or {}).get("frontendUrl") == url):
-                          fail(f"master accepted {url} but it did not take")
+                          fail(f"master accepted {url} but it did not take within {window:g}s")
                       print(f"master frontendUrl: {current or '<unset>'} -> {url}")
                   discovery = f"{base}/realms/master/.well-known/openid-configuration"
                   if not settled(lambda: http.get(discovery),
                                  lambda r: r.status_code == 200 and r.json().get("issuer") == f"{url}/realms/master"):
-                      fail(f"master's issuer is {http.get(discovery).json().get('issuer')}, not {url}/realms/master")
+                      fail(f"master's issuer is {http.get(discovery).json().get('issuer')}, not {url}/realms/master, after {window:g}s")
               PY
                 cat $D/frontend-url.txt
                 [ "$rc" -eq 0 ] && rc=$frc

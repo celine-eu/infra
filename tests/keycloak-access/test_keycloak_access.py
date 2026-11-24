@@ -38,6 +38,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -354,13 +355,25 @@ class FakeMaster:
 
     PUBLIC_ISSUER = "https://keycloak.example.org/realms/master"
 
-    def __init__(self, attributes: dict, secret: str, stale_reads: int = 0):
+    def stale(self) -> bool:
+        """True while a read must still see the map from before the last write."""
+        if self.stale_left > 0:
+            self.stale_left -= 1
+            return True
+        return time.monotonic() < self.stale_until
+
+    def __init__(self, attributes: dict, secret: str, stale_reads: int = 0, stale_for: float = 0.0):
         self.attributes = dict(attributes)
         self.secret = secret
         # realm reads right after a write that still return the map from before it, as prod's
         # Keycloak 26.7.3 did once on 2026-10-19 (the next run found the value set)
         self.stale_reads = stale_reads
         self.stale_left = 0
+        # the same, for a time rather than a number of reads: staging's Keycloak 26.8.1 on
+        # 2026-11-24 still returned the old map after ten reads a second apart, and the realm's
+        # issuer with it (the pod started a few minutes later found both set)
+        self.stale_for = stale_for
+        self.stale_until = 0.0
         self.before_write: dict = {}
         self.calls: list[tuple[str, str, object]] = []
         fake = self
@@ -394,13 +407,11 @@ class FakeMaster:
             def do_GET(self):
                 fake.calls.append(("GET", self.path, None))
                 if self.path == "/realms/master/.well-known/openid-configuration":
-                    front = fake.attributes.get("frontendUrl")
+                    seen = fake.before_write if time.monotonic() < fake.stale_until else fake.attributes
+                    front = seen.get("frontendUrl")
                     self.reply(200, {"issuer": f"{front}/realms/master" if front else fake.PUBLIC_ISSUER})
                 elif self.path == "/admin/realms/master" and self.authorized():
-                    seen = fake.attributes
-                    if fake.stale_left > 0:
-                        fake.stale_left -= 1
-                        seen = fake.before_write
+                    seen = fake.before_write if fake.stale() else fake.attributes
                     self.reply(200, {"realm": "master", "attributes": dict(seen)})
                 else:
                     self.reply(403)
@@ -411,6 +422,7 @@ class FakeMaster:
                 if self.path == "/admin/realms/master" and self.authorized():
                     fake.before_write = dict(fake.attributes)
                     fake.stale_left = fake.stale_reads
+                    fake.stale_until = time.monotonic() + fake.stale_for
                     fake.attributes = rep["attributes"]  # Keycloak replaces the map whole
                     self.reply(204)
                 else:
@@ -420,8 +432,9 @@ class FakeMaster:
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
         self.url = f"http://127.0.0.1:{self.server.server_port}"
 
-    def run(self, step: str, url: str, secret: str) -> subprocess.CompletedProcess:
+    def run(self, step: str, url: str, secret: str, **extra: str) -> subprocess.CompletedProcess:
         env = {"PATH": os.environ.get("PATH", ""), "MASTER_FRONTEND_URL": url, "CELINE_KEYCLOAK_BASE_URL": self.url}
+        env.update(extra)
         if secret:
             env["CELINE_KEYCLOAK_BOOTSTRAP_CLIENT_SECRET"] = secret
         return subprocess.run([sys.executable, "-"], input=step, capture_output=True, text=True, env=env, timeout=60)
@@ -434,8 +447,8 @@ class FakeMaster:
 def fake_master():
     masters = []
 
-    def make(attributes: dict, secret: str = SECRET, stale_reads: int = 0) -> FakeMaster:
-        masters.append(FakeMaster(attributes, secret, stale_reads))
+    def make(attributes: dict, secret: str = SECRET, stale_reads: int = 0, stale_for: float = 0.0) -> FakeMaster:
+        masters.append(FakeMaster(attributes, secret, stale_reads, stale_for))
         return masters[-1]
 
     yield make
@@ -471,12 +484,36 @@ def test_a_write_read_back_stale_a_few_times_still_passes(shell_dev, fake_master
     assert len(master.puts()) == 1
 
 
-def test_a_write_that_never_takes_still_fails(shell_dev, fake_master):
-    master = fake_master({"frontendUrl": "https://keycloak.example.org"}, stale_reads=1000)
-    result = master.run(frontend_url_step(shell_dev), "http://localhost:18080", SECRET)
-    assert result.returncode == 1 and "did not take" in result.stdout
+# The read-back waits for a time, not a number of reads: the window and the pause are the
+# step's own defaults in the pod, shortened here through the environment.
+FAST = {"MASTER_FRONTEND_URL_SETTLE_SECONDS": "3", "MASTER_FRONTEND_URL_SETTLE_PAUSE": "0.1"}
+
+
+def test_a_write_and_issuer_stale_for_longer_than_ten_reads_still_pass(shell_dev, fake_master):
+    # staging, Keycloak 26.8.1, 2026-11-24: still stale after ten reads a second apart
+    master = fake_master({"frontendUrl": "https://keycloak.example.org"}, stale_for=1.5)
+    result = master.run(frontend_url_step(shell_dev), "http://localhost:18080", SECRET, **FAST)
+    assert result.returncode == 0, result.stdout + result.stderr
     reads = [c for c in master.calls if c == ("GET", "/admin/realms/master", None)]
-    assert len(reads) <= 12  # bounded: one read before the write, a few after
+    assert len(reads) > 11 and len(master.puts()) == 1
+    assert "-> http://localhost:18080" in result.stdout
+
+
+def test_a_write_that_never_takes_still_fails_within_the_window(shell_dev, fake_master):
+    master = fake_master({"frontendUrl": "https://keycloak.example.org"}, stale_for=3600)
+    started = time.monotonic()
+    result = master.run(frontend_url_step(shell_dev), "http://localhost:18080", SECRET,
+                        MASTER_FRONTEND_URL_SETTLE_SECONDS="1", MASTER_FRONTEND_URL_SETTLE_PAUSE="0.1")
+    assert result.returncode == 1 and "did not take" in result.stdout
+    assert "within 1s" in result.stdout
+    assert time.monotonic() - started < 10  # bounded by the window, not by the fake
+
+
+def test_the_step_waits_two_minutes_by_default(shell_dev):
+    # long enough for what staging measured (over 10 s), short enough for an init container
+    step = frontend_url_step(shell_dev)
+    assert re.search(r'"MASTER_FRONTEND_URL_SETTLE_SECONDS",\s*"120"', step)
+    assert re.search(r'"MASTER_FRONTEND_URL_SETTLE_PAUSE",\s*"3"', step)
 
 
 def test_without_the_bootstrap_client_secret_master_is_left_alone(shell_dev, fake_master):
