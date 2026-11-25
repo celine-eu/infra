@@ -25,6 +25,18 @@ oauth2Proxy:
   # `allowed_groups`; realm roles are `role:<name>`), for an environment whose sso fronts
   # admin UIs only. Unset: every signed-in user passes, as before.
   allowedGroups: {{ .Environment.Values | dig "auth_setup" "allowed_groups" list | toJson }}
+  {{- /* `auth_setup.cookie_name`: the session cookie's name (oauth2-proxy `cookie_name`; the
+         CSRF cookie becomes `<name>_csrf`). An environment whose domain sits under another's
+         (staging under prod) needs its own: the browser sends the outer one's `.<domain>`
+         cookie to the inner one's hosts too. A plain token only: no `__Host-`/`__Secure-`
+         prefix (they forbid the Domain attribute oauth2-proxy sets). Unset: `_oauth2_proxy`. */}}
+  {{- if hasKey (.Environment.Values | dig "auth_setup" (dict) | default (dict)) "cookie_name" }}
+  {{- $cookieName := .Environment.Values.auth_setup.cookie_name }}
+  {{- if not (and (kindIs "string" $cookieName) (regexMatch "^[A-Za-z0-9_][A-Za-z0-9_.-]*$" (toString $cookieName)) (not (hasPrefix "__Host-" (toString $cookieName))) (not (hasPrefix "__Secure-" (toString $cookieName)))) }}
+  {{- fail (printf "auth_setup.cookie_name must be a plain cookie name (letters, digits, _ . -; no __Host-/__Secure- prefix), got %q" (toString $cookieName)) }}
+  {{- end }}
+  cookieName: {{ $cookieName | quote }}
+  {{- end }}
   {{- /* `ingress_controller.annotations: traefik`: the admin UIs' forwardAuth address is the
          proxy's root (defaults/0020-auth/oauth2-proxy), so a session must answer 2xx there:
          static://202. Traefik treats anything else as a refusal and returns it as is. */}}

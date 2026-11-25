@@ -22,6 +22,11 @@ data:
     # app) then sees no organization at all.
     scope = "openid email profile organization:*"
     cookie_domains = [ ".{{ .Values.domain }}" ]
+    {{- with .Values.oauth2Proxy.cookieName }}
+    # A name of its own (auth_setup.cookie_name): an outer environment's `.<domain>` cookie,
+    # sent to these hosts too, is then not read as this proxy's.
+    cookie_name = {{ . | quote }}
+    {{- end }}
     whitelist_domains = [ ".{{ .Values.domain }}" ]
     skip_provider_button = true
     set_xauthrequest = true
