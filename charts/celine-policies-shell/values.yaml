@@ -100,6 +100,9 @@ bootstrap:
   # through a port-forward signs in to master through this URL, so it must equal Keycloak's
   # KC_HOSTNAME_ADMIN. Empty: master is left alone.
   masterFrontendUrl: ""
+  # This shell's realm's Frontend URL (REALM_FRONTEND_URL), for a realm served on another
+  # host than KC_HOSTNAME; empty: the realm is left alone. Converged by the same step.
+  realmFrontendUrl: ""
   waitRetries: 20
   waitDelaySeconds: 15
   # An overlay on platform.yaml (realm_settings.supportedLocales and platform_admin.users,

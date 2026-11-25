@@ -1,0 +1,39 @@
+{{- /* A realm of this Keycloak on an internal host (README, "Keycloak admin access"):
+       `keycloak.internal_ingress` {host, cluster_issuer, realms}. helmfile.d/0020-auth
+       installs the release only with keycloak.enabled and a `realms` key. The realm's issuer
+       follows its own frontendUrl, set by its policies-shell (`keycloak.realm_frontend_url`);
+       it leaves the public host through `keycloak.public_realms`. */}}
+{{- $ii := .Environment.Values | dig "keycloak" "internal_ingress" (dict) | default (dict) }}
+{{- $host := $ii | dig "host" "" | toString | trim }}
+{{- if not $host }}
+{{- fail "keycloak.internal_ingress.host is required with keycloak.internal_ingress.realms: the internal host, e.g. auth.celine.apps.labs" }}
+{{- end }}
+{{- $issuer := $ii | dig "cluster_issuer" "" | toString | trim }}
+{{- if not $issuer }}
+{{- fail "keycloak.internal_ingress.cluster_issuer is required with keycloak.internal_ingress.realms: the ClusterIssuer of the internal host's certificate, e.g. platform-ca" }}
+{{- end }}
+{{- $realms := $ii | dig "realms" nil }}
+{{- if not (and (kindIs "slice" $realms) $realms) }}
+{{- fail "keycloak.internal_ingress.realms is a non-empty list of realm names, e.g. [celine-warehouse]" }}
+{{- end }}
+{{- range $realms }}
+{{- if not (regexMatch "^[A-Za-z0-9][A-Za-z0-9._-]*$" (toString .)) }}
+{{- fail (printf "keycloak.internal_ingress.realms: %q is not a realm name" (toString .)) }}
+{{- end }}
+{{- if eq (toString .) "master" }}
+{{- fail "keycloak.internal_ingress.realms must not name master: master is reached only through a port-forward" }}
+{{- end }}
+{{- end }}
+{{- $ic := .Values | dig "ingress_controller" (dict) | default (dict) }}
+{{- $ns := .Environment.Values | dig "namespace" (printf "celine-%s" .Environment.Name) | toString }}
+host: {{ $host | quote }}
+clusterIssuer: {{ $issuer | quote }}
+realms: {{ $realms | toJson }}
+ingressClassName: {{ $ic | dig "class" "nginx" | quote }}
+annotations:
+  {{- if eq ($ic | dig "annotations" "nginx" | toString) "traefik" }}
+  traefik.ingress.kubernetes.io/router.entrypoints: {{ $ic | dig "entrypoint" "websecure" | quote }}
+  {{- with $ic | dig "tls_options" "" }}
+  traefik.ingress.kubernetes.io/router.tls.options: {{ printf "%s-%s@kubernetescrd" $ns . | quote }}
+  {{- end }}
+  {{- end }}

@@ -96,34 +96,46 @@ spec:
                 $BOOTSTRAP --check > $D/check.txt 2>&1 || rc=$?
                 cat $D/check.txt
               fi
-              # 4. master's Frontend URL: the admin console's port-forward URL (KC_HOSTNAME_ADMIN),
-              #    or the console never signs in to master. Not a platform.yaml key (celine-policies
-              #    has none for it), so converged here: as the bootstrap client, read master, merge
-              #    frontendUrl into the attributes read back (a PUT replaces `attributes` whole),
-              #    write only if it differs, then check master's issuer. Runs even when a step
-              #    above failed, so the console stays reachable to repair it. Never prints the
-              #    secret or the token.
-              if [ "$reachable" -eq 1 ] && [ -n "$MASTER_FRONTEND_URL" ]; then
+              # 4. Frontend URLs: master's (MASTER_FRONTEND_URL), the admin console's URL
+              #    (KC_HOSTNAME_ADMIN), or the console never signs in to master; and this shell's
+              #    realm's (REALM_FRONTEND_URL), when the realm is served on another host than
+              #    KC_HOSTNAME (keycloak.internal_ingress). Not platform.yaml keys (celine-policies
+              #    has none for them), so converged here: as the bootstrap client, read the realm,
+              #    merge frontendUrl into the attributes read back (a PUT replaces `attributes`
+              #    whole), write only if it differs, then check the realm's issuer. Runs even when
+              #    a step above failed, so the console stays reachable to repair it. Never prints
+              #    the secret or the token.
+              if [ "$reachable" -eq 1 ] && { [ -n "$MASTER_FRONTEND_URL" ] || [ -n "$REALM_FRONTEND_URL" ]; }; then
                 frc=0
                 python - > $D/frontend-url.txt 2>&1 <<'PY' || frc=$?
               import os, sys, time
               import httpx
 
-              url = os.environ["MASTER_FRONTEND_URL"].rstrip("/")
               base = os.environ["CELINE_KEYCLOAK_BASE_URL"].rstrip("/")
               client_id = os.environ.get("CELINE_KEYCLOAK_BOOTSTRAP_CLIENT_ID") or "svc-celine-policies-bootstrap"
               secret = os.environ.get("CELINE_KEYCLOAK_BOOTSTRAP_CLIENT_SECRET", "")
+              wanted = []  # (realm, url)
+              if os.environ.get("MASTER_FRONTEND_URL"):
+                  wanted.append(("master", os.environ["MASTER_FRONTEND_URL"].rstrip("/")))
+              if os.environ.get("REALM_FRONTEND_URL"):
+                  realm = os.environ.get("CELINE_KEYCLOAK_REALM", "")
+                  if not realm or realm == "master":
+                      print(f"realm frontendUrl: REALM_FRONTEND_URL is for the shell's own realm, never master (realm {realm or '<unset>'})")
+                      sys.exit(1)
+                  wanted.append((realm, os.environ["REALM_FRONTEND_URL"].rstrip("/")))
               if not secret:
-                  print(f"master frontendUrl: no bootstrap client secret, left alone (want {url}; README 'Keycloak admin access')")
+                  for realm, url in wanted:
+                      print(f"{realm} frontendUrl: no bootstrap client secret, left alone (want {url}; README 'Keycloak admin access')")
                   sys.exit(0)
 
               def fail(message):
-                  print(f"master frontendUrl: {message}")
+                  print(message)
                   sys.exit(1)
 
-              # How long a write may take to show in master's reads and issuer: prod's Keycloak
-              # 26.7.3 returned the old map for a read or two (2026-10-19), staging's 26.8.1 for
-              # over ten seconds (2026-11-24). The environment shortens it for the chart's tests.
+              # How long a write may take to show in the realm's reads and issuer: prod's
+              # Keycloak 26.7.3 returned the old map for a read or two (2026-10-19), staging's
+              # 26.8.1 for over ten seconds (2026-11-24). The environment shortens it for the
+              # chart's tests.
               window = float(os.environ.get("MASTER_FRONTEND_URL_SETTLE_SECONDS", "120"))
               pause = float(os.environ.get("MASTER_FRONTEND_URL_SETTLE_PAUSE", "3"))
 
@@ -141,31 +153,32 @@ spec:
                   r = http.post(f"{base}/realms/master/protocol/openid-connect/token",
                                 data={"grant_type": "client_credentials", "client_id": client_id, "client_secret": secret})
                   if r.status_code != 200:
-                      fail(f"signing in to master as {client_id}: HTTP {r.status_code}")
+                      fail(f"frontendUrl: signing in to master as {client_id}: HTTP {r.status_code}")
                   headers = {"Authorization": "Bearer " + r.json()["access_token"]}
-                  realm_url = f"{base}/admin/realms/master"
-                  r = http.get(realm_url, headers=headers)
-                  if r.status_code != 200:
-                      fail(f"reading master: HTTP {r.status_code}")
-                  attributes = dict(r.json().get("attributes") or {})
-                  current = attributes.get("frontendUrl") or ""
-                  if current == url:
-                      print(f"master frontendUrl: {url}, no change")
-                  else:
-                      attributes["frontendUrl"] = url
-                      r = http.put(realm_url, headers=headers, json={"attributes": attributes})
-                      if r.status_code not in (200, 204):
-                          fail(f"writing master: HTTP {r.status_code}")
-                      # A read right after the write can still return the old map (see
-                      # `window` above): read again until it shows, or the window ends.
-                      if not settled(lambda: http.get(realm_url, headers=headers),
-                                     lambda r: r.status_code == 200 and (r.json().get("attributes") or {}).get("frontendUrl") == url):
-                          fail(f"master accepted {url} but it did not take within {window:g}s")
-                      print(f"master frontendUrl: {current or '<unset>'} -> {url}")
-                  discovery = f"{base}/realms/master/.well-known/openid-configuration"
-                  if not settled(lambda: http.get(discovery),
-                                 lambda r: r.status_code == 200 and r.json().get("issuer") == f"{url}/realms/master"):
-                      fail(f"master's issuer is {http.get(discovery).json().get('issuer')}, not {url}/realms/master, after {window:g}s")
+                  for realm, url in wanted:
+                      realm_url = f"{base}/admin/realms/{realm}"
+                      r = http.get(realm_url, headers=headers)
+                      if r.status_code != 200:
+                          fail(f"{realm} frontendUrl: reading {realm}: HTTP {r.status_code}")
+                      attributes = dict(r.json().get("attributes") or {})
+                      current = attributes.get("frontendUrl") or ""
+                      if current == url:
+                          print(f"{realm} frontendUrl: {url}, no change")
+                      else:
+                          attributes["frontendUrl"] = url
+                          r = http.put(realm_url, headers=headers, json={"attributes": attributes})
+                          if r.status_code not in (200, 204):
+                              fail(f"{realm} frontendUrl: writing {realm}: HTTP {r.status_code}")
+                          # A read right after the write can still return the old map (see
+                          # `window` above): read again until it shows, or the window ends.
+                          if not settled(lambda: http.get(realm_url, headers=headers),
+                                         lambda r: r.status_code == 200 and (r.json().get("attributes") or {}).get("frontendUrl") == url):
+                              fail(f"{realm} frontendUrl: {realm} accepted {url} but it did not take within {window:g}s")
+                          print(f"{realm} frontendUrl: {current or '<unset>'} -> {url}")
+                      discovery = f"{base}/realms/{realm}/.well-known/openid-configuration"
+                      if not settled(lambda: http.get(discovery),
+                                     lambda r: r.status_code == 200 and r.json().get("issuer") == f"{url}/realms/{realm}"):
+                          fail(f"{realm} frontendUrl: {realm}'s issuer is {http.get(discovery).json().get('issuer')}, not {url}/realms/{realm}, after {window:g}s")
               PY
                 cat $D/frontend-url.txt
                 [ "$rc" -eq 0 ] && rc=$frc
@@ -184,6 +197,10 @@ spec:
             {{- end }}
             {{- with .Values.bootstrap.masterFrontendUrl }}
             - name: MASTER_FRONTEND_URL
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.bootstrap.realmFrontendUrl }}
+            - name: REALM_FRONTEND_URL
               value: {{ . | quote }}
             {{- end }}
             {{- with .Values.bootstrap.smtp }}

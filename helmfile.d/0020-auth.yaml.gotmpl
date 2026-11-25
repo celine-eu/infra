@@ -91,6 +91,21 @@ releases:
     labels:
       group: auth
 
+  # A realm of this Keycloak on an internal host (keycloak.internal_ingress: host,
+  # cluster_issuer, realms): its own Ingress, so the realm's sign-in never answers on the
+  # public host. Installed with the keycloak release and a `realms` key only.
+  - name: keycloak-internal-ingress
+    namespace: {{ $ns }}
+    chart: ../charts/keycloak-internal-ingress
+    version: 0.1.0
+    installed: {{ and $keycloakOn (hasKey (.Environment.Values | dig "keycloak" "internal_ingress" (dict) | default (dict)) "realms") }}
+    createNamespace: true
+    missingFileHandler: Warn
+    values:
+      - ../defaults/0020-auth/keycloak-internal-ingress/values.yaml.gotmpl
+    labels:
+      group: auth
+
   - name: oauth2-proxy
     namespace: {{ $ns }}
     chart: oauth2-proxy/oauth2-proxy

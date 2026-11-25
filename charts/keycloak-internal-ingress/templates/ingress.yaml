@@ -1,0 +1,45 @@
+{{- /* Each realm as `/realms/<realm>` (Exact) and `/realms/<realm>/` (Prefix): Traefik reads
+       Prefix as a plain string prefix, so `/realms/<realm>` alone would also match
+       `/realms/<realm>2`. `/resources/` carries the sign-in pages' static files. */}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: keycloak-internal
+  annotations:
+    cert-manager.io/cluster-issuer: {{ required "clusterIssuer" .Values.clusterIssuer | quote }}
+    {{- range $k, $v := .Values.annotations }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingressClassName | quote }}
+  tls:
+    - hosts:
+        - {{ required "host" .Values.host | quote }}
+      secretName: keycloak-internal-tls
+  rules:
+    - host: {{ .Values.host | quote }}
+      http:
+        paths:
+          {{- range .Values.realms }}
+          - path: /realms/{{ . }}
+            pathType: Exact
+            backend:
+              service:
+                name: {{ $.Values.service.name }}
+                port:
+                  name: {{ $.Values.service.port }}
+          - path: /realms/{{ . }}/
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $.Values.service.name }}
+                port:
+                  name: {{ $.Values.service.port }}
+          {{- end }}
+          - path: /resources/
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.service.name }}
+                port:
+                  name: {{ .Values.service.port }}

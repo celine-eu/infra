@@ -1,0 +1,8 @@
+apiVersion: v2
+name: keycloak-internal-ingress
+description: >-
+  Listed realms of a Keycloak on an internal host (keycloak.internal_ingress): one Ingress
+  with /realms/<realm> and /resources/ only, its certificate from a ClusterIssuer. Nothing
+  of /admin, never master.
+type: application
+version: 0.1.0

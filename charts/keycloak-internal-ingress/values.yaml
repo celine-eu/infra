@@ -1,0 +1,10 @@
+# infra fills these from `keycloak.internal_ingress` (defaults/0020-auth/keycloak-internal-ingress).
+host: ""
+clusterIssuer: ""
+realms: []
+ingressClassName: traefik
+# Ingress annotations besides the certificate's (the Traefik entrypoint and TLS options).
+annotations: {}
+service:
+  name: keycloak-keycloakx-http
+  port: http

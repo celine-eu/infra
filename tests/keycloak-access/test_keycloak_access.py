@@ -362,8 +362,12 @@ class FakeMaster:
             return True
         return time.monotonic() < self.stale_until
 
-    def __init__(self, attributes: dict, secret: str, stale_reads: int = 0, stale_for: float = 0.0):
+    def __init__(self, attributes: dict, secret: str, stale_reads: int = 0, stale_for: float = 0.0,
+                 realms: dict | None = None):
         self.attributes = dict(attributes)
+        # realms other than master (name -> attributes), read and written as master is,
+        # without staleness; their issuer follows their own frontendUrl, as Keycloak's does
+        self.realms = {k: dict(v) for k, v in (realms or {}).items()}
         self.secret = secret
         # realm reads right after a write that still return the map from before it, as prod's
         # Keycloak 26.7.3 did once on 2026-10-19 (the next run found the value set)
@@ -413,6 +417,15 @@ class FakeMaster:
                 elif self.path == "/admin/realms/master" and self.authorized():
                     seen = fake.before_write if fake.stale() else fake.attributes
                     self.reply(200, {"realm": "master", "attributes": dict(seen)})
+                elif self.path.startswith("/admin/realms/") and self.authorized() \
+                        and self.path[len("/admin/realms/"):] in fake.realms:
+                    name = self.path[len("/admin/realms/"):]
+                    self.reply(200, {"realm": name, "attributes": dict(fake.realms[name])})
+                elif self.path.startswith("/realms/") and self.path.endswith("/.well-known/openid-configuration") \
+                        and self.path.split("/")[2] in fake.realms:
+                    name = self.path.split("/")[2]
+                    front = fake.realms[name].get("frontendUrl")
+                    self.reply(200, {"issuer": f"{front or 'https://keycloak.example.org'}/realms/{name}"})
                 else:
                     self.reply(403)
 
@@ -425,6 +438,10 @@ class FakeMaster:
                     fake.stale_until = time.monotonic() + fake.stale_for
                     fake.attributes = rep["attributes"]  # Keycloak replaces the map whole
                     self.reply(204)
+                elif self.path.startswith("/admin/realms/") and self.authorized() \
+                        and self.path[len("/admin/realms/"):] in fake.realms:
+                    fake.realms[self.path[len("/admin/realms/"):]] = rep["attributes"]
+                    self.reply(204)
                 else:
                     self.reply(403)
 
@@ -433,7 +450,9 @@ class FakeMaster:
         self.url = f"http://127.0.0.1:{self.server.server_port}"
 
     def run(self, step: str, url: str, secret: str, **extra: str) -> subprocess.CompletedProcess:
-        env = {"PATH": os.environ.get("PATH", ""), "MASTER_FRONTEND_URL": url, "CELINE_KEYCLOAK_BASE_URL": self.url}
+        env = {"PATH": os.environ.get("PATH", ""), "CELINE_KEYCLOAK_BASE_URL": self.url}
+        if url:
+            env["MASTER_FRONTEND_URL"] = url
         env.update(extra)
         if secret:
             env["CELINE_KEYCLOAK_BOOTSTRAP_CLIENT_SECRET"] = secret
@@ -447,8 +466,9 @@ class FakeMaster:
 def fake_master():
     masters = []
 
-    def make(attributes: dict, secret: str = SECRET, stale_reads: int = 0, stale_for: float = 0.0) -> FakeMaster:
-        masters.append(FakeMaster(attributes, secret, stale_reads, stale_for))
+    def make(attributes: dict, secret: str = SECRET, stale_reads: int = 0, stale_for: float = 0.0,
+             realms: dict | None = None) -> FakeMaster:
+        masters.append(FakeMaster(attributes, secret, stale_reads, stale_for, realms))
         return masters[-1]
 
     yield make
@@ -529,6 +549,76 @@ def test_a_rejected_client_fails_the_step_without_printing_the_secret(shell_dev,
     result = master.run(frontend_url_step(shell_dev), "http://localhost:18080", secret)
     assert result.returncode == 1 and "HTTP 401" in result.stdout
     assert secret not in result.stdout + result.stderr and master.puts() == []
+
+
+# ---------------------------------------------------------------------------
+# the shell's own realm's Frontend URL (keycloak.realm_frontend_url), and master's override
+# ---------------------------------------------------------------------------
+# A realm served on another host than KC_HOSTNAME (keycloak.internal_ingress) takes its issuer
+# from its own frontendUrl. The same step converges it, as the bootstrap client, for the
+# shell's realm only. Master's URL can be named outright (keycloak.master_frontend_url), so a
+# shell whose realm moved keeps writing the value the instance's other shells write.
+
+INTERNAL_URL = "https://auth.internal.test"
+WAREHOUSE = "celine-warehouse"
+
+
+def test_no_realm_frontend_url_by_default(shell_dev):
+    assert "REALM_FRONTEND_URL" not in env_of(containers(shell_dev)["bootstrap"])
+
+
+def test_realm_frontend_url_reaches_the_bootstrap_init_only():
+    override = (f"keycloak:\n  realm: {WAREHOUSE}\n  realm_frontend_url: {INTERNAL_URL}/\n"
+                f"policies_shell:\n  bootstrap:\n    client_secret: {SECRET}\n")
+    shell = containers(docs_of(policies_shell(override, env="staging")))
+    env = env_of(shell["bootstrap"])
+    assert env["REALM_FRONTEND_URL"]["value"] == INTERNAL_URL
+    assert env["CELINE_KEYCLOAK_REALM"]["value"] == WAREHOUSE
+    assert "REALM_FRONTEND_URL" not in env_of(shell["shell"])
+
+
+@pytest.mark.parametrize("extra", ["", "  admin_public:\n    enabled: true\n    allow_source_ranges: [192.168.1.47/32]\n"])
+def test_master_frontend_url_can_be_named_outright(extra):
+    override = (f"domain: example.org\nkeycloak:\n  master_frontend_url: https://auth.public.test\n{extra}"
+                f"policies_shell:\n  bootstrap:\n    client_secret: {SECRET}\n")
+    shell = containers(docs_of(policies_shell(override, env="staging")))
+    assert env_of(shell["bootstrap"])["MASTER_FRONTEND_URL"]["value"] == "https://auth.public.test"
+
+
+def test_the_step_sets_the_realms_frontend_url_and_leaves_master_alone(shell_dev, fake_master):
+    master = fake_master({"frontendUrl": "https://keycloak.example.org"}, realms={WAREHOUSE: {"x": "1"}})
+    result = master.run(frontend_url_step(shell_dev), "", SECRET,
+                        REALM_FRONTEND_URL=INTERNAL_URL, CELINE_KEYCLOAK_REALM=WAREHOUSE)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert master.realms[WAREHOUSE] == {"x": "1", "frontendUrl": INTERNAL_URL}
+    assert master.attributes == {"frontendUrl": "https://keycloak.example.org"}
+    assert [c[1] for c in master.puts()] == [f"/admin/realms/{WAREHOUSE}"]
+    assert f"{WAREHOUSE} frontendUrl: <unset> -> {INTERNAL_URL}" in result.stdout
+
+
+def test_the_step_converges_master_and_the_realm_together(shell_dev, fake_master):
+    master = fake_master({}, realms={WAREHOUSE: {"frontendUrl": INTERNAL_URL}})
+    result = master.run(frontend_url_step(shell_dev), "https://auth.public.test", SECRET,
+                        REALM_FRONTEND_URL=INTERNAL_URL, CELINE_KEYCLOAK_REALM=WAREHOUSE)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert master.attributes == {"frontendUrl": "https://auth.public.test"}
+    assert f"{WAREHOUSE} frontendUrl: {INTERNAL_URL}, no change" in result.stdout
+    assert [c[1] for c in master.puts()] == ["/admin/realms/master"]
+
+
+def test_the_realm_step_never_names_master(shell_dev, fake_master):
+    master = fake_master({})
+    result = master.run(frontend_url_step(shell_dev), "", SECRET,
+                        REALM_FRONTEND_URL=INTERNAL_URL, CELINE_KEYCLOAK_REALM="master")
+    assert result.returncode == 1 and "master" in result.stdout
+    assert master.puts() == []
+
+
+def test_the_bootstrap_script_runs_the_step_for_a_realm_url_alone():
+    override = (f"keycloak:\n  realm: {WAREHOUSE}\n  realm_frontend_url: {INTERNAL_URL}\n"
+                f"policies_shell:\n  bootstrap:\n    client_secret: {SECRET}\n")
+    script = bootstrap_script(docs_of(policies_shell(override, env="staging")))
+    assert '[ -n "$REALM_FRONTEND_URL" ]' in script
 
 
 # ---------------------------------------------------------------------------

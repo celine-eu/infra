@@ -102,6 +102,20 @@ extraObjects:
 {{- end }}
 {{- end }}
 
+{{- /* `oauth2_proxy.provider_ca` ({configmap, key}): a CA bundle in a ConfigMap of the
+       namespace that oauth2-proxy trusts for its provider, e.g. trust-manager's
+       `platform-ca-bundle` (public roots plus the platform's) for a realm on an internal
+       host (keycloak.internal_ingress). Both keys required; not with tls_setup.self_signed,
+       which mounts its own. */}}
+{{- $providerCa := .Environment.Values | dig "oauth2_proxy" "provider_ca" (dict) | default (dict) }}
+{{- if $providerCa }}
+{{- if not (and ($providerCa | dig "configmap" "") ($providerCa | dig "key" "")) }}
+{{- fail "oauth2_proxy.provider_ca needs both `configmap` and `key`, e.g. {configmap: platform-ca-bundle, key: ca-certificates.crt}" }}
+{{- end }}
+{{- if .Environment.Values.tls_setup.self_signed }}
+{{- fail "oauth2_proxy.provider_ca is not used with tls_setup.self_signed, which already sets the provider's CA" }}
+{{- end }}
+{{- end }}
 extraEnv:
 {{- if .Environment.Values.tls_setup.self_signed }}
   - name: OAUTH2_PROXY_LOG_LEVEL
@@ -113,6 +127,10 @@ extraEnv:
 {{- else }}
   - name: OAUTH2_PROXY_LOG_LEVEL
     value: info
+{{- end }}
+{{- if $providerCa }}
+  - name: OAUTH2_PROXY_PROVIDER_CA_FILES
+    value: /etc/ssl/provider-ca/{{ $providerCa.key }}
 {{- end }}
 
 {{- if .Environment.Values.tls_setup.self_signed }}
@@ -127,6 +145,20 @@ extraVolumes:
 extraVolumeMounts:
   - name: celine-ca
     mountPath: /etc/ssl/celine-ca
+    readOnly: true
+{{- end }}
+{{- if $providerCa }}
+extraVolumes:
+  - name: provider-ca
+    configMap:
+      name: {{ $providerCa.configmap }}
+      items:
+        - key: {{ $providerCa.key }}
+          path: {{ $providerCa.key }}
+
+extraVolumeMounts:
+  - name: provider-ca
+    mountPath: /etc/ssl/provider-ca
     readOnly: true
 {{- end }}
 

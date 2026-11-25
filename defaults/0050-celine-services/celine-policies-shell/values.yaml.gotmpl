@@ -109,6 +109,14 @@ resources:
        but KC_HOSTNAME_ADMIN is global to the instance and moves anyway. Unchanged until the
        spike has measured it: the public host whenever admin_public is on. */}}
 {{- $masterFrontendUrl := ternary (.Environment.Values | dig "keycloak" "public_url" (printf "https://keycloak.%s" .Environment.Values.domain)) (printf "http://localhost:%d" (.Environment.Values | dig "keycloak" "admin_forward_port" 18080 | int)) $adminPublicOn }}
+{{- /* `keycloak.master_frontend_url` names master's outright: a shell whose own realm moved
+       to another host (keycloak.internal_ingress) keeps writing what the instance's other
+       shells write. `keycloak.realm_frontend_url`: this shell's realm's own frontendUrl, for a
+       realm served on another host than KC_HOSTNAME; unset, the realm is left alone. */}}
+{{- with .Environment.Values | dig "keycloak" "master_frontend_url" "" | toString | trimSuffix "/" }}
+{{- $masterFrontendUrl = . }}
+{{- end }}
+{{- $realmFrontendUrl := .Environment.Values | dig "keycloak" "realm_frontend_url" "" | toString | trimSuffix "/" }}
 keycloak:
   # The Keycloak Service inside the cluster, never the public host: the public host serves
   # no /admin and no /realms/master (defaults/0020-auth/keycloak), and bootstrap and sync
@@ -223,6 +231,7 @@ bootstrap:
   # disagree: master's Frontend URL must be it, or the console never signs in to master
   # (README, "Keycloak admin access").
   masterFrontendUrl: {{ $masterFrontendUrl | quote }}
+  realmFrontendUrl: {{ $realmFrontendUrl | quote }}
   overlay:
     {{- with .Environment.Values | dig "keycloak" "platform" (dict) }}
     {{- toYaml . | nindent 4 }}
