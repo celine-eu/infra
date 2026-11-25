@@ -8,7 +8,8 @@ spec:
   policyTypes:
     - Ingress
 ---
-{{- /* ...except from the namespace itself and the namespaces in `allowNamespaces`.
+{{- /* ...except from the namespace itself, the namespaces in `allowNamespaces` and the pods
+       in `allowPods` (namespace and pod selector in one peer: both must match).
        Egress stays open: no policy here selects it. */}}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -27,4 +28,14 @@ spec:
               - key: kubernetes.io/metadata.name
                 operator: In
                 values: {{ toJson . }}
+        {{- end }}
+        {{- range .Values.allowPods }}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .namespace | quote }}
+          podSelector:
+            matchLabels:
+              {{- range $k, $v := .labels }}
+              {{ $k }}: {{ $v | quote }}
+              {{- end }}
         {{- end }}

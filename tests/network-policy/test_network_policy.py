@@ -9,6 +9,8 @@ through helmfile (release `celine-network-policy`, group `core`).
 - The ingress controller's namespace is infra's Traefik (`ingress_controller.namespace`,
   default `ingress`) where infra installs it, else `ingress-nginx`, unless
   `network_policy.ingress_namespace` names another.
+- `network_policy.allow_pods` admits single workloads of another namespace: namespace and
+  pod labels in one peer (both must match); an entry without either stops the render.
 - `network_policy.pod_security` labels the namespace (enforce, warn, audit, version) from a
   presync hook; a level other than privileged, baseline or restricted stops the render.
 
@@ -184,3 +186,56 @@ def test_unknown_pod_security_level_stops_the_render():
     result = render("example", ON + "  pod_security:\n    enforce: strict\n")
     assert result.returncode != 0
     assert "pod_security.enforce" in result.stderr
+
+
+# ---------------------------------------------------------------------------
+# single workloads from other namespaces (network_policy.allow_pods)
+# ---------------------------------------------------------------------------
+
+PODS = ("  allow_pods:\n"
+        "    - namespace: celine-staging\n"
+        "      labels: {app.kubernetes.io/name: celine-provisioning}\n"
+        "    - namespace: celine-staging\n"
+        "      labels: {app.kubernetes.io/name: celine-member-mirror, app.kubernetes.io/instance: member-mirror}\n")
+
+
+def pod_peers(allow: dict) -> list[dict]:
+    return [p for r in allow["spec"]["ingress"] for p in r["from"]
+            if "namespaceSelector" in p and "podSelector" in p]
+
+
+def test_no_allow_pods_no_pod_peer(prod_like):
+    assert pod_peers(prod_like["allow-perimeter"]) == []
+
+
+def test_allow_pods_admits_only_the_labelled_pods_of_that_namespace():
+    pols = policies(render("example", ON + PODS))
+    peers = pod_peers(pols["allow-perimeter"])
+    assert peers == [
+        {"namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "celine-staging"}},
+         "podSelector": {"matchLabels": {"app.kubernetes.io/name": "celine-provisioning"}}},
+        {"namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "celine-staging"}},
+         "podSelector": {"matchLabels": {"app.kubernetes.io/instance": "member-mirror",
+                                         "app.kubernetes.io/name": "celine-member-mirror"}}},
+    ]
+    # the namespace itself is not widened to every pod
+    assert "celine-staging" not in allowed_namespaces(pols["allow-perimeter"])
+
+
+def test_allow_pods_both_peer_selectors_in_one_entry():
+    """namespaceSelector and podSelector in the same `from` entry mean AND; split into two
+    entries they would mean OR: every pod of that namespace, or those labels anywhere."""
+    pols = policies(render("example", ON + PODS))
+    for peer in pod_peers(pols["allow-perimeter"]):
+        assert set(peer) == {"namespaceSelector", "podSelector"}
+
+
+@pytest.mark.parametrize("entry, needle", [
+    ("    - labels: {a: b}\n", "allow_pods"),
+    ("    - namespace: celine-staging\n", "allow_pods"),
+    ("    - namespace: celine-staging\n      labels: {}\n", "allow_pods"),
+])
+def test_allow_pods_entry_without_namespace_or_labels_stops_the_render(entry, needle):
+    result = render("example", ON + "  allow_pods:\n" + entry)
+    assert result.returncode != 0
+    assert needle in result.stderr

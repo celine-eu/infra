@@ -367,6 +367,7 @@ does not set it renders unchanged.
 | `network_policy.enabled` | `false` unless set. `true` installs two NetworkPolicies: every pod refuses incoming connections, except from the namespace itself, the ingress controller's namespace and `cnpg` |
 | `network_policy.ingress_namespace` | the ingress controller's namespace. Default: `ingress_controller.namespace` where infra installs Traefik, else `ingress-nginx` |
 | `network_policy.allow_namespaces` | further namespaces allowed in (a dataspace calling celine, a metrics scraper), default none |
+| `network_policy.allow_pods` | single workloads of another namespace, `[{namespace, labels}]`: only that namespace's pods carrying every one of `labels` (a shared Keycloak admitting the one service that calls its Service). Both keys required, `labels` non-empty, or the render stops. Default none |
 | `network_policy.pod_security.{enforce,warn,audit}` | Pod Security Admission level per mode (`privileged`, `baseline`, `restricted`), set as namespace labels by a presync hook; any other value stops the render |
 | `network_policy.pod_security.version` | the policy version the labels pin, default `latest` |
 

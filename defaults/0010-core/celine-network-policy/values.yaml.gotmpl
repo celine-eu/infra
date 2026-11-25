@@ -3,7 +3,12 @@
          (`ingress_controller.namespace`, default `ingress`) where infra installs it, else
          `ingress-nginx`;
        - `cnpg`, whose operator reaches the Postgres instance pods;
-       - `network_policy.allow_namespaces`, any others (a dataspace calling celine, ...). */}}
+       - `network_policy.allow_namespaces`, any others (a dataspace calling celine, ...);
+       - `network_policy.allow_pods`, single workloads of another namespace: a list of
+         `{namespace, labels}`, each admitting only that namespace's pods carrying every one
+         of `labels` (a shared Keycloak admits the one service that calls its Service, not
+         the whole namespace). Both keys are required, `labels` non-empty: an entry without
+         them would admit a whole namespace, or those labels anywhere. */}}
 {{- $np := .Values | dig "network_policy" (dict) }}
 {{- $ic := .Values | dig "ingress_controller" (dict) }}
 {{- $ingressNs := "ingress-nginx" }}
@@ -12,3 +17,14 @@
 {{- end }}
 {{- $ingressNs = $np | dig "ingress_namespace" $ingressNs }}
 allowNamespaces: {{ concat (list $ingressNs "cnpg") ($np | dig "allow_namespaces" (list)) | uniq | toJson }}
+
+{{- $pods := list }}
+{{- range ($np | dig "allow_pods" (list)) }}
+{{- $ns := . | dig "namespace" "" | toString }}
+{{- $labels := . | dig "labels" (dict) }}
+{{- if or (not $ns) (not $labels) }}
+{{- fail (printf "network_policy.allow_pods: every entry needs `namespace` and non-empty `labels`, got %v" .) }}
+{{- end }}
+{{- $pods = append $pods (dict "namespace" $ns "labels" $labels) }}
+{{- end }}
+allowPods: {{ $pods | toJson }}
